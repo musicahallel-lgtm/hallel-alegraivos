@@ -32,26 +32,27 @@
 
         /* ── Header ── */
         .header {
-            background: var(--bg2); border-bottom:1px solid var(--border);
+            background: #ffffff; border-bottom:1px solid #e0e0e0;
             padding: 0 20px; position:sticky; top:0; z-index:100;
-            display:flex; align-items:center; height:60px; gap:16px;
+            display:flex; align-items:center; height:64px; gap:16px;
+            box-shadow: 0 2px 8px rgba(0,0,0,.08);
         }
         .logo {
             display:flex; align-items:center; gap:8px; white-space:nowrap; text-decoration:none;
         }
         .logo img {
-            height:44px; width:auto; object-fit:contain;
+            height:48px; width:auto; object-fit:contain;
         }
         .logo-alegraivos {
-            font-size:17px; font-weight:800; color:#2db85a; letter-spacing:.3px;
+            font-size:17px; font-weight:800; color:#007a32; letter-spacing:.3px;
         }
         .nav { display:flex; gap:4px; flex:1; }
         .nav-btn {
             padding:8px 16px; border-radius:var(--radius-sm); border:none;
-            background:transparent; color:var(--muted); cursor:pointer;
+            background:transparent; color:#555; cursor:pointer;
             font-size:14px; font-weight:600; transition:all .15s;
         }
-        .nav-btn:hover { background:var(--bg3); color:var(--text); }
+        .nav-btn:hover { background:#f0f0f0; color:#111; }
         .nav-btn.active { background:var(--purple); color:#fff; }
         .header-actions { display:flex; gap:8px; margin-left:auto; }
 
