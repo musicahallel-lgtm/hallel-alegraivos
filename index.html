@@ -233,49 +233,70 @@
         .pdf-badge-size { font-size:11px; color:var(--muted); }
 
         /* ── Stem Mixer ── */
-        .mixer-wrap { padding:14px; display:flex; flex-direction:column; gap:10px; }
+        .mixer-wrap { padding:12px; display:flex; flex-direction:column; gap:10px; }
+        .mixer-load-btn {
+            display:flex; align-items:center; justify-content:center; gap:10px;
+            padding:18px; border-radius:var(--radius-sm); border:2px dashed var(--purple);
+            background:transparent; color:var(--purple); font-size:15px; font-weight:700;
+            cursor:pointer; transition:all .2s; width:100%; font-family:inherit;
+        }
+        .mixer-load-btn:hover { background:rgba(0,150,63,.1); }
+        .mixer-progress-bar-wrap {
+            padding:16px 14px; background:var(--bg4); border-radius:var(--radius-sm);
+            display:none;
+        }
+        .mixer-progress-bar-label { font-size:13px; color:var(--muted); margin-bottom:8px; }
+        .mixer-progress-bar {
+            height:6px; background:var(--border); border-radius:3px; overflow:hidden;
+        }
+        .mixer-progress-bar-fill { height:100%; background:var(--purple); width:0%; transition:width .3s; border-radius:3px; }
         .mixer-transport {
-            display:flex; align-items:center; gap:10px; padding:10px 14px;
+            display:flex; align-items:center; gap:12px; padding:12px 14px;
             background:var(--bg4); border-radius:var(--radius-sm);
         }
         .mixer-play-btn {
-            width:40px; height:40px; border-radius:50%; border:none; cursor:pointer;
-            background:var(--purple); color:#fff; font-size:18px;
+            width:56px; height:56px; border-radius:50%; border:none; cursor:pointer;
+            background:var(--purple); color:#fff; font-size:22px;
             display:flex; align-items:center; justify-content:center; flex-shrink:0;
-            transition:all .15s;
+            transition:all .15s; touch-action:manipulation;
         }
-        .mixer-play-btn:hover { background:var(--purple-light); }
+        .mixer-play-btn:active { transform:scale(.93); }
         .mixer-time { font-size:13px; color:var(--muted); font-variant-numeric:tabular-nums; min-width:90px; }
-        .mixer-progress {
-            flex:1; height:4px; background:var(--border); border-radius:2px; cursor:pointer; position:relative;
+        .mixer-seek {
+            flex:1; height:10px; background:var(--border); border-radius:5px;
+            cursor:pointer; position:relative; touch-action:manipulation;
         }
-        .mixer-progress-fill { height:100%; background:var(--purple); border-radius:2px; width:0%; transition:width .1s linear; }
-        .mixer-stems { display:flex; flex-direction:column; gap:6px; }
+        .mixer-seek-fill { height:100%; background:var(--purple); border-radius:5px; width:0%; transition:width .1s linear; }
+        .mixer-stems { display:flex; flex-direction:column; gap:8px; }
         .stem-row {
-            display:grid; grid-template-columns:28px 100px 1fr 44px 44px;
-            align-items:center; gap:8px;
-            padding:7px 10px; background:var(--bg4); border-radius:var(--radius-sm);
+            display:grid; grid-template-columns:32px 1fr auto auto;
+            align-items:center; gap:10px;
+            padding:12px 12px; background:var(--bg4); border-radius:var(--radius-sm);
             transition:opacity .2s;
         }
-        .stem-row.muted { opacity:.35; }
-        .stem-emoji { font-size:16px; text-align:center; }
-        .stem-name { font-size:12px; font-weight:600; color:var(--text); }
+        .stem-row.muted { opacity:.3; }
+        .stem-emoji { font-size:20px; text-align:center; }
+        .stem-name-vol { display:flex; flex-direction:column; gap:6px; min-width:0; }
+        .stem-name { font-size:13px; font-weight:600; color:var(--text); }
         .stem-vol {
             -webkit-appearance:none; appearance:none;
-            width:100%; height:4px; border-radius:2px; outline:none;
+            width:100%; height:8px; border-radius:4px; outline:none;
             background: linear-gradient(to right, var(--purple) 80%, var(--border) 80%);
-            cursor:pointer;
+            cursor:pointer; touch-action:manipulation;
         }
         .stem-vol::-webkit-slider-thumb {
-            -webkit-appearance:none; width:14px; height:14px; border-radius:50%;
+            -webkit-appearance:none; width:26px; height:26px; border-radius:50%;
             background:var(--purple-light); cursor:pointer;
+            box-shadow:0 2px 6px rgba(0,0,0,.4);
         }
         .stem-btn {
-            padding:4px 6px; border-radius:4px; border:1px solid var(--border);
-            background:transparent; color:var(--muted); font-size:11px; font-weight:700;
-            cursor:pointer; transition:all .15s;
+            min-width:48px; height:48px; border-radius:var(--radius-sm);
+            border:2px solid var(--border);
+            background:transparent; color:var(--muted); font-size:13px; font-weight:800;
+            cursor:pointer; transition:all .15s; touch-action:manipulation;
+            display:flex; align-items:center; justify-content:center;
         }
-        .stem-btn:hover { border-color:var(--purple); color:var(--text); }
+        .stem-btn:active { transform:scale(.9); }
         .stem-btn.on { background:var(--purple); border-color:var(--purple); color:#fff; }
         .mixer-loading { padding:30px; text-align:center; color:var(--muted); font-size:13px; }
 
@@ -854,16 +875,24 @@ function detailModal(song) {
 
                     ${song.stemsPath?`<div class="dsec" style="margin-bottom:14px" id="mixer-wrap-${song.id}">
                         <div class="dsec-title">🎛 Mixer — Stems Separados</div>
-                        <div class="mixer-loading" id="mixer-loading-${song.id}">⏳ Carregando stems…</div>
-                        <div id="mixer-ui-${song.id}" style="display:none">
-                            <div class="mixer-transport">
-                                <button class="mixer-play-btn" id="mixer-play-${song.id}" onclick="mixerToggle('${song.id}')">▶</button>
-                                <span class="mixer-time" id="mixer-time-${song.id}">0:00 / 0:00</span>
-                                <div class="mixer-progress" onclick="mixerSeek(event,'${song.id}')">
-                                    <div class="mixer-progress-fill" id="mixer-prog-${song.id}"></div>
-                                </div>
+                        <div class="mixer-wrap">
+                            <button class="mixer-load-btn" id="mixer-load-btn-${song.id}" onclick="initMixer('${song.id}','${song.stemsPath}')">
+                                🎛 Carregar Mixer
+                            </button>
+                            <div class="mixer-progress-bar-wrap" id="mixer-prog-wrap-${song.id}">
+                                <div class="mixer-progress-bar-label" id="mixer-prog-label-${song.id}">Carregando…</div>
+                                <div class="mixer-progress-bar"><div class="mixer-progress-bar-fill" id="mixer-prog-bar-${song.id}"></div></div>
                             </div>
-                            <div class="mixer-stems" id="mixer-stems-${song.id}"></div>
+                            <div id="mixer-ui-${song.id}" style="display:none">
+                                <div class="mixer-transport">
+                                    <button class="mixer-play-btn" id="mixer-play-${song.id}" onclick="mixerToggle('${song.id}')">▶</button>
+                                    <span class="mixer-time" id="mixer-time-${song.id}">0:00 / 0:00</span>
+                                    <div class="mixer-seek" onclick="mixerSeek(event,'${song.id}')">
+                                        <div class="mixer-seek-fill" id="mixer-prog-${song.id}"></div>
+                                    </div>
+                                </div>
+                                <div class="mixer-stems" id="mixer-stems-${song.id}"></div>
+                            </div>
                         </div>
                     </div>`:''}
 
@@ -1163,7 +1192,6 @@ async function openDetail(id) {
         }
     }
     S.modal={type:'detail',data:s}; render();
-    maybeInitMixer(s);
 }
 
 function openAdd() {
@@ -1516,28 +1544,43 @@ const STEM_META = {
 async function initMixer(songId, stemsPath) {
     if (MIXERS[songId]) { showMixerUI(songId); return; }
 
+    // Esconde botão, mostra barra de progresso
+    const loadBtn = document.getElementById(`mixer-load-btn-${songId}`);
+    const progWrap = document.getElementById(`mixer-prog-wrap-${songId}`);
+    const progBar  = document.getElementById(`mixer-prog-bar-${songId}`);
+    const progLabel= document.getElementById(`mixer-prog-label-${songId}`);
+    if (loadBtn) loadBtn.style.display = 'none';
+    if (progWrap) progWrap.style.display = 'block';
+
     const stemNames = Object.keys(STEM_META);
     const ctx = new (window.AudioContext || window.webkitAudioContext)();
     const tracks = [];
+    let loaded = 0;
 
-    // Try to load each stem (skip 404s silently)
-    const results = await Promise.all(stemNames.map(async name => {
+    // Carrega um stem por vez para mostrar progresso real
+    for (const name of stemNames) {
         try {
             const res = await fetch(`${stemsPath}/${name}.mp3`);
-            if (!res.ok) return null;
+            if (!res.ok) continue;
             const buf = await res.arrayBuffer();
             const decoded = await ctx.decodeAudioData(buf);
-            return { name, decoded };
-        } catch { return null; }
-    }));
+            const gain = ctx.createGain();
+            gain.connect(ctx.destination);
+            tracks.push({ name, decoded, gain, muted: false, solo: false, vol: 1 });
+            loaded++;
+            const pct = Math.round((loaded / stemNames.length) * 100);
+            if (progBar)   progBar.style.width = pct + '%';
+            if (progLabel) progLabel.textContent = `Carregando… ${loaded} de ${stemNames.length}`;
+        } catch { /* stem não existe, pula */ }
+    }
 
-    results.filter(Boolean).forEach(({ name, decoded }) => {
-        const gain = ctx.createGain();
-        gain.connect(ctx.destination);
-        tracks.push({ name, decoded, gain, muted: false, solo: false, vol: 1 });
-    });
+    if (!tracks.length) {
+        if (progLabel) progLabel.textContent = '⚠️ Stems não encontrados.';
+        return;
+    }
 
-    MIXERS[songId] = { ctx, tracks, playing: false, startTime: 0, offset: 0, duration: tracks[0]?.decoded.duration || 0, raf: null };
+    MIXERS[songId] = { ctx, tracks, playing: false, startTime: 0, offset: 0,
+        duration: tracks[0].decoded.duration, raf: null };
     buildMixerUI(songId);
     showMixerUI(songId);
 }
@@ -1550,9 +1593,11 @@ function buildMixerUI(songId) {
         const meta = STEM_META[t.name] || { label: t.name, emoji: '🔊' };
         return `<div class="stem-row" id="stemrow-${songId}-${t.name}">
             <span class="stem-emoji">${meta.emoji}</span>
-            <span class="stem-name">${meta.label}</span>
-            <input type="range" class="stem-vol" min="0" max="1" step="0.01" value="1"
-                oninput="stemVol('${songId}','${t.name}',this.value)">
+            <div class="stem-name-vol">
+                <span class="stem-name">${meta.label}</span>
+                <input type="range" class="stem-vol" min="0" max="1" step="0.01" value="1"
+                    oninput="stemVol('${songId}','${t.name}',this.value)">
+            </div>
             <button class="stem-btn" id="stem-m-${songId}-${t.name}" onclick="stemMute('${songId}','${t.name}')">M</button>
             <button class="stem-btn" id="stem-s-${songId}-${t.name}" onclick="stemSolo('${songId}','${t.name}')">S</button>
         </div>`;
@@ -1561,9 +1606,9 @@ function buildMixerUI(songId) {
 }
 
 function showMixerUI(songId) {
-    const loading = document.getElementById(`mixer-loading-${songId}`);
+    const progWrap = document.getElementById(`mixer-prog-wrap-${songId}`);
     const ui = document.getElementById(`mixer-ui-${songId}`);
-    if (loading) loading.style.display = 'none';
+    if (progWrap) progWrap.style.display = 'none';
     if (ui) ui.style.display = 'block';
 }
 
