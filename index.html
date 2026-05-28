@@ -1677,10 +1677,16 @@ function maybeInitMixer(song) {
     // Remove músicas retiradas do repertório
     const removedSet = new Set(REMOVED.map(t => t.toLowerCase()));
     S.songs = S.songs.filter(s => !removedSet.has((s.title||'').toLowerCase()));
-    // Adiciona músicas novas do repertório oficial que ainda não estão salvas
+    // Adiciona músicas novas e sincroniza campos oficiais (ex: stemsPath, moisesUrl)
     SEED.forEach(seed => {
-        if (!S.songs.find(s => s.title.toLowerCase() === seed.title.toLowerCase())) {
+        const existing = S.songs.find(s => s.title.toLowerCase() === seed.title.toLowerCase());
+        if (!existing) {
             S.songs.push(seed);
+        } else {
+            // Sempre sincroniza campos técnicos do seed para o local
+            ['stemsPath','moisesUrl','youtubeUrl','spotifyUrl','deezerUrl'].forEach(k => {
+                if (seed[k]) existing[k] = seed[k];
+            });
         }
     });
     persist();
