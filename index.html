@@ -125,11 +125,22 @@
             font-size:11px; padding:2px 7px; border-radius:4px;
             background:var(--bg4); color:var(--muted); font-weight:500;
         }
-        .tag-yt  { color:#ff5555; }
-        .tag-sp  { color:#1DB954; }
-        .tag-dz  { color:#ef5466; }
-        .tag-bpm { color:var(--green); }
-        .tag-pdf { color:#60a5fa; }
+        .tag-yt     { color:#ff5555; }
+        .tag-sp     { color:#1DB954; }
+        .tag-dz     { color:#ef5466; }
+        .tag-bpm    { color:var(--green); }
+        .tag-pdf    { color:#60a5fa; }
+        .tag-moises { color:#f97316; }
+        .moises-btn {
+            display:flex; align-items:center; gap:10px; padding:12px 14px;
+            background:linear-gradient(135deg,rgba(249,115,22,.15),rgba(249,115,22,.05));
+            border:1px solid rgba(249,115,22,.4); border-radius:var(--radius-sm);
+            text-decoration:none; color:var(--text); transition:all .2s;
+        }
+        .moises-btn:hover { background:linear-gradient(135deg,rgba(249,115,22,.28),rgba(249,115,22,.1)); border-color:rgba(249,115,22,.7); }
+        .moises-logo { font-size:20px; }
+        .moises-label { font-weight:700; font-size:14px; color:#f97316; }
+        .moises-desc  { font-size:11px; color:var(--muted); margin-top:1px; }
 
         /* ── Set List Cards ── */
         .setlist-grid {
@@ -672,6 +683,7 @@ function songCard(s, i) {
             ${hasYt?`<span class="tag tag-yt">▶ YouTube</span>`:''}
             ${hasSp?`<span class="tag tag-sp">● Spotify</span>`:''}
             ${hasDz?`<span class="tag tag-dz">♫ Deezer</span>`:''}
+            ${s.moisesUrl?`<span class="tag tag-moises">◈ Moises</span>`:''}
             ${hasPdf?`<span class="tag tag-pdf">📄 PDF</span>`:''}
             ${s.reaperUrl?`<span class="tag">🎛 Reaper</span>`:''}
             ${s.bandUrl?`<span class="tag">🥁 Banda</span>`:''}
@@ -754,6 +766,20 @@ function detailModal(song) {
                         ${tab==='youtube'&&yt?`<div class="video-wrap"><iframe src="https://www.youtube.com/embed/${yt}?rel=0" allowfullscreen></iframe></div>`:''}
                         ${tab==='spotify'&&sp?`<iframe src="https://open.spotify.com/embed/track/${sp}" height="152" frameborder="0" allow="autoplay;clipboard-write;encrypted-media;fullscreen;picture-in-picture" style="width:100%"></iframe>`:''}
                         ${tab==='deezer'&&dz ?`<iframe src="https://widget.deezer.com/widget/dark/track/${dz}" height="152" frameborder="0" style="width:100%"></iframe>`:''}
+                    </div>`:''}
+
+                    ${song.moisesUrl?`<div class="dsec" style="margin-bottom:14px">
+                        <div class="dsec-title">◈ Moises</div>
+                        <div style="padding:10px">
+                            <a href="${song.moisesUrl}" target="_blank" class="moises-btn">
+                                <span class="moises-logo">◈</span>
+                                <div>
+                                    <div class="moises-label">Abrir no Moises</div>
+                                    <div class="moises-desc">Stems separados — voz, guitarra, bateria, baixo</div>
+                                </div>
+                                <span style="margin-left:auto;font-size:18px">↗</span>
+                            </a>
+                        </div>
                     </div>`:''}
 
                     ${(song.reaperUrl||song.bandUrl)?`<div class="dsec">
@@ -895,6 +921,12 @@ function addModal(v) {
 
                 <div class="fg full"><div class="divider"></div></div>
 
+                <div class="fg full">
+                    <label>◈ Moises — Link da música separada</label>
+                    <input type="url" id="f_mo" value="${esc(v.moisesUrl)}" placeholder="https://studio.moises.ai/library/…"
+                           style="border-color:rgba(249,115,22,.3)">
+                    <span style="font-size:11px;color:#f97316;margin-top:2px">Cole o link da música no Moises → qualquer um da equipe abre direto com os stems separados</span>
+                </div>
                 <div class="fg full"><label>🎛 Reaper (Drive — por instrumento)</label>
                     <input type="url" id="f_rp" value="${esc(v.reaperUrl)}" placeholder="https://drive.google.com/…"></div>
                 <div class="fg full"><label>🥁 Metrônomo + Voz (Drive — ensaio banda)</label>
@@ -1070,6 +1102,7 @@ async function saveSong(eid) {
         youtubeUrl: document.getElementById('f_yt')?.value?.trim()||'',
         spotifyUrl: document.getElementById('f_sp')?.value?.trim()||'',
         deezerUrl:  document.getElementById('f_dz')?.value?.trim()||'',
+        moisesUrl:  document.getElementById('f_mo')?.value?.trim()||'',
         reaperUrl:  document.getElementById('f_rp')?.value?.trim()||'',
         bandUrl:    document.getElementById('f_bd')?.value?.trim()||'',
         chords:  document.getElementById('f_ch')?.value||'',
