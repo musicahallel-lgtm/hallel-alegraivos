@@ -261,12 +261,19 @@
             transition:all .15s; touch-action:manipulation;
         }
         .mixer-play-btn:active { transform:scale(.93); }
-        .mixer-time { font-size:13px; color:var(--muted); font-variant-numeric:tabular-nums; min-width:90px; }
-        .mixer-seek {
-            flex:1; height:10px; background:var(--border); border-radius:5px;
-            cursor:pointer; position:relative; touch-action:manipulation;
+        .mixer-transport { flex-wrap:wrap; }
+        .mixer-time { font-size:14px; color:var(--muted); font-variant-numeric:tabular-nums; white-space:nowrap; }
+        .mixer-seek-input {
+            -webkit-appearance:none; appearance:none;
+            width:100%; height:8px; border-radius:4px; outline:none;
+            background: linear-gradient(to right, var(--purple) 0%, var(--border) 0%);
+            cursor:pointer; touch-action:manipulation; flex:1; min-width:0;
         }
-        .mixer-seek-fill { height:100%; background:var(--purple); border-radius:5px; width:0%; transition:width .1s linear; }
+        .mixer-seek-input::-webkit-slider-thumb {
+            -webkit-appearance:none; width:28px; height:28px; border-radius:50%;
+            background:#fff; cursor:pointer; border:3px solid var(--purple);
+            box-shadow:0 2px 8px rgba(0,0,0,.5);
+        }
         .mixer-stems { display:flex; flex-direction:column; gap:8px; }
         .stem-row {
             display:grid; grid-template-columns:32px 1fr auto auto;
@@ -886,10 +893,11 @@ function detailModal(song) {
                             <div id="mixer-ui-${song.id}" style="display:none">
                                 <div class="mixer-transport">
                                     <button class="mixer-play-btn" id="mixer-play-${song.id}" onclick="mixerToggle('${song.id}')">▶</button>
+                                    <input type="range" class="mixer-seek-input" id="mixer-prog-${song.id}"
+                                        min="0" max="1000" value="0" step="1"
+                                        oninput="mixerSeekRange(this,'${song.id}')"
+                                        style="flex:1">
                                     <span class="mixer-time" id="mixer-time-${song.id}">0:00 / 0:00</span>
-                                    <div class="mixer-seek" onclick="mixerSeek(event,'${song.id}')">
-                                        <div class="mixer-seek-fill" id="mixer-prog-${song.id}"></div>
-                                    </div>
                                 </div>
                                 <div class="mixer-stems" id="mixer-stems-${song.id}"></div>
                             </div>
@@ -1646,12 +1654,11 @@ function mixerPause(songId) {
     document.getElementById(`mixer-play-${songId}`).textContent = '▶';
 }
 
-function mixerSeek(e, songId) {
+function mixerSeek(e, songId) { /* legado */ }
+function mixerSeekRange(input, songId) {
     const m = MIXERS[songId];
     if (!m) return;
-    const rect = e.currentTarget.getBoundingClientRect();
-    const pct = (e.clientX - rect.left) / rect.width;
-    m.offset = pct * m.duration;
+    m.offset = (input.value / 1000) * m.duration;
     if (m.playing) { mixerPause(songId); mixerPlay(songId); }
     updateMixerTime(songId);
 }
@@ -1666,12 +1673,17 @@ function mixerTick(songId) {
 function updateMixerTime(songId) {
     const m = MIXERS[songId];
     if (!m) return;
-    const cur = m.playing ? m.ctx.currentTime - m.startTime : m.offset;
+    const cur = Math.min(m.playing ? m.ctx.currentTime - m.startTime : m.offset, m.duration);
     const fmt = s => `${Math.floor(s/60)}:${String(Math.floor(s%60)).padStart(2,'0')}`;
+    const pct = m.duration > 0 ? cur / m.duration : 0;
     const timeEl = document.getElementById(`mixer-time-${songId}`);
-    const progEl = document.getElementById(`mixer-prog-${songId}`);
+    const seekEl = document.getElementById(`mixer-prog-${songId}`);
     if (timeEl) timeEl.textContent = `${fmt(cur)} / ${fmt(m.duration)}`;
-    if (progEl) progEl.style.width = `${Math.min(100, (cur / m.duration) * 100)}%`;
+    if (seekEl) {
+        seekEl.value = Math.round(pct * 1000);
+        const p = pct * 100;
+        seekEl.style.background = `linear-gradient(to right, var(--purple) ${p}%, var(--border) ${p}%)`;
+    }
 }
 
 function stemVol(songId, name, val) {
