@@ -534,26 +534,37 @@ function hydrate() {
 }
 
 // ═══════════════════════════════════════════════
-//  SEED DATA  (only if library is empty)
+//  REPERTÓRIO OFICIAL — editado pelo administrador
+//  Adicionar: inclua uma entrada em SEED
+//  Remover:   adicione o título em REMOVED
 // ═══════════════════════════════════════════════
 const SEED = [
     {
-        id:'seed1', title:'Templo Vivo', artist:'Hallel Ano 10',
-        key:'G', bpm:0, category:'Adoração',
-        youtubeUrl:'https://youtu.be/rp3pv94cuns',
-        spotifyUrl:'', deezerUrl:'', reaperUrl:'', bandUrl:'',
-        chords:`[G]Templo vivo [D]Tu és, Senhor\n[Em]Em meu coração [C]Tu habitas\n\n[G]Gloria [D]ao teu nome [Em]eterno [C]Rei`,
-        notes:'Repertório 2026'
+        id:'seed-vou-voar',
+        title:'Vou Voar',
+        artist:'Missionários Shalom',
+        key:'E', bpm:'130', category:'',
+        youtubeUrl:'https://www.youtube.com/watch?v=S2-17yPmt5A',
+        spotifyUrl:'https://open.spotify.com/intl-pt/track/6ykYgXNMUwLVUcDZG1mPKC',
+        deezerUrl:'',
+        moisesUrl:'https://studio.moises.ai/player2/d8ea5223-05b9-49d6-9957-4228c6994723',
+        reaperUrl:'', bandUrl:'', chords:'', notes:''
     },
     {
-        id:'seed2', title:'Dança de Avivamento', artist:'Hallel Ano 10',
-        key:'D', bpm:0, category:'Louvor',
-        youtubeUrl:'https://youtu.be/SMxh1zDi4ic',
-        spotifyUrl:'', deezerUrl:'', reaperUrl:'', bandUrl:'',
-        chords:`[D]Dança de [A]avivamento\n[Bm]O Espírito [G]está aqui\n\n[D]Fogo do [A]céu desça agora\n[Bm]Renova [G]o teu povo`,
-        notes:'Repertório 2026'
+        id:'seed-ora-que-melhora',
+        title:'Ora que Melhora',
+        artist:'Fraternidade o Caminho',
+        key:'Em', bpm:'130', category:'',
+        youtubeUrl:'https://www.youtube.com/watch?v=VTJV0Gro8v8',
+        spotifyUrl:'https://open.spotify.com/intl-pt/track/4wTjOJCTto1WE5COsQYgFP',
+        deezerUrl:'',
+        moisesUrl:'https://studio.moises.ai/player2/94e95d21-3834-4a50-9576-bac32d5ab6d4',
+        reaperUrl:'', bandUrl:'', chords:'', notes:''
     },
 ];
+
+// Músicas retiradas do repertório — removidas automaticamente ao abrir o app
+const REMOVED = ['Templo Vivo', 'Dança de Avivamento'];
 
 // ═══════════════════════════════════════════════
 //  UTILS
@@ -1413,7 +1424,16 @@ function plPrev() { plGoTo(S.pl.idx - 1); }
 // ═══════════════════════════════════════════════
 (async () => {
     hydrate();
-    if (S.songs.length===0) { S.songs=SEED; persist(); }
+    // Remove músicas retiradas do repertório
+    const removedSet = new Set(REMOVED.map(t => t.toLowerCase()));
+    S.songs = S.songs.filter(s => !removedSet.has((s.title||'').toLowerCase()));
+    // Adiciona músicas novas do repertório oficial que ainda não estão salvas
+    SEED.forEach(seed => {
+        if (!S.songs.find(s => s.title.toLowerCase() === seed.title.toLowerCase())) {
+            S.songs.push(seed);
+        }
+    });
+    persist();
     await openDB();
     await loadPdfIndex();
     // Load YouTube IFrame API (async, no blocking)
