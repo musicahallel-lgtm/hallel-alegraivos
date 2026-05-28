@@ -769,16 +769,19 @@ function detailModal(song) {
                     </div>`:''}
 
                     ${song.moisesUrl?`<div class="dsec" style="margin-bottom:14px">
-                        <div class="dsec-title">◈ Moises</div>
-                        <div style="padding:10px">
-                            <a href="${song.moisesUrl}" target="_blank" class="moises-btn">
-                                <span class="moises-logo">◈</span>
-                                <div>
-                                    <div class="moises-label">Abrir no Moises</div>
-                                    <div class="moises-desc">Stems separados — voz, guitarra, bateria, baixo</div>
-                                </div>
-                                <span style="margin-left:auto;font-size:18px">↗</span>
-                            </a>
+                        <div class="dsec-title" style="display:flex;align-items:center;justify-content:space-between">
+                            <span>◈ Moises — Stems Separados</span>
+                            <a href="${song.moisesUrl}" target="_blank" style="font-size:11px;color:#f97316;text-decoration:none;opacity:.8">Abrir em nova aba ↗</a>
+                        </div>
+                        <div style="padding:10px 10px 12px">
+                            <iframe
+                                src="${song.moisesUrl}"
+                                style="width:100%;height:420px;border:none;border-radius:10px;background:#111"
+                                allow="autoplay; encrypted-media"
+                                allowfullscreen
+                                loading="lazy"
+                                title="Moises Player"
+                            ></iframe>
                         </div>
                     </div>`:''}
 
