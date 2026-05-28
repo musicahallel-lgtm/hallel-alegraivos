@@ -232,6 +232,53 @@
         .pdf-badge-name { flex:1; font-size:13px; font-weight:600; color:#60a5fa; }
         .pdf-badge-size { font-size:11px; color:var(--muted); }
 
+        /* ── Stem Mixer ── */
+        .mixer-wrap { padding:14px; display:flex; flex-direction:column; gap:10px; }
+        .mixer-transport {
+            display:flex; align-items:center; gap:10px; padding:10px 14px;
+            background:var(--bg4); border-radius:var(--radius-sm);
+        }
+        .mixer-play-btn {
+            width:40px; height:40px; border-radius:50%; border:none; cursor:pointer;
+            background:var(--purple); color:#fff; font-size:18px;
+            display:flex; align-items:center; justify-content:center; flex-shrink:0;
+            transition:all .15s;
+        }
+        .mixer-play-btn:hover { background:var(--purple-light); }
+        .mixer-time { font-size:13px; color:var(--muted); font-variant-numeric:tabular-nums; min-width:90px; }
+        .mixer-progress {
+            flex:1; height:4px; background:var(--border); border-radius:2px; cursor:pointer; position:relative;
+        }
+        .mixer-progress-fill { height:100%; background:var(--purple); border-radius:2px; width:0%; transition:width .1s linear; }
+        .mixer-stems { display:flex; flex-direction:column; gap:6px; }
+        .stem-row {
+            display:grid; grid-template-columns:28px 100px 1fr 44px 44px;
+            align-items:center; gap:8px;
+            padding:7px 10px; background:var(--bg4); border-radius:var(--radius-sm);
+            transition:opacity .2s;
+        }
+        .stem-row.muted { opacity:.35; }
+        .stem-emoji { font-size:16px; text-align:center; }
+        .stem-name { font-size:12px; font-weight:600; color:var(--text); }
+        .stem-vol {
+            -webkit-appearance:none; appearance:none;
+            width:100%; height:4px; border-radius:2px; outline:none;
+            background: linear-gradient(to right, var(--purple) 80%, var(--border) 80%);
+            cursor:pointer;
+        }
+        .stem-vol::-webkit-slider-thumb {
+            -webkit-appearance:none; width:14px; height:14px; border-radius:50%;
+            background:var(--purple-light); cursor:pointer;
+        }
+        .stem-btn {
+            padding:4px 6px; border-radius:4px; border:1px solid var(--border);
+            background:transparent; color:var(--muted); font-size:11px; font-weight:700;
+            cursor:pointer; transition:all .15s;
+        }
+        .stem-btn:hover { border-color:var(--purple); color:var(--text); }
+        .stem-btn.on { background:var(--purple); border-color:var(--purple); color:#fff; }
+        .mixer-loading { padding:30px; text-align:center; color:var(--muted); font-size:13px; }
+
         /* ── Song Detail ── */
         .detail-grid { display:grid; grid-template-columns:1fr 1fr; gap:18px; }
         .dsec { background:var(--bg3); border-radius:var(--radius-sm); overflow:hidden; }
@@ -568,6 +615,7 @@ const SEED = [
         spotifyUrl:'https://open.spotify.com/intl-pt/track/4wTjOJCTto1WE5COsQYgFP',
         deezerUrl:'',
         moisesUrl:'https://studio.moises.ai/player2/94e95d21-3834-4a50-9576-bac32d5ab6d4',
+        stemsPath:'stems/ora-que-melhora',
         reaperUrl:'', bandUrl:'', chords:'', notes:''
     },
 ];
@@ -802,6 +850,21 @@ function detailModal(song) {
                                 loading="lazy"
                                 title="Moises Player"
                             ></iframe>
+                        </div>
+                    </div>`:''}
+
+                    ${song.stemsPath?`<div class="dsec" style="margin-bottom:14px" id="mixer-wrap-${song.id}">
+                        <div class="dsec-title">🎛 Mixer — Stems Separados</div>
+                        <div class="mixer-loading" id="mixer-loading-${song.id}">⏳ Carregando stems…</div>
+                        <div id="mixer-ui-${song.id}" style="display:none">
+                            <div class="mixer-transport">
+                                <button class="mixer-play-btn" id="mixer-play-${song.id}" onclick="mixerToggle('${song.id}')">▶</button>
+                                <span class="mixer-time" id="mixer-time-${song.id}">0:00 / 0:00</span>
+                                <div class="mixer-progress" onclick="mixerSeek(event,'${song.id}')">
+                                    <div class="mixer-progress-fill" id="mixer-prog-${song.id}"></div>
+                                </div>
+                            </div>
+                            <div class="mixer-stems" id="mixer-stems-${song.id}"></div>
                         </div>
                     </div>`:''}
 
@@ -1101,6 +1164,7 @@ async function openDetail(id) {
         }
     }
     S.modal={type:'detail',data:s}; render();
+    maybeInitMixer(s);
 }
 
 function openAdd() {
@@ -1427,6 +1491,182 @@ function plGoTo(idx) {
 
 function plNext() { plGoTo(S.pl.idx + 1); }
 function plPrev() { plGoTo(S.pl.idx - 1); }
+
+// ═══════════════════════════════════════════════
+//  STEM MIXER  (Web Audio API)
+// ═══════════════════════════════════════════════
+const MIXERS = {}; // songId → mixer state
+
+const STEM_META = {
+    vocals:        { label:'Voz',         emoji:'🎤' },
+    backing_vocals:{ label:'Back Vocal',  emoji:'🎤' },
+    drums:         { label:'Bateria',     emoji:'🥁' },
+    bass:          { label:'Baixo',       emoji:'🎸' },
+    electric:      { label:'Elétrica',    emoji:'🎸' },
+    acoustic:      { label:'Acústica',    emoji:'🎸' },
+    piano:         { label:'Piano',       emoji:'🎹' },
+    keys:          { label:'Keys',        emoji:'⌨️' },
+    strings:       { label:'Cordas',      emoji:'🎻' },
+    wind:          { label:'Sopros',      emoji:'🎷' },
+    metronome:     { label:'Metrônomo',   emoji:'🎚' },
+    other:         { label:'Outros',      emoji:'🔊' },
+};
+
+async function initMixer(songId, stemsPath) {
+    if (MIXERS[songId]) { showMixerUI(songId); return; }
+
+    const stemNames = Object.keys(STEM_META);
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const tracks = [];
+
+    // Try to load each stem (skip 404s silently)
+    const results = await Promise.all(stemNames.map(async name => {
+        try {
+            const res = await fetch(`${stemsPath}/${name}.mp3`);
+            if (!res.ok) return null;
+            const buf = await res.arrayBuffer();
+            const decoded = await ctx.decodeAudioData(buf);
+            return { name, decoded };
+        } catch { return null; }
+    }));
+
+    results.filter(Boolean).forEach(({ name, decoded }) => {
+        const gain = ctx.createGain();
+        gain.connect(ctx.destination);
+        tracks.push({ name, decoded, gain, muted: false, solo: false, vol: 1 });
+    });
+
+    MIXERS[songId] = { ctx, tracks, playing: false, startTime: 0, offset: 0, duration: tracks[0]?.decoded.duration || 0, raf: null };
+    buildMixerUI(songId);
+    showMixerUI(songId);
+}
+
+function buildMixerUI(songId) {
+    const m = MIXERS[songId];
+    const stemsEl = document.getElementById(`mixer-stems-${songId}`);
+    if (!stemsEl) return;
+    stemsEl.innerHTML = m.tracks.map(t => {
+        const meta = STEM_META[t.name] || { label: t.name, emoji: '🔊' };
+        return `<div class="stem-row" id="stemrow-${songId}-${t.name}">
+            <span class="stem-emoji">${meta.emoji}</span>
+            <span class="stem-name">${meta.label}</span>
+            <input type="range" class="stem-vol" min="0" max="1" step="0.01" value="1"
+                oninput="stemVol('${songId}','${t.name}',this.value)">
+            <button class="stem-btn" id="stem-m-${songId}-${t.name}" onclick="stemMute('${songId}','${t.name}')">M</button>
+            <button class="stem-btn" id="stem-s-${songId}-${t.name}" onclick="stemSolo('${songId}','${t.name}')">S</button>
+        </div>`;
+    }).join('');
+    updateMixerTime(songId);
+}
+
+function showMixerUI(songId) {
+    const loading = document.getElementById(`mixer-loading-${songId}`);
+    const ui = document.getElementById(`mixer-ui-${songId}`);
+    if (loading) loading.style.display = 'none';
+    if (ui) ui.style.display = 'block';
+}
+
+function mixerToggle(songId) {
+    const m = MIXERS[songId];
+    if (!m) return;
+    if (m.playing) { mixerPause(songId); } else { mixerPlay(songId); }
+}
+
+function mixerPlay(songId) {
+    const m = MIXERS[songId];
+    if (!m || m.playing) return;
+    if (m.ctx.state === 'suspended') m.ctx.resume();
+    const when = m.ctx.currentTime;
+    m.sources = m.tracks.map(t => {
+        const src = m.ctx.createBufferSource();
+        src.buffer = t.decoded;
+        src.connect(t.gain);
+        src.start(when, m.offset);
+        return src;
+    });
+    m.startTime = when - m.offset;
+    m.playing = true;
+    document.getElementById(`mixer-play-${songId}`).textContent = '⏸';
+    mixerTick(songId);
+}
+
+function mixerPause(songId) {
+    const m = MIXERS[songId];
+    if (!m || !m.playing) return;
+    m.offset = m.ctx.currentTime - m.startTime;
+    m.sources?.forEach(s => { try { s.stop(); } catch {} });
+    m.playing = false;
+    cancelAnimationFrame(m.raf);
+    document.getElementById(`mixer-play-${songId}`).textContent = '▶';
+}
+
+function mixerSeek(e, songId) {
+    const m = MIXERS[songId];
+    if (!m) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const pct = (e.clientX - rect.left) / rect.width;
+    m.offset = pct * m.duration;
+    if (m.playing) { mixerPause(songId); mixerPlay(songId); }
+    updateMixerTime(songId);
+}
+
+function mixerTick(songId) {
+    const m = MIXERS[songId];
+    if (!m || !m.playing) return;
+    updateMixerTime(songId);
+    m.raf = requestAnimationFrame(() => mixerTick(songId));
+}
+
+function updateMixerTime(songId) {
+    const m = MIXERS[songId];
+    if (!m) return;
+    const cur = m.playing ? m.ctx.currentTime - m.startTime : m.offset;
+    const fmt = s => `${Math.floor(s/60)}:${String(Math.floor(s%60)).padStart(2,'0')}`;
+    const timeEl = document.getElementById(`mixer-time-${songId}`);
+    const progEl = document.getElementById(`mixer-prog-${songId}`);
+    if (timeEl) timeEl.textContent = `${fmt(cur)} / ${fmt(m.duration)}`;
+    if (progEl) progEl.style.width = `${Math.min(100, (cur / m.duration) * 100)}%`;
+}
+
+function stemVol(songId, name, val) {
+    const m = MIXERS[songId];
+    const t = m?.tracks.find(t => t.name === name);
+    if (t) { t.vol = parseFloat(val); t.gain.gain.value = t.muted ? 0 : t.vol; }
+    // Update slider gradient
+    const el = document.querySelector(`#stemrow-${songId}-${name} .stem-vol`);
+    if (el) el.style.background = `linear-gradient(to right, var(--purple) ${val*100}%, var(--border) ${val*100}%)`;
+}
+
+function stemMute(songId, name) {
+    const m = MIXERS[songId];
+    const t = m?.tracks.find(t => t.name === name);
+    if (!t) return;
+    t.muted = !t.muted;
+    t.gain.gain.value = t.muted ? 0 : t.vol;
+    document.getElementById(`stemrow-${songId}-${name}`)?.classList.toggle('muted', t.muted);
+    document.getElementById(`stem-m-${songId}-${name}`)?.classList.toggle('on', t.muted);
+}
+
+function stemSolo(songId, name) {
+    const m = MIXERS[songId];
+    if (!m) return;
+    const t = m.tracks.find(t => t.name === name);
+    if (!t) return;
+    t.solo = !t.solo;
+    const anySolo = m.tracks.some(t => t.solo);
+    m.tracks.forEach(tr => {
+        const active = !anySolo || tr.solo;
+        tr.gain.gain.value = active && !tr.muted ? tr.vol : 0;
+        document.getElementById(`stemrow-${songId}-${tr.name}`)?.classList.toggle('muted', !active);
+    });
+    document.getElementById(`stem-s-${songId}-${name}`)?.classList.toggle('on', t.solo);
+}
+
+// Auto-init mixer when detail modal opens (if song has stemsPath)
+function maybeInitMixer(song) {
+    if (!song.stemsPath) return;
+    setTimeout(() => initMixer(song.id, song.stemsPath), 100);
+}
 
 // ═══════════════════════════════════════════════
 //  INIT
