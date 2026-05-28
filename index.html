@@ -1,0 +1,1391 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hallel — Alegraivos</title>
+    <style>
+        :root {
+            --purple: #7c3aed;
+            --purple-light: #a78bfa;
+            --purple-dark: #5b21b6;
+            --gold: #f59e0b;
+            --gold-light: #fcd34d;
+            --bg:   #0c0c1d;
+            --bg2:  #13132b;
+            --bg3:  #1e1e3a;
+            --bg4:  #252550;
+            --border: #2d2d5e;
+            --text:   #e2e2f0;
+            --muted:  #8080a0;
+            --green:  #10b981;
+            --red:    #ef4444;
+            --radius: 12px;
+            --radius-sm: 8px;
+        }
+        * { margin:0; padding:0; box-sizing:border-box; }
+        html,body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg); color: var(--text); min-height:100vh; overflow-x:hidden;
+        }
+
+        /* ── Header ── */
+        .header {
+            background: var(--bg2); border-bottom:1px solid var(--border);
+            padding: 0 20px; position:sticky; top:0; z-index:100;
+            display:flex; align-items:center; height:60px; gap:16px;
+        }
+        .logo { font-size:19px; font-weight:800; color:var(--gold); white-space:nowrap; }
+        .logo span { color:var(--purple-light); }
+        .nav { display:flex; gap:4px; flex:1; }
+        .nav-btn {
+            padding:8px 16px; border-radius:var(--radius-sm); border:none;
+            background:transparent; color:var(--muted); cursor:pointer;
+            font-size:14px; font-weight:600; transition:all .15s;
+        }
+        .nav-btn:hover { background:var(--bg3); color:var(--text); }
+        .nav-btn.active { background:var(--purple); color:#fff; }
+        .header-actions { display:flex; gap:8px; margin-left:auto; }
+
+        /* ── Buttons ── */
+        .btn {
+            padding:9px 18px; border-radius:var(--radius-sm); border:none;
+            cursor:pointer; font-size:14px; font-weight:600; transition:all .15s;
+            display:inline-flex; align-items:center; gap:6px; white-space:nowrap;
+            font-family:inherit;
+        }
+        .btn-primary  { background:var(--purple); color:#fff; }
+        .btn-primary:hover { background:var(--purple-light); color:#0c0c1d; }
+        .btn-gold     { background:var(--gold); color:#1a0a00; }
+        .btn-gold:hover { background:var(--gold-light); }
+        .btn-ghost    { background:transparent; color:var(--muted); border:1px solid var(--border); }
+        .btn-ghost:hover { background:var(--bg3); color:var(--text); }
+        .btn-danger   { background:var(--red); color:#fff; }
+        .btn-danger:hover { opacity:.85; }
+        .btn-sm  { padding:6px 12px; font-size:13px; }
+        .btn-icon{ padding:7px; }
+
+        /* ── Main ── */
+        .main { max-width:1200px; margin:0 auto; padding:24px 20px; }
+        .section-header {
+            display:flex; align-items:center; justify-content:space-between; margin-bottom:20px;
+        }
+        .section-title { font-size:20px; font-weight:700; }
+        .section-count {
+            font-size:12px; color:var(--muted); background:var(--bg3);
+            padding:3px 10px; border-radius:20px;
+        }
+
+        /* ── Toolbar ── */
+        .toolbar { display:flex; gap:12px; margin-bottom:24px; flex-wrap:wrap; }
+        .search-wrap { flex:1; min-width:200px; position:relative; }
+        .search-wrap .si {
+            position:absolute; left:12px; top:50%; transform:translateY(-50%);
+            color:var(--muted); font-size:15px; pointer-events:none;
+        }
+        .search-input {
+            width:100%; padding:10px 12px 10px 36px;
+            background:var(--bg3); border:1px solid var(--border);
+            border-radius:var(--radius-sm); color:var(--text); font-size:14px;
+        }
+        .search-input:focus { outline:none; border-color:var(--purple); }
+        select {
+            padding:10px 12px; background:var(--bg3); border:1px solid var(--border);
+            border-radius:var(--radius-sm); color:var(--text); font-size:14px; cursor:pointer;
+        }
+        select:focus { outline:none; border-color:var(--purple); }
+
+        /* ── Song Grid ── */
+        .songs-grid {
+            display:grid; grid-template-columns:repeat(auto-fill,minmax(270px,1fr)); gap:14px;
+        }
+        .song-card {
+            background:var(--bg2); border:1px solid var(--border);
+            border-radius:var(--radius); padding:16px;
+            cursor:pointer; transition:all .15s; position:relative;
+        }
+        .song-card:hover {
+            border-color:var(--purple); background:var(--bg3); transform:translateY(-2px);
+            box-shadow:0 8px 30px rgba(124,58,237,.15);
+        }
+        .card-top { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
+        .song-num {
+            background:var(--purple); color:#fff; width:28px; height:28px;
+            border-radius:50%; display:flex; align-items:center; justify-content:center;
+            font-size:12px; font-weight:700; flex-shrink:0;
+        }
+        .key-badge {
+            background:var(--bg4); color:var(--gold); padding:3px 8px;
+            border-radius:4px; font-size:12px; font-weight:700;
+        }
+        .song-title { font-size:16px; font-weight:700; margin-bottom:3px; }
+        .song-artist { font-size:13px; color:var(--muted); margin-bottom:10px; min-height:18px; }
+        .song-tags { display:flex; gap:5px; flex-wrap:wrap; }
+        .tag {
+            font-size:11px; padding:2px 7px; border-radius:4px;
+            background:var(--bg4); color:var(--muted); font-weight:500;
+        }
+        .tag-yt  { color:#ff5555; }
+        .tag-sp  { color:#1DB954; }
+        .tag-dz  { color:#ef5466; }
+        .tag-bpm { color:var(--green); }
+        .tag-pdf { color:#60a5fa; }
+
+        /* ── Set List Cards ── */
+        .setlist-grid {
+            display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:16px;
+        }
+        .setlist-card {
+            background:var(--bg2); border:1px solid var(--border);
+            border-radius:var(--radius); padding:20px;
+            cursor:pointer; transition:all .15s;
+        }
+        .setlist-card:hover { border-color:var(--purple); transform:translateY(-2px); }
+        .setlist-name { font-size:18px; font-weight:700; margin-bottom:4px; }
+        .setlist-date { font-size:13px; color:var(--muted); margin-bottom:10px; }
+        .setlist-count { font-size:13px; color:var(--purple-light); font-weight:600; }
+        .setlist-preview { margin-top:10px; font-size:13px; color:var(--muted); }
+        .setlist-preview div { padding:2px 0; }
+
+        /* ── Modal ── */
+        .backdrop {
+            position:fixed; inset:0; background:rgba(0,0,0,.72); z-index:200;
+            display:flex; align-items:flex-start; justify-content:center;
+            padding:20px; overflow-y:auto;
+        }
+        .modal {
+            background:var(--bg2); border:1px solid var(--border);
+            border-radius:var(--radius); width:100%; max-width:840px;
+            margin:auto; position:relative;
+        }
+        .modal-hd {
+            padding:20px 24px; border-bottom:1px solid var(--border);
+            display:flex; align-items:center; gap:12px; flex-wrap:wrap;
+        }
+        .modal-title { font-size:20px; font-weight:700; flex:1; min-width:0; }
+        .modal-body { padding:24px; }
+        .modal-ft {
+            padding:14px 24px; border-top:1px solid var(--border);
+            display:flex; gap:8px; justify-content:flex-end; flex-wrap:wrap;
+        }
+        .close-btn {
+            background:transparent; border:none; color:var(--muted);
+            font-size:22px; cursor:pointer; padding:4px; line-height:1; flex-shrink:0;
+        }
+        .close-btn:hover { color:var(--text); }
+
+        /* ── Form ── */
+        .form-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+        .fg { display:flex; flex-direction:column; gap:6px; }
+        .fg.full { grid-column:1/-1; }
+        label { font-size:12px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.5px; }
+        input[type=text],input[type=url],input[type=number],select.field,textarea {
+            padding:10px 12px; background:var(--bg3); border:1px solid var(--border);
+            border-radius:var(--radius-sm); color:var(--text); font-size:14px;
+            font-family:inherit; width:100%;
+        }
+        input:focus,select.field:focus,textarea:focus { outline:none; border-color:var(--purple); }
+        textarea {
+            resize:vertical; min-height:130px; font-family:'Courier New',monospace;
+            font-size:13px; line-height:1.7;
+        }
+        .divider { height:1px; background:var(--border); margin:4px 0; }
+
+        /* ── PDF Upload Box ── */
+        .pdf-upload-box {
+            border:2px dashed var(--border); border-radius:var(--radius-sm);
+            padding:20px; text-align:center; transition:all .2s; cursor:pointer;
+            background:var(--bg3);
+        }
+        .pdf-upload-box:hover, .pdf-upload-box.drag { border-color:var(--purple); background:var(--bg4); }
+        .pdf-upload-box input[type=file] { display:none; }
+        .pdf-upload-icon { font-size:32px; margin-bottom:8px; }
+        .pdf-upload-label { font-size:14px; font-weight:600; color:var(--text); margin-bottom:4px; }
+        .pdf-upload-hint  { font-size:12px; color:var(--muted); }
+
+        .pdf-badge {
+            display:flex; align-items:center; gap:10px; padding:12px 14px;
+            background:rgba(96,165,250,.1); border:1px solid rgba(96,165,250,.3);
+            border-radius:var(--radius-sm);
+        }
+        .pdf-badge-icon { font-size:22px; }
+        .pdf-badge-name { flex:1; font-size:13px; font-weight:600; color:#60a5fa; }
+        .pdf-badge-size { font-size:11px; color:var(--muted); }
+
+        /* ── Song Detail ── */
+        .detail-grid { display:grid; grid-template-columns:1fr 1fr; gap:18px; }
+        .dsec { background:var(--bg3); border-radius:var(--radius-sm); overflow:hidden; }
+        .dsec-title {
+            padding:9px 14px; font-size:11px; font-weight:700; text-transform:uppercase;
+            letter-spacing:.5px; color:var(--muted); border-bottom:1px solid var(--border);
+            background:var(--bg4);
+        }
+
+        /* ── Cifra toggle ── */
+        .cifra-toggle {
+            display:flex; border-bottom:1px solid var(--border); background:var(--bg4);
+        }
+        .ctab {
+            flex:1; padding:9px 12px; font-size:13px; font-weight:600; cursor:pointer;
+            color:var(--muted); border:none; background:transparent; transition:all .15s;
+            border-bottom:2px solid transparent; margin-bottom:-1px;
+        }
+        .ctab:hover { color:var(--text); }
+        .ctab.active { color:var(--purple-light); border-bottom-color:var(--purple); }
+
+        /* ── Player ── */
+        .player-tabs { display:flex; border-bottom:1px solid var(--border); background:var(--bg4); }
+        .ptab {
+            padding:10px 14px; font-size:13px; font-weight:600; cursor:pointer;
+            color:var(--muted); border-bottom:2px solid transparent; margin-bottom:-1px;
+            transition:all .15s; border:none; background:transparent;
+        }
+        .ptab:hover { color:var(--text); }
+        .ptab.active { color:var(--purple-light); border-bottom-color:var(--purple); }
+        .video-wrap { position:relative; padding-bottom:56.25%; height:0; }
+        .video-wrap iframe { position:absolute; inset:0; width:100%; height:100%; border:none; }
+        .player-ph { padding:40px; text-align:center; color:var(--muted); font-size:14px; }
+
+        /* ── PDF viewer ── */
+        .pdf-viewer {
+            width:100%; height:420px; border:none; display:block; background:#fff;
+        }
+        .pdf-viewer-wrap { padding:0; }
+        .pdf-no-preview {
+            padding:30px; text-align:center; color:var(--muted); font-size:14px;
+        }
+        .pdf-actions {
+            padding:10px 14px; display:flex; gap:8px; align-items:center;
+            border-top:1px solid var(--border); background:var(--bg4);
+        }
+
+        /* ── Chord Chart ── */
+        .chord-chart {
+            padding:14px 16px; font-family:'Courier New',monospace; font-size:13px;
+            line-height:1.8; white-space:pre-wrap; word-break:break-word; min-height:180px;
+        }
+        .ch { color:var(--gold); font-weight:700; }
+        .transpose-bar {
+            display:flex; align-items:center; gap:8px; padding:10px 14px;
+            border-top:1px solid var(--border); background:var(--bg4);
+        }
+        .t-label { font-size:12px; color:var(--muted); font-weight:600; }
+        .t-offset { min-width:60px; text-align:center; font-size:14px; font-weight:700; color:var(--gold); }
+
+        /* ── Links ── */
+        .links-list { padding:10px; display:flex; flex-direction:column; gap:6px; }
+        .link-item {
+            display:flex; align-items:center; gap:10px; padding:10px 12px;
+            background:var(--bg4); border-radius:var(--radius-sm); text-decoration:none;
+            color:var(--text); font-size:13px; transition:all .15s;
+        }
+        .link-item:hover { background:var(--border); }
+        .link-label { font-weight:600; }
+        .link-desc  { font-size:11px; color:var(--muted); }
+
+        /* ── Set List Editor ── */
+        .sl-editor { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+        .col-hd {
+            font-size:12px; font-weight:700; color:var(--muted); text-transform:uppercase;
+            letter-spacing:.5px; margin-bottom:10px; padding-bottom:8px; border-bottom:1px solid var(--border);
+        }
+        .sl-item {
+            display:flex; align-items:center; gap:8px; padding:10px 12px;
+            background:var(--bg3); border:1px solid var(--border);
+            border-radius:var(--radius-sm); margin-bottom:6px;
+        }
+        .sl-num { color:var(--gold); font-weight:700; font-size:14px; min-width:22px; }
+        .sl-title { flex:1; font-size:14px; font-weight:600; }
+        .sl-key { font-size:11px; color:var(--gold); background:var(--bg4); padding:2px 6px; border-radius:4px; }
+        .avail-list { overflow-y:auto; max-height:460px; display:flex; flex-direction:column; gap:5px; }
+        .avail-item {
+            display:flex; align-items:center; gap:10px; padding:10px 12px;
+            background:var(--bg3); border:1px solid var(--border);
+            border-radius:var(--radius-sm); cursor:pointer; transition:all .15s;
+        }
+        .avail-item:hover { border-color:var(--purple); }
+        .avail-item.in-list { opacity:.38; cursor:default; pointer-events:none; }
+
+        /* ── Print View ── */
+        .print-view {
+            background:#fff; color:#111; padding:36px;
+            font-family:Georgia,serif; border-radius:var(--radius-sm);
+        }
+        .ph { text-align:center; margin-bottom:28px; border-bottom:2px solid #222; padding-bottom:18px; }
+        .ph-title { font-size:26px; font-weight:bold; margin-bottom:4px; }
+        .ph-sub { font-size:13px; color:#555; }
+        .plist { list-style:none; }
+        .plist li {
+            display:flex; align-items:center; gap:14px; padding:13px 0;
+            border-bottom:1px solid #eee; font-size:15px;
+        }
+        .pnum {
+            width:30px; height:30px; background:#111; color:#fff;
+            border-radius:50%; display:flex; align-items:center; justify-content:center;
+            font-size:13px; font-weight:bold; flex-shrink:0;
+        }
+        .p-title { flex:1; font-weight:bold; }
+        .p-key { font-size:13px; color:#555; }
+        .p-bpm { font-size:12px; color:#999; }
+
+        /* ── Meta row ── */
+        .meta-row { display:flex; gap:14px; align-items:center; flex-wrap:wrap; }
+        .meta-it { display:flex; align-items:center; gap:6px; font-size:14px; }
+        .meta-lb { color:var(--muted); }
+        .meta-vl { font-weight:700; }
+        .meta-vl.key { color:var(--gold); font-size:18px; }
+
+        /* ── Toast ── */
+        .toast {
+            position:fixed; bottom:24px; left:50%; transform:translateX(-50%);
+            background:var(--bg3); border:1px solid var(--border); color:var(--text);
+            padding:12px 20px; border-radius:var(--radius-sm); font-size:14px;
+            font-weight:500; z-index:999; animation:slideUp .2s ease; white-space:nowrap;
+        }
+        @keyframes slideUp {
+            from { transform:translateX(-50%) translateY(20px); opacity:0; }
+            to   { transform:translateX(-50%) translateY(0);    opacity:1; }
+        }
+
+        /* ── Empty state ── */
+        .empty { text-align:center; padding:60px 20px; color:var(--muted); }
+        .empty .ei { font-size:48px; margin-bottom:14px; }
+        .empty h3  { font-size:18px; margin-bottom:8px; color:var(--text); }
+        .empty p   { font-size:14px; }
+
+        /* ── Playlist ── */
+        .pl-topbar { display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:20px; }
+        .pl-tabs { display:flex; background:var(--bg3); border-radius:var(--radius-sm); overflow:hidden; border:1px solid var(--border); }
+        .pl-tabs .ptab { border-radius:0; border-bottom:none; padding:9px 16px; }
+        .pl-tabs .ptab.active { background:var(--purple); color:#fff; border-bottom-color:transparent; }
+        .pl-body { display:grid; grid-template-columns:1fr 320px; gap:20px; align-items:start; }
+        .pl-left { display:flex; flex-direction:column; gap:12px; }
+        .pl-player-box {
+            background:#000; border-radius:var(--radius); overflow:hidden;
+            min-height:240px; display:flex; align-items:center; justify-content:center;
+        }
+        .pl-player-box .video-wrap { width:100%; }
+        .pl-spotify-wrap { background:var(--bg2); border-radius:var(--radius); overflow:hidden; }
+        .pl-no-media { padding:48px 20px; text-align:center; color:var(--muted); font-size:14px; }
+        .pl-info-bar {
+            background:var(--bg2); border:1px solid var(--border); border-radius:var(--radius);
+            padding:16px 20px; display:flex; align-items:center; gap:16px; flex-wrap:wrap;
+        }
+        .pl-now-title  { font-size:18px; font-weight:700; }
+        .pl-now-artist { font-size:13px; color:var(--muted); margin-top:2px; }
+        .pl-now-meta   { display:flex; gap:10px; margin-top:8px; flex-wrap:wrap; }
+        .pl-nav {
+            background:var(--bg2); border:1px solid var(--border); border-radius:var(--radius);
+            padding:12px 20px; display:flex; align-items:center; justify-content:space-between; gap:12px;
+        }
+        .pl-counter { font-size:13px; color:var(--muted); font-weight:600; }
+        .pl-right { display:flex; flex-direction:column; }
+        .pl-q-hd {
+            font-size:12px; font-weight:700; color:var(--muted); text-transform:uppercase;
+            letter-spacing:.5px; padding-bottom:8px; border-bottom:1px solid var(--border); margin-bottom:8px;
+        }
+        .pl-queue { max-height:540px; overflow-y:auto; display:flex; flex-direction:column; gap:4px; }
+        .pl-q-item {
+            display:flex; align-items:center; gap:10px; padding:10px 12px;
+            background:var(--bg2); border:1px solid var(--border); border-radius:var(--radius-sm);
+            cursor:pointer; transition:all .15s;
+        }
+        .pl-q-item:hover { border-color:var(--purple); background:var(--bg3); }
+        .pl-q-item.now  { border-color:var(--purple); background:var(--bg4); }
+        .pl-q-num { min-width:22px; text-align:center; font-size:13px; font-weight:700; color:var(--muted); }
+        .pl-q-item.now .pl-q-num { color:var(--purple-light); }
+        .pl-q-title { font-size:14px; font-weight:600; }
+        .pl-q-artist { font-size:12px; color:var(--muted); }
+        .pl-q-info { flex:1; }
+        .pl-empty-q { padding:30px; text-align:center; color:var(--muted); font-size:13px; }
+        #pl-yt-div { width:100%; aspect-ratio:16/9; }
+        @media(max-width:840px){ .pl-body { grid-template-columns:1fr; } }
+
+        /* ── Responsive ── */
+        @media(max-width:640px){
+            .form-grid,.detail-grid,.sl-editor { grid-template-columns:1fr; }
+            .logo { font-size:15px; }
+            .nav-btn { padding:6px 10px; font-size:13px; }
+        }
+
+        /* ── Print media ── */
+        @media print {
+            body * { visibility:hidden; }
+            .print-view,.print-view * { visibility:visible; }
+            .print-view { position:absolute; left:0; top:0; width:100%; }
+            .modal-ft { display:none; }
+        }
+    </style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+// ═══════════════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════════════
+const S = {
+    page: 'library',
+    songs: [],
+    setlists: [],
+    modal: null,
+    q: '',
+    filterKey: '',
+    transpose: 0,
+    ptab: 'youtube',
+    cifraTab: 'texto',     // 'texto' | 'pdf'
+    currentPdfUrl: null,   // blob URL for current detail
+    hasPdf: new Set(),     // song IDs that have PDF stored
+    // pending form state
+    pendingPdfFile: null,  // File object waiting to be saved
+    pendingPdfRemove: false,
+    pl: { source: 'all', platform: 'youtube', idx: 0 },
+};
+
+// ═══════════════════════════════════════════════
+//  INDEX DB  (PDF storage — no size limit)
+// ═══════════════════════════════════════════════
+let DB = null;
+let ytPL = null; // YouTube IFrame API player instance for playlist
+
+window.onYouTubeIframeAPIReady = function() {
+    if (S.page === 'playlist' && S.pl.platform === 'youtube') initYTPL();
+};
+
+function openDB() {
+    return new Promise((res, rej) => {
+        const req = indexedDB.open('hallel_db', 1);
+        req.onupgradeneeded = e => e.target.result.createObjectStore('pdfs');
+        req.onsuccess = e => { DB = e.target.result; res(DB); };
+        req.onerror = rej;
+    });
+}
+
+function dbSavePDF(songId, file) {
+    return new Promise(async (res, rej) => {
+        const buf = await file.arrayBuffer();
+        const tx = DB.transaction('pdfs', 'readwrite');
+        tx.objectStore('pdfs').put({ buf, name: file.name, size: file.size }, songId);
+        tx.oncomplete = res;
+        tx.onerror = rej;
+    });
+}
+
+function dbGetPDF(songId) {
+    return new Promise((res) => {
+        const tx = DB.transaction('pdfs', 'readonly');
+        const req = tx.objectStore('pdfs').get(songId);
+        req.onsuccess = () => res(req.result || null);
+        req.onerror = () => res(null);
+    });
+}
+
+function dbDeletePDF(songId) {
+    return new Promise((res) => {
+        const tx = DB.transaction('pdfs', 'readwrite');
+        tx.objectStore('pdfs').delete(songId);
+        tx.oncomplete = res;
+        tx.onerror = res;
+    });
+}
+
+function dbHasPDF(songId) {
+    return new Promise((res) => {
+        const tx = DB.transaction('pdfs', 'readonly');
+        const req = tx.objectStore('pdfs').count(songId);
+        req.onsuccess = () => res(req.result > 0);
+        req.onerror = () => res(false);
+    });
+}
+
+async function loadPdfIndex() {
+    return new Promise((res) => {
+        const tx = DB.transaction('pdfs', 'readonly');
+        const req = tx.objectStore('pdfs').getAllKeys();
+        req.onsuccess = () => { S.hasPdf = new Set(req.result); res(); };
+        req.onerror = res;
+    });
+}
+
+// ═══════════════════════════════════════════════
+//  PERSISTENCE  (songs + setlists in localStorage)
+// ═══════════════════════════════════════════════
+function persist() {
+    localStorage.setItem('hl_songs',    JSON.stringify(S.songs));
+    localStorage.setItem('hl_setlists', JSON.stringify(S.setlists));
+}
+function hydrate() {
+    try {
+        const s  = localStorage.getItem('hl_songs');
+        const sl = localStorage.getItem('hl_setlists');
+        if (s)  S.songs    = JSON.parse(s);
+        if (sl) S.setlists = JSON.parse(sl);
+    } catch(e) { console.error(e); }
+}
+
+// ═══════════════════════════════════════════════
+//  SEED DATA  (only if library is empty)
+// ═══════════════════════════════════════════════
+const SEED = [
+    {
+        id:'seed1', title:'Templo Vivo', artist:'Hallel Ano 10',
+        key:'G', bpm:0, category:'Adoração',
+        youtubeUrl:'https://youtu.be/rp3pv94cuns',
+        spotifyUrl:'', deezerUrl:'', reaperUrl:'', bandUrl:'',
+        chords:`[G]Templo vivo [D]Tu és, Senhor\n[Em]Em meu coração [C]Tu habitas\n\n[G]Gloria [D]ao teu nome [Em]eterno [C]Rei`,
+        notes:'Repertório 2026'
+    },
+    {
+        id:'seed2', title:'Dança de Avivamento', artist:'Hallel Ano 10',
+        key:'D', bpm:0, category:'Louvor',
+        youtubeUrl:'https://youtu.be/SMxh1zDi4ic',
+        spotifyUrl:'', deezerUrl:'', reaperUrl:'', bandUrl:'',
+        chords:`[D]Dança de [A]avivamento\n[Bm]O Espírito [G]está aqui\n\n[D]Fogo do [A]céu desça agora\n[Bm]Renova [G]o teu povo`,
+        notes:'Repertório 2026'
+    },
+];
+
+// ═══════════════════════════════════════════════
+//  UTILS
+// ═══════════════════════════════════════════════
+function uid() { return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
+function esc(v) { return (v||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
+
+function ytId(url) {
+    if (!url) return null;
+    const m = url.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|v\/|shorts\/))([^&\n?#]+)/);
+    return m ? m[1] : null;
+}
+function spId(url) {
+    if (!url) return null;
+    const m = url.match(/spotify\.com\/(?:intl-[a-z]+\/)?track\/([a-zA-Z0-9]+)/);
+    return m ? m[1] : null;
+}
+function dzId(url) {
+    if (!url) return null;
+    const m = url.match(/deezer\.com\/(?:[a-z]+\/)?track\/(\d+)/);
+    return m ? m[1] : null;
+}
+
+// Chord transposition
+const SH = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+const FL = ['C','Db','D','Eb','E','F','Gb','G','Ab','A','Bb','B'];
+function tNote(n, d) {
+    let i = SH.indexOf(n); if (i===-1) i=FL.indexOf(n); if (i===-1) return n;
+    return SH[((i+d)%12+12)%12];
+}
+function tChord(c, d) {
+    const m = c.match(/^([A-G][b#]?)(.*)$/);
+    return m ? tNote(m[1],d)+m[2] : c;
+}
+function tText(txt, d) {
+    if (!d) return txt;
+    return txt.replace(/\[([A-G][b#]?[^\]]*)\]/g, (_,c)=>'['+tChord(c,d)+']');
+}
+function fmtChord(txt) {
+    return txt.replace(/\[([A-G][b#]?[^\]]*)\]/g, (_,c)=>`<span class="ch">[${c}]</span>`);
+}
+function fmtLines(txt) { return txt.split('\n').map(fmtChord).join('\n'); }
+function offsetLbl(n)  { return n===0?'Original':(n>0?'+':'')+n; }
+function fmtSize(b)    { return b > 1048576 ? (b/1048576).toFixed(1)+' MB' : Math.round(b/1024)+' KB'; }
+
+const KEYS = ['C','C#/Db','D','D#/Eb','E','F','F#/Gb','G','G#/Ab','A','A#/Bb','B'];
+
+function toast(msg) {
+    document.querySelectorAll('.toast').forEach(el=>el.remove());
+    const el = document.createElement('div'); el.className='toast'; el.textContent=msg;
+    document.body.appendChild(el); setTimeout(()=>el.remove(),2600);
+}
+
+// ═══════════════════════════════════════════════
+//  RENDER
+// ═══════════════════════════════════════════════
+function render() {
+    document.getElementById('app').innerHTML = html();
+    if (S.page === 'playlist') afterPLRender();
+}
+
+function html() {
+    let page = '';
+    if (S.page === 'library')  page = libPage();
+    if (S.page === 'setlists') page = slPage();
+    if (S.page === 'playlist') page = playlistPage();
+    return header() + `<div class="main">${page}</div>` + (S.modal ? modalHtml() : '');
+}
+
+function header() {
+    return `<div class="header">
+        <div class="logo">🎵 Hallel <span>Alegraivos</span></div>
+        <nav class="nav">
+            <button class="nav-btn ${S.page==='library'?'active':''}"  onclick="nav('library')">🎸 Biblioteca</button>
+            <button class="nav-btn ${S.page==='setlists'?'active':''}" onclick="nav('setlists')">📋 Set Lists</button>
+            <button class="nav-btn ${S.page==='playlist'?'active':''}" onclick="nav('playlist')">▶ Playlist</button>
+        </nav>
+        <div class="header-actions">
+            ${S.page==='library'  ? `<button class="btn btn-primary" onclick="openAdd()">+ Música</button>` : ''}
+            ${S.page==='setlists' ? `<button class="btn btn-primary" onclick="newSL()">+ Set List</button>` : ''}
+        </div>
+    </div>`;
+}
+
+// ── Library ──
+function libPage() {
+    const q = S.q.toLowerCase();
+    const list = S.songs.filter(s => {
+        const mq = !q || s.title.toLowerCase().includes(q) || (s.artist||'').toLowerCase().includes(q);
+        const mk = !S.filterKey || s.key===S.filterKey;
+        return mq && mk;
+    });
+    return `
+    <div class="section-header">
+        <h2 class="section-title">Biblioteca</h2>
+        <span class="section-count">${S.songs.length} música${S.songs.length!==1?'s':''}</span>
+    </div>
+    <div class="toolbar">
+        <div class="search-wrap">
+            <span class="si">🔍</span>
+            <input class="search-input" type="text" placeholder="Buscar música ou artista…"
+                   value="${esc(S.q)}" oninput="doSearch(this.value)">
+        </div>
+        <select onchange="doFilterKey(this.value)">
+            <option value="">Todos os tons</option>
+            ${KEYS.map(k=>`<option value="${k}" ${S.filterKey===k?'selected':''}>${k}</option>`).join('')}
+        </select>
+    </div>
+    ${list.length===0 ? `<div class="empty"><div class="ei">${S.songs.length===0?'🎵':'🔍'}</div>
+        <h3>${S.songs.length===0?'Nenhuma música ainda':'Sem resultados'}</h3>
+        <p>${S.songs.length===0?'Clique em "+ Música" para começar.':'Tente outro filtro.'}</p></div>` :
+    `<div class="songs-grid">${list.map((s,i)=>songCard(s,i)).join('')}</div>`}`;
+}
+
+function songCard(s, i) {
+    const hasYt=!!ytId(s.youtubeUrl), hasSp=!!spId(s.spotifyUrl), hasDz=!!dzId(s.deezerUrl);
+    const hasPdf=S.hasPdf.has(s.id);
+    return `<div class="song-card" onclick="openDetail('${s.id}')">
+        <div class="card-top">
+            <div class="song-num">${i+1}</div>
+            ${s.key?`<div class="key-badge">${s.key}</div>`:''}
+        </div>
+        <div class="song-title">${s.title}</div>
+        <div class="song-artist">${s.artist||''}</div>
+        <div class="song-tags">
+            ${s.bpm?`<span class="tag tag-bpm">♩ ${s.bpm}</span>`:''}
+            ${hasYt?`<span class="tag tag-yt">▶ YouTube</span>`:''}
+            ${hasSp?`<span class="tag tag-sp">● Spotify</span>`:''}
+            ${hasDz?`<span class="tag tag-dz">♫ Deezer</span>`:''}
+            ${hasPdf?`<span class="tag tag-pdf">📄 PDF</span>`:''}
+            ${s.reaperUrl?`<span class="tag">🎛 Reaper</span>`:''}
+            ${s.bandUrl?`<span class="tag">🥁 Banda</span>`:''}
+            ${s.chords?`<span class="tag">🎸 Cifra</span>`:''}
+        </div>
+    </div>`;
+}
+
+// ── Set Lists page ──
+function slPage() {
+    return `
+    <div class="section-header">
+        <h2 class="section-title">Set Lists</h2>
+        <span class="section-count">${S.setlists.length}</span>
+    </div>
+    ${S.setlists.length===0 ? `<div class="empty"><div class="ei">📋</div>
+        <h3>Nenhum set list ainda</h3>
+        <p>Clique em "+ Set List" para criar a ordem de um culto.</p></div>` :
+    `<div class="setlist-grid">${S.setlists.map(slCard).join('')}</div>`}`;
+}
+
+function slCard(sl) {
+    const songs = sl.songIds.map(id=>S.songs.find(s=>s.id===id)).filter(Boolean);
+    return `<div class="setlist-card" onclick="openSL('${sl.id}')">
+        <div class="setlist-name">${sl.name}</div>
+        ${sl.date?`<div class="setlist-date">📅 ${sl.date}</div>`:''}
+        <div class="setlist-count">🎵 ${songs.length} música${songs.length!==1?'s':''}</div>
+        ${songs.length>0?`<div class="setlist-preview">
+            ${songs.slice(0,3).map((s,i)=>`<div>${i+1}. ${s.title}</div>`).join('')}
+            ${songs.length>3?`<div style="color:var(--purple-light)">+${songs.length-3} mais…</div>`:''}
+        </div>`:''}
+    </div>`;
+}
+
+// ═══════════════════════════════════════════════
+//  MODALS
+// ═══════════════════════════════════════════════
+function modalHtml() {
+    const {type,data} = S.modal;
+    if (type==='detail')  return detailModal(data);
+    if (type==='add')     return addModal(data);
+    if (type==='sl')      return slModal(data);
+    if (type==='print')   return printModal(data);
+    return '';
+}
+
+// ── Song Detail ──
+function detailModal(song) {
+    const yt=ytId(song.youtubeUrl), sp=spId(song.spotifyUrl), dz=dzId(song.deezerUrl);
+    const tab = S.ptab;
+    const transposed = tText(song.chords||'', S.transpose);
+    const hasPdf = S.hasPdf.has(song.id);
+    const ct = S.cifraTab;
+    const pdfUrl = S.currentPdfUrl;
+
+    return `<div class="backdrop" onclick="closeModal(event)">
+    <div class="modal" style="max-width:960px">
+        <div class="modal-hd">
+            <div style="flex:1;min-width:0">
+                <div class="modal-title">${song.title}</div>
+                ${song.artist?`<div style="color:var(--muted);font-size:13px;margin-top:2px">${song.artist}</div>`:''}
+            </div>
+            <div class="meta-row">
+                ${song.key?`<div class="meta-it"><span class="meta-lb">Tom</span><span class="meta-vl key">${song.key}</span></div>`:''}
+                ${song.bpm?`<div class="meta-it"><span class="meta-lb">BPM</span><span class="meta-vl">${song.bpm}</span></div>`:''}
+            </div>
+            <button class="close-btn" onclick="closeModal()">✕</button>
+        </div>
+        <div class="modal-body">
+            <div class="detail-grid">
+
+                <!-- LEFT: Player + Links -->
+                <div>
+                    ${(yt||sp||dz)?`<div class="dsec" style="margin-bottom:14px">
+                        <div class="player-tabs">
+                            ${yt?`<button class="ptab ${tab==='youtube'?'active':''}" onclick="setPTab('youtube','${song.id}')">▶ YouTube</button>`:''}
+                            ${sp?`<button class="ptab ${tab==='spotify'?'active':''}" onclick="setPTab('spotify','${song.id}')">● Spotify</button>`:''}
+                            ${dz?`<button class="ptab ${tab==='deezer'?'active':''}"  onclick="setPTab('deezer','${song.id}')">♫ Deezer</button>`:''}
+                        </div>
+                        ${tab==='youtube'&&yt?`<div class="video-wrap"><iframe src="https://www.youtube.com/embed/${yt}?rel=0" allowfullscreen></iframe></div>`:''}
+                        ${tab==='spotify'&&sp?`<iframe src="https://open.spotify.com/embed/track/${sp}" height="152" frameborder="0" allow="autoplay;clipboard-write;encrypted-media;fullscreen;picture-in-picture" style="width:100%"></iframe>`:''}
+                        ${tab==='deezer'&&dz ?`<iframe src="https://widget.deezer.com/widget/dark/track/${dz}" height="152" frameborder="0" style="width:100%"></iframe>`:''}
+                    </div>`:''}
+
+                    ${(song.reaperUrl||song.bandUrl)?`<div class="dsec">
+                        <div class="dsec-title">🔗 Links de Ensaio</div>
+                        <div class="links-list">
+                            ${song.reaperUrl?`<a href="${song.reaperUrl}" target="_blank" class="link-item">
+                                <span style="font-size:18px">🎛</span>
+                                <div><div class="link-label">Reaper — por instrumento</div><div class="link-desc">Drive</div></div>
+                                <span style="margin-left:auto;color:var(--muted)">↗</span></a>`:''}
+                            ${song.bandUrl?`<a href="${song.bandUrl}" target="_blank" class="link-item">
+                                <span style="font-size:18px">🥁</span>
+                                <div><div class="link-label">Metrônomo + Voz</div><div class="link-desc">Drive — ensaio banda</div></div>
+                                <span style="margin-left:auto;color:var(--muted)">↗</span></a>`:''}
+                        </div></div>`:''}
+                </div>
+
+                <!-- RIGHT: Cifra (texto ou PDF) -->
+                <div>
+                    ${(song.chords||hasPdf) ? `<div class="dsec">
+                        ${(song.chords && hasPdf) ? `
+                        <div class="cifra-toggle">
+                            <button class="ctab ${ct==='texto'?'active':''}" onclick="setCifraTab('texto','${song.id}')">🎸 Texto</button>
+                            <button class="ctab ${ct==='pdf'?'active':''}"   onclick="setCifraTab('pdf','${song.id}')">📄 PDF</button>
+                        </div>` :
+                        `<div class="dsec-title">${hasPdf?'📄 Cifra em PDF':'🎸 Cifra'}</div>`}
+
+                        ${ct==='texto' && song.chords ? `
+                        <div class="chord-chart" id="cc">${fmtLines(transposed)}</div>
+                        <div class="transpose-bar">
+                            <span class="t-label">Tom:</span>
+                            <button class="btn btn-ghost btn-sm btn-icon" onclick="doT(-1)">−</button>
+                            <span class="t-offset" id="toff">${offsetLbl(S.transpose)}</span>
+                            <button class="btn btn-ghost btn-sm btn-icon" onclick="doT(+1)">+</button>
+                            <button class="btn btn-ghost btn-sm" style="margin-left:auto" onclick="doT(0,true)">Original</button>
+                        </div>` : ''}
+
+                        ${ct==='pdf' && hasPdf ? `
+                        <div class="pdf-viewer-wrap">
+                            ${pdfUrl
+                                ? `<iframe class="pdf-viewer" src="${pdfUrl}"></iframe>`
+                                : `<div class="pdf-no-preview"><div style="font-size:32px;margin-bottom:10px">⏳</div>Carregando PDF…</div>`}
+                        </div>
+                        <div class="pdf-actions">
+                            ${pdfUrl?`<a href="${pdfUrl}" download="${song.title}.pdf" class="btn btn-ghost btn-sm">⬇ Baixar PDF</a>`:''}
+                            <button class="btn btn-ghost btn-sm" style="margin-left:auto" onclick="openEdit('${song.id}')">✏️ Substituir</button>
+                        </div>` : ''}
+                    </div>` :
+                    `<div class="dsec" style="min-height:160px">
+                        <div class="dsec-title">🎸 Cifra</div>
+                        <div class="player-ph">Nenhuma cifra cadastrada.<br><br>
+                        <button class="btn btn-ghost btn-sm" onclick="openEdit('${song.id}')">+ Adicionar cifra ou PDF</button></div>
+                    </div>`}
+
+                    ${song.notes?`<div class="dsec" style="margin-top:12px">
+                        <div class="dsec-title">📝 Observações</div>
+                        <div style="padding:12px;font-size:13px;line-height:1.7;color:var(--muted)">${song.notes}</div></div>`:''}
+                </div>
+            </div>
+        </div>
+        <div class="modal-ft">
+            <button class="btn btn-ghost btn-sm" onclick="openEdit('${song.id}')">✏️ Editar</button>
+            <button class="btn btn-danger btn-sm" onclick="delSong('${song.id}')">🗑 Excluir</button>
+            <button class="btn btn-ghost" onclick="closeModal()">Fechar</button>
+        </div>
+    </div></div>`;
+}
+
+// ── Add / Edit Song ──
+function addModal(v) {
+    v = v || {};
+    const isEdit = !!v.id;
+    const hasPdf = isEdit && S.hasPdf.has(v.id);
+    const pf = S.pendingPdfFile;
+    const removing = S.pendingPdfRemove;
+
+    let pdfSection = '';
+    if (removing) {
+        pdfSection = `<div style="padding:10px;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);border-radius:var(--radius-sm);font-size:13px;color:#fca5a5;display:flex;align-items:center;gap:10px;">
+            <span>🗑 PDF será removido ao salvar.</span>
+            <button class="btn btn-ghost btn-sm" style="margin-left:auto" onclick="cancelPdfRemove()">Cancelar</button>
+        </div>`;
+    } else if (pf) {
+        pdfSection = `<div class="pdf-badge">
+            <span class="pdf-badge-icon">📄</span>
+            <div><div class="pdf-badge-name">${esc(pf.name)}</div><div class="pdf-badge-size">${fmtSize(pf.size)} — pronto para salvar</div></div>
+            <button class="btn btn-ghost btn-sm btn-icon" onclick="clearPendingPdf()" title="Cancelar">✕</button>
+        </div>`;
+    } else if (hasPdf) {
+        pdfSection = `<div class="pdf-badge" style="justify-content:space-between">
+            <span class="pdf-badge-icon">📄</span>
+            <div style="flex:1"><div class="pdf-badge-name">PDF cadastrado</div><div class="pdf-badge-size">Clique em "Substituir" para trocar</div></div>
+            <label class="btn btn-ghost btn-sm" style="cursor:pointer">
+                Substituir <input type="file" accept=".pdf,application/pdf" onchange="onPdfPick(this)" style="display:none">
+            </label>
+            <button class="btn btn-danger btn-sm" onclick="markPdfRemove()">Remover</button>
+        </div>`;
+    } else {
+        pdfSection = `<div class="pdf-upload-box" id="pdfDropZone" onclick="document.getElementById('pdfFileInput').click()"
+                ondragover="event.preventDefault();this.classList.add('drag')"
+                ondragleave="this.classList.remove('drag')"
+                ondrop="onPdfDrop(event)">
+            <input type="file" id="pdfFileInput" accept=".pdf,application/pdf" onchange="onPdfPick(this)">
+            <div class="pdf-upload-icon">📄</div>
+            <div class="pdf-upload-label">Clique ou arraste o PDF da cifra aqui</div>
+            <div class="pdf-upload-hint">Arquivo .pdf — fica salvo no seu navegador</div>
+        </div>`;
+    }
+
+    return `<div class="backdrop" onclick="closeModal(event)">
+    <div class="modal" style="max-width:700px">
+        <div class="modal-hd">
+            <div class="modal-title">${isEdit?'✏️ Editar Música':'+ Adicionar Música'}</div>
+            <button class="close-btn" onclick="closeModal()">✕</button>
+        </div>
+        <div class="modal-body">
+            <div class="form-grid">
+                <div class="fg full"><label>Título *</label>
+                    <input type="text" id="f_title" value="${esc(v.title)}" placeholder="Nome da música"></div>
+                <div class="fg"><label>Artista / Banda</label>
+                    <input type="text" id="f_artist" value="${esc(v.artist)}" placeholder="ex: Hallel Ano 10"></div>
+                <div class="fg"><label>Categoria</label>
+                    <input type="text" id="f_cat" value="${esc(v.category)}" placeholder="ex: Adoração, Louvor"></div>
+                <div class="fg"><label>Tom</label>
+                    <select class="field" id="f_key">
+                        <option value="">— selecionar —</option>
+                        ${KEYS.map(k=>`<option value="${k}" ${v.key===k?'selected':''}>${k}</option>`).join('')}
+                    </select></div>
+                <div class="fg"><label>BPM</label>
+                    <input type="number" id="f_bpm" value="${v.bpm||''}" placeholder="ex: 120" min="40" max="300"></div>
+
+                <div class="fg full"><div class="divider"></div></div>
+
+                <div class="fg full"><label>▶ YouTube</label>
+                    <input type="url" id="f_yt" value="${esc(v.youtubeUrl)}" placeholder="https://youtu.be/…"></div>
+                <div class="fg"><label>● Spotify</label>
+                    <input type="url" id="f_sp" value="${esc(v.spotifyUrl)}" placeholder="https://open.spotify.com/track/…"></div>
+                <div class="fg"><label>♫ Deezer</label>
+                    <input type="url" id="f_dz" value="${esc(v.deezerUrl)}" placeholder="https://www.deezer.com/track/…"></div>
+
+                <div class="fg full"><div class="divider"></div></div>
+
+                <div class="fg full"><label>🎛 Reaper (Drive — por instrumento)</label>
+                    <input type="url" id="f_rp" value="${esc(v.reaperUrl)}" placeholder="https://drive.google.com/…"></div>
+                <div class="fg full"><label>🥁 Metrônomo + Voz (Drive — ensaio banda)</label>
+                    <input type="url" id="f_bd" value="${esc(v.bandUrl)}" placeholder="https://drive.google.com/…"></div>
+
+                <div class="fg full"><div class="divider"></div></div>
+
+                <div class="fg full">
+                    <label>📄 Cifra em PDF</label>
+                    ${pdfSection}
+                </div>
+
+                <div class="fg full"><label>🎸 Cifra em Texto  <span style="font-weight:400;text-transform:none;letter-spacing:0">(use [Acorde], ex: [G] [D] [Em] — opcional se tiver PDF)</span></label>
+                    <textarea id="f_ch" placeholder="[G]Eu vou louvar [D]ao Senhor&#10;[Em]Ele é [C]digno de louvor…">${v.chords||''}</textarea></div>
+
+                <div class="fg full"><label>📝 Observações</label>
+                    <textarea id="f_nt" placeholder="Observações…" style="min-height:80px">${esc(v.notes)}</textarea></div>
+            </div>
+        </div>
+        <div class="modal-ft">
+            <button class="btn btn-ghost" onclick="closeModal()">Cancelar</button>
+            <button class="btn btn-primary" onclick="saveSong('${v.id||''}')">
+                ${isEdit?'💾 Salvar':'+ Adicionar música'}</button>
+        </div>
+    </div></div>`;
+}
+
+// ── Set List Editor ──
+function slModal(sl) {
+    const songs = sl.songIds.map(id=>S.songs.find(s=>s.id===id)).filter(Boolean);
+    const inSet = new Set(sl.songIds);
+    return `<div class="backdrop" onclick="closeModal(event)">
+    <div class="modal" style="max-width:920px">
+        <div class="modal-hd">
+            <div style="flex:1">
+                <div class="modal-title">${sl.name}</div>
+                ${sl.date?`<div style="color:var(--muted);font-size:13px;margin-top:2px">📅 ${sl.date}</div>`:''}
+            </div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap">
+                <button class="btn btn-gold btn-sm"  onclick="openPrint('${sl.id}')">🖨 Imprimir</button>
+                <button class="btn btn-ghost btn-sm" onclick="editSLMeta('${sl.id}')">✏️ Editar</button>
+                <button class="btn btn-danger btn-sm" onclick="delSL('${sl.id}')">🗑</button>
+            </div>
+            <button class="close-btn" onclick="closeModal()">✕</button>
+        </div>
+        <div class="modal-body">
+            <div class="sl-editor">
+                <div>
+                    <div class="col-hd">🎵 Ordem — ${songs.length} música${songs.length!==1?'s':''}</div>
+                    ${songs.length===0?`<div style="color:var(--muted);font-size:13px;padding:20px 0;text-align:center">Selecione músicas ao lado →</div>`:''}
+                    ${songs.map((s,i)=>`<div class="sl-item">
+                        <span class="sl-num">${i+1}</span>
+                        <span class="sl-title">${s.title}</span>
+                        ${s.key?`<span class="sl-key">${s.key}</span>`:''}
+                        <div style="display:flex;gap:2px;margin-left:4px">
+                            ${i>0?`<button class="btn btn-ghost btn-sm btn-icon" onclick="slMove('${sl.id}','${s.id}',-1)">↑</button>`:'<span style="width:30px"></span>'}
+                            ${i<songs.length-1?`<button class="btn btn-ghost btn-sm btn-icon" onclick="slMove('${sl.id}','${s.id}',1)">↓</button>`:'<span style="width:30px"></span>'}
+                            <button class="btn btn-ghost btn-sm btn-icon" onclick="slDel('${sl.id}','${s.id}')">✕</button>
+                        </div></div>`).join('')}
+                </div>
+                <div>
+                    <div class="col-hd">📚 Biblioteca (clique para adicionar)</div>
+                    <div class="avail-list">
+                        ${S.songs.length===0?`<div style="color:var(--muted);font-size:13px">Biblioteca vazia</div>`:''}
+                        ${S.songs.map(s=>`<div class="avail-item ${inSet.has(s.id)?'in-list':''}"
+                            onclick="${inSet.has(s.id)?'':` slAdd('${sl.id}','${s.id}')`}">
+                            <div style="flex:1">
+                                <div style="font-size:14px;font-weight:600">${s.title}</div>
+                                ${s.artist?`<div style="font-size:12px;color:var(--muted)">${s.artist}</div>`:''}
+                            </div>
+                            ${s.key?`<span class="sl-key">${s.key}</span>`:''}
+                            <span style="color:${inSet.has(s.id)?'var(--muted)':'var(--purple-light)'};margin-left:6px">
+                                ${inSet.has(s.id)?'✓':'+'}
+                            </span></div>`).join('')}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div></div>`;
+}
+
+// ── Print ──
+function printModal(sl) {
+    const songs = sl.songIds.map(id=>S.songs.find(s=>s.id===id)).filter(Boolean);
+    const today = new Date().toLocaleDateString('pt-BR');
+    return `<div class="backdrop" onclick="closeModal(event)">
+    <div class="modal" style="max-width:680px">
+        <div class="modal-hd">
+            <div class="modal-title">🖨 Imprimir Set List</div>
+            <button class="close-btn" onclick="closeModal()">✕</button>
+        </div>
+        <div class="modal-body">
+            <div class="print-view">
+                <div class="ph">
+                    <div class="ph-title">${sl.name}</div>
+                    <div class="ph-sub">Ministério de Música Hallel — Alegraivos &nbsp;|&nbsp; ${sl.date||today}</div>
+                </div>
+                <ol class="plist">
+                    ${songs.map((s,i)=>`<li>
+                        <div class="pnum">${i+1}</div>
+                        <div class="p-title">${s.title}</div>
+                        ${s.artist?`<div style="color:#555;font-size:12px">${s.artist}</div>`:''}
+                        ${s.key?`<div class="p-key">${s.key}</div>`:''}
+                        ${s.bpm?`<div class="p-bpm">${s.bpm} BPM</div>`:''}
+                    </li>`).join('')}
+                </ol>
+                <div style="margin-top:28px;text-align:center;font-size:12px;color:#999">
+                    Total: ${songs.length} música${songs.length!==1?'s':''}
+                </div>
+            </div>
+        </div>
+        <div class="modal-ft">
+            <button class="btn btn-ghost" onclick="closeModal()">Fechar</button>
+            <button class="btn btn-primary" onclick="window.print()">🖨 Imprimir</button>
+        </div>
+    </div></div>`;
+}
+
+// ═══════════════════════════════════════════════
+//  ACTIONS
+// ═══════════════════════════════════════════════
+function nav(p)  { S.page=p; render(); }
+function doSearch(v)    { S.q=v;        render(); }
+function doFilterKey(v) { S.filterKey=v; render(); }
+
+function closeModal(e) {
+    if (e && e.target!==e.currentTarget) return;
+    // revoke blob URL to free memory
+    if (S.currentPdfUrl) { URL.revokeObjectURL(S.currentPdfUrl); S.currentPdfUrl=null; }
+    S.modal=null; S.transpose=0; S.ptab='youtube'; S.cifraTab='texto';
+    S.pendingPdfFile=null; S.pendingPdfRemove=false;
+    render();
+}
+
+// Songs
+async function openDetail(id) {
+    const s=S.songs.find(x=>x.id===id); if (!s) return;
+    S.transpose=0;
+    const hasPdf = S.hasPdf.has(id);
+    S.cifraTab = hasPdf ? 'pdf' : 'texto';
+    S.ptab = ytId(s.youtubeUrl)?'youtube': spId(s.spotifyUrl)?'spotify': dzId(s.deezerUrl)?'deezer':'youtube';
+    // Load PDF from IDB
+    if (S.currentPdfUrl) { URL.revokeObjectURL(S.currentPdfUrl); S.currentPdfUrl=null; }
+    if (hasPdf) {
+        const rec = await dbGetPDF(id);
+        if (rec) {
+            const blob = new Blob([rec.buf], {type:'application/pdf'});
+            S.currentPdfUrl = URL.createObjectURL(blob);
+        }
+    }
+    S.modal={type:'detail',data:s}; render();
+}
+
+function openAdd() {
+    S.pendingPdfFile=null; S.pendingPdfRemove=false;
+    S.modal={type:'add',data:null}; render();
+}
+function openEdit(id) {
+    const s=S.songs.find(x=>x.id===id); if(!s)return;
+    S.pendingPdfFile=null; S.pendingPdfRemove=false;
+    S.modal={type:'add',data:{...s}}; render();
+}
+
+async function saveSong(eid) {
+    const title=document.getElementById('f_title')?.value?.trim();
+    if (!title) { toast('⚠️ Título é obrigatório!'); return; }
+    const d = {
+        id: eid||uid(), title,
+        artist:   document.getElementById('f_artist')?.value?.trim()||'',
+        key:      document.getElementById('f_key')?.value||'',
+        bpm:      parseInt(document.getElementById('f_bpm')?.value)||0,
+        category: document.getElementById('f_cat')?.value?.trim()||'',
+        youtubeUrl: document.getElementById('f_yt')?.value?.trim()||'',
+        spotifyUrl: document.getElementById('f_sp')?.value?.trim()||'',
+        deezerUrl:  document.getElementById('f_dz')?.value?.trim()||'',
+        reaperUrl:  document.getElementById('f_rp')?.value?.trim()||'',
+        bandUrl:    document.getElementById('f_bd')?.value?.trim()||'',
+        chords:  document.getElementById('f_ch')?.value||'',
+        notes:   document.getElementById('f_nt')?.value?.trim()||'',
+    };
+
+    // Handle PDF
+    if (S.pendingPdfFile) {
+        await dbSavePDF(d.id, S.pendingPdfFile);
+        S.hasPdf.add(d.id);
+        toast('✅ Música e PDF salvos!');
+    } else if (S.pendingPdfRemove) {
+        await dbDeletePDF(d.id);
+        S.hasPdf.delete(d.id);
+        toast('✅ Música salva (PDF removido).');
+    } else {
+        toast(eid ? '✅ Música atualizada!' : '✅ Música adicionada!');
+    }
+
+    if (eid) { const i=S.songs.findIndex(s=>s.id===eid); if(i!==-1) S.songs[i]=d; }
+    else     { S.songs.push(d); }
+
+    persist();
+    S.modal=null; S.pendingPdfFile=null; S.pendingPdfRemove=false;
+    render();
+}
+
+async function delSong(id) {
+    if (!confirm('Excluir esta música?')) return;
+    S.songs = S.songs.filter(s=>s.id!==id);
+    S.setlists.forEach(sl=>{ sl.songIds=sl.songIds.filter(x=>x!==id); });
+    if (S.hasPdf.has(id)) { await dbDeletePDF(id); S.hasPdf.delete(id); }
+    persist(); S.modal=null; toast('🗑 Música excluída.'); render();
+}
+
+// PDF picks
+function onPdfPick(input) {
+    const f = input.files?.[0]; if (!f) return;
+    S.pendingPdfFile = f;
+    S.pendingPdfRemove = false;
+    render();
+}
+function onPdfDrop(e) {
+    e.preventDefault();
+    document.getElementById('pdfDropZone')?.classList.remove('drag');
+    const f = e.dataTransfer?.files?.[0];
+    if (f && f.type==='application/pdf') { S.pendingPdfFile=f; render(); }
+    else toast('⚠️ Envie um arquivo .pdf');
+}
+function clearPendingPdf() { S.pendingPdfFile=null; render(); }
+function markPdfRemove()   { S.pendingPdfRemove=true; S.pendingPdfFile=null; render(); }
+function cancelPdfRemove() { S.pendingPdfRemove=false; render(); }
+
+// Transpose
+function doT(d, reset) {
+    if (reset) S.transpose=0; else S.transpose+=d;
+    const song=S.modal?.data; if(!song) return;
+    const transposed=tText(song.chords||'',S.transpose);
+    const cc=document.getElementById('cc');
+    const to=document.getElementById('toff');
+    if(cc) cc.innerHTML=fmtLines(transposed);
+    if(to) to.textContent=offsetLbl(S.transpose);
+}
+
+// Player tab
+function setPTab(tab, songId) {
+    S.ptab=tab;
+    const s=S.songs.find(x=>x.id===songId); if(!s)return;
+    S.modal={type:'detail',data:s}; render();
+}
+
+// Cifra tab
+async function setCifraTab(tab, songId) {
+    S.cifraTab = tab;
+    if (tab==='pdf' && S.hasPdf.has(songId) && !S.currentPdfUrl) {
+        const rec = await dbGetPDF(songId);
+        if (rec) {
+            const blob = new Blob([rec.buf], {type:'application/pdf'});
+            S.currentPdfUrl = URL.createObjectURL(blob);
+        }
+    }
+    render();
+}
+
+// Set Lists
+function newSL() {
+    const name=prompt('Nome do set list (ex: Culto Dom 01/06/2026):');
+    if (!name?.trim()) return;
+    const date=prompt('Data (opcional):') || '';
+    const sl={id:uid(),name:name.trim(),date:date.trim(),songIds:[]};
+    S.setlists.push(sl); persist();
+    S.modal={type:'sl',data:sl}; render();
+}
+function openSL(id)  { const sl=S.setlists.find(x=>x.id===id); if(!sl)return; S.modal={type:'sl',data:sl}; render(); }
+function openPrint(id){ const sl=S.setlists.find(x=>x.id===id); if(!sl)return; S.modal={type:'print',data:sl}; render(); }
+
+function editSLMeta(id) {
+    const sl=S.setlists.find(x=>x.id===id); if(!sl)return;
+    const name=prompt('Nome:',sl.name); if(name===null)return;
+    const date=prompt('Data:',sl.date||''); if(date===null)return;
+    sl.name=name.trim()||sl.name; sl.date=date.trim();
+    persist(); S.modal={type:'sl',data:sl}; render();
+}
+function delSL(id) {
+    if(!confirm('Excluir este set list?'))return;
+    S.setlists=S.setlists.filter(x=>x.id!==id);
+    persist(); S.modal=null; toast('🗑 Set list excluído.'); render();
+}
+function slAdd(slId,songId) {
+    const sl=S.setlists.find(x=>x.id===slId); if(!sl||sl.songIds.includes(songId))return;
+    sl.songIds.push(songId); persist(); S.modal={type:'sl',data:sl}; render();
+}
+function slDel(slId,songId) {
+    const sl=S.setlists.find(x=>x.id===slId); if(!sl)return;
+    sl.songIds=sl.songIds.filter(x=>x!==songId); persist(); S.modal={type:'sl',data:sl}; render();
+}
+function slMove(slId,songId,dir) {
+    const sl=S.setlists.find(x=>x.id===slId); if(!sl)return;
+    const i=sl.songIds.indexOf(songId); if(i===-1)return;
+    const j=i+dir; if(j<0||j>=sl.songIds.length)return;
+    [sl.songIds[i],sl.songIds[j]]=[sl.songIds[j],sl.songIds[i]];
+    persist(); S.modal={type:'sl',data:sl}; render();
+}
+
+// ═══════════════════════════════════════════════
+//  PLAYLIST PAGE
+// ═══════════════════════════════════════════════
+function plSongs() {
+    const plat = S.pl.platform;
+    const hasUrl = s => {
+        if (plat === 'youtube') return !!ytId(s.youtubeUrl);
+        if (plat === 'spotify') return !!spId(s.spotifyUrl);
+        if (plat === 'deezer')  return !!dzId(s.deezerUrl);
+        return false;
+    };
+    if (S.pl.source === 'all') return S.songs.filter(hasUrl);
+    const sl = S.setlists.find(x => x.id === S.pl.source);
+    if (!sl) return S.songs.filter(hasUrl);
+    return sl.songIds.map(id => S.songs.find(s => s.id === id)).filter(Boolean).filter(hasUrl);
+}
+
+function plInfoHtml(song) {
+    if (!song) return '<div style="color:var(--muted);font-size:14px">Nenhuma música selecionada</div>';
+    return `<div style="flex:1">
+        <div class="pl-now-title">${song.title}</div>
+        ${song.artist ? `<div class="pl-now-artist">${song.artist}</div>` : ''}
+        <div class="pl-now-meta">
+            ${song.key  ? `<span class="tag tag-bpm" style="color:var(--gold)">Tom: ${song.key}</span>` : ''}
+            ${song.bpm  ? `<span class="tag tag-bpm">♩ ${song.bpm} BPM</span>` : ''}
+            ${song.category ? `<span class="tag">${song.category}</span>` : ''}
+        </div>
+    </div>`;
+}
+
+function playlistPage() {
+    const songs  = plSongs();
+    const idx    = Math.min(S.pl.idx, Math.max(0, songs.length - 1));
+    S.pl.idx     = idx;
+    const song   = songs[idx] || null;
+    const plat   = S.pl.platform;
+    const source = S.pl.source;
+
+    // Build player HTML (YouTube uses a target div; Spotify/Deezer use iframes)
+    let playerHtml = '';
+    if (!song) {
+        playerHtml = `<div class="pl-no-media">Nenhuma música com ${plat} cadastrado.<br><small>Cadastre links na Biblioteca.</small></div>`;
+    } else if (plat === 'youtube') {
+        const vid = ytId(song.youtubeUrl);
+        playerHtml = vid
+            ? `<div class="video-wrap"><div id="pl-yt-div"></div></div>`
+            : `<div class="pl-no-media">Esta música não tem YouTube</div>`;
+    } else if (plat === 'spotify') {
+        const sid = spId(song.spotifyUrl);
+        playerHtml = sid
+            ? `<div class="pl-spotify-wrap"><iframe id="pl-embed" src="https://open.spotify.com/embed/track/${sid}" height="232" frameborder="0" allow="autoplay;clipboard-write;encrypted-media;fullscreen;picture-in-picture" style="width:100%"></iframe></div>`
+            : `<div class="pl-no-media">Esta música não tem Spotify</div>`;
+    } else if (plat === 'deezer') {
+        const did = dzId(song.deezerUrl);
+        playerHtml = did
+            ? `<div class="pl-spotify-wrap"><iframe id="pl-embed" src="https://widget.deezer.com/widget/dark/track/${did}" height="232" frameborder="0" style="width:100%"></iframe></div>`
+            : `<div class="pl-no-media">Esta música não tem Deezer</div>`;
+    }
+
+    return `
+    <div class="pl-topbar">
+        <h2 class="section-title">▶ Playlist</h2>
+        <div class="pl-tabs">
+            <button class="ptab ${plat==='youtube'?'active':''}" onclick="plSetPlatform('youtube')">▶ YouTube</button>
+            <button class="ptab ${plat==='spotify'?'active':''}" onclick="plSetPlatform('spotify')">● Spotify</button>
+            <button class="ptab ${plat==='deezer'?'active':''}"  onclick="plSetPlatform('deezer')">♫ Deezer</button>
+        </div>
+        <select onchange="plSetSource(this.value)" style="margin-left:auto">
+            <option value="all" ${source==='all'?'selected':''}>📚 Todas as músicas</option>
+            ${S.setlists.map(sl => `<option value="${sl.id}" ${source===sl.id?'selected':''}>${sl.name}</option>`).join('')}
+        </select>
+    </div>
+
+    <div class="pl-body">
+        <!-- Player column -->
+        <div class="pl-left">
+            <div class="pl-player-box">${playerHtml}</div>
+
+            <div class="pl-info-bar" id="pl-info">
+                ${plInfoHtml(song)}
+            </div>
+
+            <div class="pl-nav">
+                <button id="pl-prev" class="btn btn-ghost" onclick="plPrev()" ${idx===0?'disabled':''}>◀ Anterior</button>
+                <span class="pl-counter" id="pl-counter">${songs.length > 0 ? `${idx+1} / ${songs.length}` : '—'}</span>
+                <button id="pl-next" class="btn btn-ghost" onclick="plNext()" ${idx>=songs.length-1?'disabled':''}>Próxima ▶</button>
+            </div>
+        </div>
+
+        <!-- Queue column -->
+        <div class="pl-right">
+            <div class="pl-q-hd">🎵 Fila — ${songs.length} música${songs.length!==1?'s':''}</div>
+            <div class="pl-queue" id="pl-queue">
+                ${songs.length === 0
+                    ? `<div class="pl-empty-q">Nenhuma música tem link de ${plat}.<br>Cadastre links na Biblioteca.</div>`
+                    : songs.map((s, i) => `
+                    <div class="pl-q-item ${i===idx?'now':''}" onclick="plGoTo(${i})">
+                        <div class="pl-q-num">${i===idx?'▶':i+1}</div>
+                        <div class="pl-q-info">
+                            <div class="pl-q-title">${s.title}</div>
+                            ${s.artist?`<div class="pl-q-artist">${s.artist}</div>`:''}
+                        </div>
+                        ${s.key?`<span class="sl-key">${s.key}</span>`:''}
+                    </div>`).join('')}
+            </div>
+        </div>
+    </div>`;
+}
+
+// Called after playlist page renders — creates the YouTube IFrame player
+function afterPLRender() {
+    if (S.pl.platform !== 'youtube') return;
+    const div = document.getElementById('pl-yt-div');
+    if (!div) return;
+    const songs = plSongs();
+    const song  = songs[S.pl.idx];
+    const vid   = song ? ytId(song.youtubeUrl) : null;
+    if (!vid) return;
+
+    if (window.YT && YT.Player) {
+        ytPL = new YT.Player('pl-yt-div', {
+            videoId: vid,
+            playerVars: { rel: 0, autoplay: 0, modestbranding: 1 },
+            events: { onStateChange: e => { if (e.data === YT.PlayerState.ENDED) plNext(); } }
+        });
+    }
+}
+
+// ── Playlist actions ──
+function plSetPlatform(p) { ytPL = null; S.pl.platform = p; S.pl.idx = 0; render(); }
+function plSetSource(v)   { ytPL = null; S.pl.source = v;   S.pl.idx = 0; render(); }
+
+function plGoTo(idx) {
+    const songs = plSongs();
+    if (idx < 0 || idx >= songs.length) return;
+    S.pl.idx = idx;
+    const song = songs[idx];
+    const plat = S.pl.platform;
+
+    // Update player without full re-render
+    if (plat === 'youtube' && ytPL && ytPL.loadVideoById) {
+        const vid = ytId(song.youtubeUrl);
+        if (vid) ytPL.loadVideoById(vid);
+    } else if ((plat === 'spotify' || plat === 'deezer') && song) {
+        const iframe = document.getElementById('pl-embed');
+        if (iframe) {
+            const src = plat === 'spotify'
+                ? `https://open.spotify.com/embed/track/${spId(song.spotifyUrl)}`
+                : `https://widget.deezer.com/widget/dark/track/${dzId(song.deezerUrl)}`;
+            iframe.src = src;
+        }
+    }
+
+    // Patch info bar
+    const infoEl = document.getElementById('pl-info');
+    if (infoEl) infoEl.innerHTML = plInfoHtml(song);
+
+    // Patch counter
+    const ctrEl = document.getElementById('pl-counter');
+    if (ctrEl) ctrEl.textContent = `${idx+1} / ${songs.length}`;
+
+    // Patch prev/next buttons
+    const prev = document.getElementById('pl-prev');
+    const next = document.getElementById('pl-next');
+    if (prev) prev.disabled = idx === 0;
+    if (next) next.disabled = idx >= songs.length - 1;
+
+    // Patch queue highlight
+    document.querySelectorAll('.pl-q-item').forEach((el, i) => {
+        el.classList.toggle('now', i === idx);
+        el.querySelector('.pl-q-num').textContent = i === idx ? '▶' : i + 1;
+        if (i === idx) el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    });
+}
+
+function plNext() { plGoTo(S.pl.idx + 1); }
+function plPrev() { plGoTo(S.pl.idx - 1); }
+
+// ═══════════════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════════════
+(async () => {
+    hydrate();
+    if (S.songs.length===0) { S.songs=SEED; persist(); }
+    await openDB();
+    await loadPdfIndex();
+    // Load YouTube IFrame API (async, no blocking)
+    const ytScript = document.createElement('script');
+    ytScript.src = 'https://www.youtube.com/iframe_api';
+    document.head.appendChild(ytScript);
+    render();
+})();
+</script>
+</body>
+</html>
