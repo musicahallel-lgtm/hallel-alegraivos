@@ -37,15 +37,14 @@
             display:flex; align-items:center; height:60px; gap:16px;
         }
         .logo {
-            font-size:19px; font-weight:900; white-space:nowrap;
-            display:flex; align-items:center; gap:6px; letter-spacing:.5px;
+            display:flex; align-items:center; gap:8px; white-space:nowrap; text-decoration:none;
         }
-        .logo-hallel {
-            background: linear-gradient(90deg, #F15A24, #FFD400);
-            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-            background-clip: text;
+        .logo img {
+            height:44px; width:auto; object-fit:contain;
         }
-        .logo-alegraivos { color: #2db85a; font-weight:700; }
+        .logo-alegraivos {
+            font-size:17px; font-weight:800; color:#2db85a; letter-spacing:.3px;
+        }
         .nav { display:flex; gap:4px; flex:1; }
         .nav-btn {
             padding:8px 16px; border-radius:var(--radius-sm); border:none;
@@ -694,7 +693,10 @@ function html() {
 
 function header() {
     return `<div class="header">
-        <div class="logo">🎵 <span class="logo-hallel">Hallel</span><span class="logo-alegraivos">Alegraivos</span></div>
+        <div class="logo">
+            <img src="logo.png" alt="Comunidade Católica Hallel">
+            <span class="logo-alegraivos">Alegraivos</span>
+        </div>
         <nav class="nav">
             <button class="nav-btn ${S.page==='library'?'active':''}"  onclick="nav('library')">🎸 Biblioteca</button>
             <button class="nav-btn ${S.page==='setlists'?'active':''}" onclick="nav('setlists')">📋 Set Lists</button>
