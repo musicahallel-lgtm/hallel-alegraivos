@@ -580,6 +580,33 @@
         .escal-input::placeholder { color:var(--bg4); }
         .escal-input:focus { background:var(--bg4); }
 
+        /* ── Login Screen ── */
+        .login-screen {
+            min-height:100vh; display:flex; align-items:center; justify-content:center;
+            background:var(--bg); padding:20px;
+        }
+        .login-card {
+            background:var(--bg2); border:1px solid var(--border); border-radius:var(--radius);
+            padding:36px 32px; width:100%; max-width:360px;
+            box-shadow:0 8px 32px rgba(0,0,0,.6);
+        }
+        .login-logo { text-align:center; margin-bottom:24px; }
+        .login-logo img { height:64px; width:auto; }
+        .login-title { font-size:20px; font-weight:800; color:var(--text); text-align:center; margin-bottom:4px; }
+        .login-sub   { font-size:13px; color:var(--muted); text-align:center; margin-bottom:28px; }
+        .login-field { margin-bottom:14px; }
+        .login-field label { display:block; font-size:12px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.5px; margin-bottom:6px; }
+        .login-err { background:rgba(158,28,32,.15); border:1px solid var(--red); border-radius:6px; padding:10px 14px; font-size:13px; color:#f87171; margin-bottom:14px; display:none; }
+        .login-err.show { display:block; }
+        .login-btn { width:100%; padding:13px; font-size:15px; font-weight:700; border-radius:var(--radius-sm); border:none; background:var(--purple); color:#fff; cursor:pointer; margin-top:6px; }
+        .login-btn:hover { background:var(--purple-light); }
+        /* Role badge in header */
+        .role-badge {
+            font-size:11px; font-weight:700; padding:3px 9px; border-radius:10px; letter-spacing:.4px;
+        }
+        .role-badge.adm   { background:rgba(0,150,63,.2); color:var(--purple-light); border:1px solid rgba(0,150,63,.3); }
+        .role-badge.geral { background:rgba(241,90,36,.15); color:#f97316; border:1px solid rgba(241,90,36,.3); }
+
         /* ── Print media ── */
         @media print {
             body * { visibility:hidden; }
@@ -595,6 +622,14 @@
 // ═══════════════════════════════════════════════
 //  STATE
 // ═══════════════════════════════════════════════
+// ── Credenciais ──────────────────────────────────────────
+// ⚠️ Altere os usuários e senhas antes de publicar!
+const CREDS = [
+    { user: 'admin',  pass: 'hallel@adm',    role: 'adm'   },
+    { user: 'equipe', pass: 'equipe@hallel',  role: 'geral' },
+];
+// ─────────────────────────────────────────────────────────
+
 const S = {
     page: 'library',
     songs: [],
@@ -604,15 +639,17 @@ const S = {
     filterKey: '',
     transpose: 0,
     ptab: 'youtube',
-    cifraTab: 'texto',     // 'texto' | 'pdf'
-    currentPdfUrl: null,   // blob URL for current detail
-    hasPdf: new Set(),     // song IDs that have PDF stored
-    // pending form state
-    pendingPdfFile: null,  // File object waiting to be saved
+    cifraTab: 'texto',
+    currentPdfUrl: null,
+    hasPdf: new Set(),
+    pendingPdfFile: null,
     pendingPdfRemove: false,
     pl: { source: 'all', platform: 'youtube', idx: 0 },
     slActiveBlock: null,
+    role: localStorage.getItem('hl_role') || null,
 };
+const isAdm   = () => S.role === 'adm';
+const isGeral = () => S.role === 'geral';
 
 // ═══════════════════════════════════════════════
 //  INDEX DB  (PDF storage — no size limit)
@@ -826,8 +863,55 @@ function toast(msg) {
 //  RENDER
 // ═══════════════════════════════════════════════
 function render() {
+    if (!S.role) {
+        document.getElementById('app').innerHTML = loginScreen();
+        return;
+    }
     document.getElementById('app').innerHTML = html();
     if (S.page === 'playlist') afterPLRender();
+}
+
+function loginScreen() {
+    return `<div class="login-screen">
+    <div class="login-card">
+        <div class="login-logo"><img src="logo.png" alt="Hallel"></div>
+        <div class="login-title">Alegraivos</div>
+        <div class="login-sub">Ministério de Música Hallel</div>
+        <div class="login-err" id="login-err">Usuário ou senha incorretos.</div>
+        <div class="login-field">
+            <label>Usuário</label>
+            <input class="field" id="lg-user" type="text" placeholder="usuário" autocomplete="username"
+                onkeydown="if(event.key==='Enter')document.getElementById('lg-pass').focus()">
+        </div>
+        <div class="login-field">
+            <label>Senha</label>
+            <input class="field" id="lg-pass" type="password" placeholder="••••••••" autocomplete="current-password"
+                onkeydown="if(event.key==='Enter')doLogin()">
+        </div>
+        <button class="login-btn" onclick="doLogin()">Entrar</button>
+    </div>
+    </div>`;
+}
+
+function doLogin() {
+    const user = document.getElementById('lg-user')?.value?.trim().toLowerCase();
+    const pass = document.getElementById('lg-pass')?.value;
+    const cred = CREDS.find(c => c.user === user && c.pass === pass);
+    if (!cred) {
+        const err = document.getElementById('login-err');
+        if (err) err.classList.add('show');
+        return;
+    }
+    S.role = cred.role;
+    localStorage.setItem('hl_role', cred.role);
+    render();
+}
+
+function doLogout() {
+    S.role = null;
+    localStorage.removeItem('hl_role');
+    S.modal = null;
+    render();
 }
 
 function html() {
@@ -839,6 +923,7 @@ function html() {
 }
 
 function header() {
+    const roleLabel = isAdm() ? 'ADM' : 'Equipe';
     return `<div class="header">
         <div class="logo">
             <img src="logo.png" alt="Comunidade Católica Hallel">
@@ -849,9 +934,11 @@ function header() {
             <button class="nav-btn ${S.page==='setlists'?'active':''}" onclick="nav('setlists')">📋 Set Lists</button>
             <button class="nav-btn ${S.page==='playlist'?'active':''}" onclick="nav('playlist')">▶ Playlist</button>
         </nav>
-        <div class="header-actions">
-            ${S.page==='library'  ? `<button class="btn btn-primary" onclick="openAdd()">+ Música</button>` : ''}
-            ${S.page==='setlists' ? `<button class="btn btn-primary" onclick="newSL()">+ Set List</button>` : ''}
+        <div class="header-actions" style="display:flex;align-items:center;gap:8px">
+            ${S.page==='library'  && isAdm() ? `<button class="btn btn-primary" onclick="openAdd()">+ Música</button>` : ''}
+            ${S.page==='setlists' && isAdm() ? `<button class="btn btn-primary" onclick="newSL()">+ Set List</button>` : ''}
+            <span class="role-badge ${S.role}">${roleLabel}</span>
+            <button class="btn btn-ghost btn-sm" onclick="doLogout()" title="Sair">⏏</button>
         </div>
     </div>`;
 }
@@ -1072,8 +1159,8 @@ function detailModal(song) {
 
         </div>
         <div class="modal-ft">
-            <button class="btn btn-ghost btn-sm" onclick="openEdit('${song.id}')">✏️ Editar</button>
-            <button class="btn btn-danger btn-sm" onclick="delSong('${song.id}')">🗑 Excluir</button>
+            ${isAdm()?`<button class="btn btn-ghost btn-sm" onclick="openEdit('${song.id}')">✏️ Editar</button>`:''}
+            ${isAdm()?`<button class="btn btn-danger btn-sm" onclick="delSong('${song.id}')">🗑 Excluir</button>`:''}
             <button class="btn btn-ghost" onclick="closeModal()">Fechar</button>
         </div>
     </div></div>`;
@@ -1204,17 +1291,17 @@ function slModal(sl) {
             <div style="display:flex;gap:6px;flex-wrap:wrap">
                 <button class="btn btn-primary btn-sm" onclick="plFromSL('${sl.id}')">▶ Tocar</button>
                 <button class="btn btn-gold btn-sm"    onclick="openPrint('${sl.id}')">🖨 Imprimir</button>
-                <button class="btn btn-ghost btn-sm"   onclick="editSLMeta('${sl.id}')">✏️ Editar</button>
-                <button class="btn btn-danger btn-sm"  onclick="delSL('${sl.id}')">🗑</button>
+                ${isAdm()?`<button class="btn btn-ghost btn-sm" onclick="editSLMeta('${sl.id}')">✏️ Editar</button>`:''}
+                ${isAdm()?`<button class="btn btn-danger btn-sm" onclick="delSL('${sl.id}')">🗑</button>`:''}
             </div>
             <button class="close-btn" onclick="closeModal()">✕</button>
         </div>
         <div class="modal-body">
-            <div class="sl-editor">
+            <div class="sl-editor" style="${isGeral()?'grid-template-columns:1fr':''}">
                 <div>
                     <div class="col-hd" style="display:flex;align-items:center;justify-content:space-between">
                         <span>🎵 Blocos</span>
-                        <button class="btn btn-ghost btn-sm" onclick="slAddBlock('${sl.id}')">+ Bloco</button>
+                        ${isAdm()?`<button class="btn btn-ghost btn-sm" onclick="slAddBlock('${sl.id}')">+ Bloco</button>`:''}
                     </div>
                     ${(sl.blocks||[]).map(block=>{
                         const bsongs = (block.songIds||[]).map(id=>S.songs.find(s=>s.id===id)).filter(Boolean);
@@ -1227,8 +1314,8 @@ function slModal(sl) {
                                     <span style="opacity:.7;font-weight:400">(${bsongs.length})</span>
                                     ${isActive?`<span style="font-size:10px;background:rgba(255,255,255,.2);padding:1px 6px;border-radius:8px;margin-left:4px">alvo</span>`:''}
                                 </span>
-                                <button class="sl-block-hd-btn" onclick="event.stopPropagation();slRenameBlock('${sl.id}','${block.id}')">✏️</button>
-                                <button class="sl-block-hd-btn" onclick="event.stopPropagation();slDelBlock('${sl.id}','${block.id}')">🗑</button>
+                                ${isAdm()?`<button class="sl-block-hd-btn" onclick="event.stopPropagation();slRenameBlock('${sl.id}','${block.id}')">✏️</button>`:''}
+                                ${isAdm()?`<button class="sl-block-hd-btn" onclick="event.stopPropagation();slDelBlock('${sl.id}','${block.id}')">🗑</button>`:''}
                             </div>
                             <div class="sl-block-body" data-block-id="${block.id}">
                                 ${bsongs.length===0?`<div class="sl-block-empty">Arraste uma música até aqui, ou clique em + ao lado</div>`:''}
@@ -1255,7 +1342,7 @@ function slModal(sl) {
                         </div>`;
                     }).join('')}
                 </div>
-                <div>
+                ${isAdm()?`<div>
                     <div class="col-hd">📚 Músicas <span style="font-size:11px;font-weight:400;color:var(--muted)">— arraste pro bloco ou clique +</span></div>
                     <div class="avail-list">
                         ${S.songs.length===0?`<div style="color:var(--muted);font-size:13px">Biblioteca vazia</div>`:''}
@@ -1271,7 +1358,7 @@ function slModal(sl) {
                                 ${inSet.has(s.id)?'✓':'+'}
                             </span></div>`).join('')}
                     </div>
-                </div>
+                </div>`:''}
             </div>
 
             <!-- Escalados do set list — full width -->
