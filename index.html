@@ -426,8 +426,21 @@
           padding:3px 7px; font-size:11px; cursor:pointer; font-weight:700;
         }
         .sl-block-hd-btn:hover { background:rgba(255,255,255,.35); }
-        .sl-block-body { padding:8px; background:var(--bg3); }
-        .sl-block-empty { padding:10px; color:var(--muted); font-size:12px; text-align:center; font-style:italic; }
+        .sl-block-body { padding:8px; background:var(--bg3); transition:background .15s, outline .15s; }
+        .sl-block-body.drag-over { background:rgba(0,150,63,.18); outline:2px dashed var(--purple); outline-offset:-2px; border-radius:4px; }
+        .sl-block-empty { padding:14px 10px; color:var(--muted); font-size:12px; text-align:center; font-style:italic; }
+        .avail-item { cursor:grab; user-select:none; touch-action:none; }
+        .avail-item:active { cursor:grabbing; }
+        .avail-item.dg-lifting { opacity:.4; }
+        .drag-ghost {
+            position:fixed; z-index:9999; pointer-events:none;
+            background:var(--bg4); border:2px solid var(--purple);
+            border-radius:10px; padding:8px 14px;
+            font-size:14px; font-weight:700; color:var(--text);
+            box-shadow:0 6px 24px rgba(0,0,0,.6);
+            white-space:nowrap; max-width:220px; overflow:hidden; text-overflow:ellipsis;
+            transform:rotate(-2deg); opacity:.93;
+        }
         /* Print block */
         .print-block { margin-bottom:28px; }
         .print-block-title {
@@ -1149,7 +1162,7 @@ function slModal(sl) {
     const activeBlock = sl.blocks?.[0]?.id||'';
     const curBlock = S.slActiveBlock && sl.blocks?.find(b=>b.id===S.slActiveBlock) ? S.slActiveBlock : activeBlock;
     return `<div class="backdrop" onclick="closeModal(event)">
-    <div class="modal" style="max-width:960px">
+    <div class="modal" style="max-width:960px" data-sl-id="${sl.id}">
         <div class="modal-hd">
             <div style="flex:1">
                 <div class="modal-title">${sl.name}</div>
@@ -1171,14 +1184,20 @@ function slModal(sl) {
                     </div>
                     ${(sl.blocks||[]).map(block=>{
                         const bsongs = (block.songIds||[]).map(id=>S.songs.find(s=>s.id===id)).filter(Boolean);
-                        return `<div class="sl-block">
-                            <div class="sl-block-hd">
-                                <span class="sl-block-hd-name">📌 ${block.name} <span style="opacity:.7;font-weight:400">(${bsongs.length})</span></span>
-                                <button class="sl-block-hd-btn" onclick="slRenameBlock('${sl.id}','${block.id}')">✏️</button>
-                                <button class="sl-block-hd-btn" onclick="slDelBlock('${sl.id}','${block.id}')">🗑</button>
+                        const isActive = curBlock === block.id;
+                        return `<div class="sl-block" style="${isActive?'border-color:var(--purple);':''}">
+                            <div class="sl-block-hd" style="${isActive?'background:var(--purple-dark);cursor:default;':'cursor:pointer;'}"
+                                onclick="slSetActive('${sl.id}','${block.id}')">
+                                <span class="sl-block-hd-name">
+                                    ${isActive?'🎯':'📌'} ${block.name}
+                                    <span style="opacity:.7;font-weight:400">(${bsongs.length})</span>
+                                    ${isActive?`<span style="font-size:10px;background:rgba(255,255,255,.2);padding:1px 6px;border-radius:8px;margin-left:4px">alvo</span>`:''}
+                                </span>
+                                <button class="sl-block-hd-btn" onclick="event.stopPropagation();slRenameBlock('${sl.id}','${block.id}')">✏️</button>
+                                <button class="sl-block-hd-btn" onclick="event.stopPropagation();slDelBlock('${sl.id}','${block.id}')">🗑</button>
                             </div>
-                            <div class="sl-block-body">
-                                ${bsongs.length===0?`<div class="sl-block-empty">Clique em uma música ao lado para adicionar neste bloco</div>`:''}
+                            <div class="sl-block-body" data-block-id="${block.id}">
+                                ${bsongs.length===0?`<div class="sl-block-empty">Arraste uma música até aqui, ou clique em + ao lado</div>`:''}
                                 ${bsongs.map((s,i)=>`<div class="sl-item">
                                     <span class="sl-num">${i+1}</span>
                                     <span class="sl-title">${s.title}</span>
@@ -1193,22 +1212,18 @@ function slModal(sl) {
                     }).join('')}
                 </div>
                 <div>
-                    <div class="col-hd">📚 Adicionar música ao bloco:</div>
-                    <div style="margin-bottom:10px">
-                        <select onchange="S.slActiveBlock=this.value" style="width:100%" class="field">
-                            ${(sl.blocks||[]).map(b=>`<option value="${b.id}" ${curBlock===b.id?'selected':''}>${b.name}</option>`).join('')}
-                        </select>
-                    </div>
+                    <div class="col-hd">📚 Músicas <span style="font-size:11px;font-weight:400;color:var(--muted)">— arraste pro bloco ou clique +</span></div>
                     <div class="avail-list">
                         ${S.songs.length===0?`<div style="color:var(--muted);font-size:13px">Biblioteca vazia</div>`:''}
                         ${S.songs.map(s=>`<div class="avail-item ${inSet.has(s.id)?'in-list':''}"
+                            onpointerdown="dgDown(event,'${s.id}')"
                             onclick="slAddToBlock('${sl.id}','${s.id}')">
-                            <div style="flex:1">
+                            <div style="flex:1;pointer-events:none">
                                 <div style="font-size:14px;font-weight:600">${s.title}</div>
                                 ${s.artist?`<div style="font-size:12px;color:var(--muted)">${s.artist}</div>`:''}
                             </div>
-                            ${s.key?`<span class="sl-key">${s.key}</span>`:''}
-                            <span style="color:${inSet.has(s.id)?'var(--muted)':'var(--purple-light)'};margin-left:6px">
+                            ${s.key?`<span class="sl-key" style="pointer-events:none">${s.key}</span>`:''}
+                            <span style="color:${inSet.has(s.id)?'var(--muted)':'var(--purple-light)'};margin-left:6px;pointer-events:none">
                                 ${inSet.has(s.id)?'✓':'+'}
                             </span></div>`).join('')}
                     </div>
@@ -1490,14 +1505,71 @@ function slDel(slId,songId) {
 }
 function slMove(slId,songId,dir) { /* deprecated — use slMoveInBlock */ }
 
+// ── Drag-and-drop para set list ──
+const _dg = {on:false, id:null, ghost:null, over:null};
+
+function dgDown(e, songId) {
+    // only start drag on real pointer/touch, not keyboard clicks
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    _dg.on = false; _dg.id = songId;
+    const song = S.songs.find(s=>s.id===songId);
+    _dg.ghost = document.createElement('div');
+    _dg.ghost.className = 'drag-ghost';
+    _dg.ghost.textContent = (song?.title||'?');
+    document.body.appendChild(_dg.ghost);
+    document.addEventListener('pointermove', dgMv, {passive:false});
+    document.addEventListener('pointerup',   dgUp);
+    document.addEventListener('pointercancel', dgUp);
+    dgMv(e);
+    e.preventDefault();
+}
+function dgMv(e) {
+    if (!_dg.ghost) return;
+    _dg.ghost.style.left = (e.clientX + 14) + 'px';
+    _dg.ghost.style.top  = (e.clientY - 18) + 'px';
+    _dg.on = true; // mark as real drag (moved)
+    // find block under pointer
+    const els = document.elementsFromPoint(e.clientX, e.clientY);
+    const bd = els.find(el => el.dataset && el.dataset.blockId);
+    if (_dg.over && _dg.over !== bd) _dg.over.classList.remove('drag-over');
+    _dg.over = bd || null;
+    if (bd) bd.classList.add('drag-over');
+    // dim source item
+    const src = document.querySelector('.avail-item.dg-lifting');
+    if (!src) {
+        const items = document.querySelectorAll('.avail-item');
+        items.forEach(it => { if (it.dataset && it.getAttribute('onpointerdown')?.includes(_dg.id)) it.classList.add('dg-lifting'); });
+    }
+    e.preventDefault();
+}
+function dgUp(e) {
+    document.removeEventListener('pointermove', dgMv);
+    document.removeEventListener('pointerup',   dgUp);
+    document.removeEventListener('pointercancel', dgUp);
+    if (_dg.ghost) { _dg.ghost.remove(); _dg.ghost = null; }
+    document.querySelectorAll('.avail-item.dg-lifting').forEach(el=>el.classList.remove('dg-lifting'));
+    if (_dg.over) {
+        _dg.over.classList.remove('drag-over');
+        const blockId = _dg.over.dataset.blockId;
+        const modal = document.querySelector('[data-sl-id]');
+        const slId = modal?.dataset.slId;
+        if (_dg.on && slId && blockId && _dg.id) {
+            slAddToBlock(slId, _dg.id, blockId);
+        }
+        _dg.over = null;
+    }
+    _dg.on = false; _dg.id = null;
+}
+
 // Block-aware actions
-function slAddToBlock(slId, songId) {
+function slAddToBlock(slId, songId, blockId) {
     const sl = S.setlists.find(x=>x.id===slId); if(!sl) return;
-    const blockId = S.slActiveBlock || sl.blocks?.[0]?.id;
-    const block = sl.blocks?.find(b=>b.id===blockId);
+    const bid = blockId || S.slActiveBlock || sl.blocks?.[0]?.id;
+    const block = sl.blocks?.find(b=>b.id===bid);
     if (!block) return;
     if (block.songIds.includes(songId)) return;
     block.songIds.push(songId);
+    S.slActiveBlock = bid;
     persist(); S.modal={type:'sl',data:sl}; render();
 }
 function slDelFromBlock(slId, blockId, songId) {
@@ -1513,6 +1585,11 @@ function slMoveInBlock(slId, blockId, songId, dir) {
     const j = i+dir; if(j<0||j>=block.songIds.length) return;
     [block.songIds[i],block.songIds[j]]=[block.songIds[j],block.songIds[i]];
     persist(); S.modal={type:'sl',data:sl}; render();
+}
+function slSetActive(slId, blockId) {
+    S.slActiveBlock = blockId;
+    const sl = S.setlists.find(x=>x.id===slId); if(!sl) return;
+    S.modal={type:'sl',data:sl}; render();
 }
 function slAddBlock(slId) {
     const sl = S.setlists.find(x=>x.id===slId); if(!sl) return;
