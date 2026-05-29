@@ -402,6 +402,40 @@
         .avail-item:hover { border-color:var(--purple); }
         .avail-item.in-list { opacity:.38; cursor:default; pointer-events:none; }
 
+        /* New SL modal */
+        .newsl-templates { display:flex; gap:10px; flex-wrap:wrap; margin-top:12px; }
+        .newsl-tpl {
+          flex:1; min-width:130px; padding:16px 12px; border-radius:var(--radius-sm);
+          border:2px solid var(--border); cursor:pointer; text-align:center; transition:all .2s;
+          background:var(--bg3);
+        }
+        .newsl-tpl:hover { border-color:var(--purple); }
+        .newsl-tpl.sel { border-color:var(--purple); background:rgba(0,150,63,.12); }
+        .newsl-tpl-icon { font-size:26px; margin-bottom:6px; }
+        .newsl-tpl-name { font-weight:700; font-size:13px; }
+        .newsl-tpl-desc { font-size:11px; color:var(--muted); margin-top:3px; line-height:1.4; }
+        /* Block sections in set list editor */
+        .sl-block { margin-bottom:14px; border-radius:var(--radius-sm); overflow:hidden; border:1px solid var(--border); }
+        .sl-block-hd {
+          display:flex; align-items:center; gap:8px; padding:9px 12px;
+          background:var(--purple); color:#fff; font-weight:700; font-size:13px;
+        }
+        .sl-block-hd-name { flex:1; }
+        .sl-block-hd-btn {
+          background:rgba(255,255,255,.2); border:none; color:#fff; border-radius:4px;
+          padding:3px 7px; font-size:11px; cursor:pointer; font-weight:700;
+        }
+        .sl-block-hd-btn:hover { background:rgba(255,255,255,.35); }
+        .sl-block-body { padding:8px; background:var(--bg3); }
+        .sl-block-empty { padding:10px; color:var(--muted); font-size:12px; text-align:center; font-style:italic; }
+        /* Print block */
+        .print-block { margin-bottom:28px; }
+        .print-block-title {
+          font-size:13px; font-weight:bold; text-transform:uppercase; letter-spacing:.8px;
+          color:#fff; background:#222; padding:5px 12px; border-radius:3px; margin-bottom:10px; display:inline-block;
+        }
+        .print-chord { font-family:'Courier New',monospace; font-size:11px; color:#555; margin-top:6px; white-space:pre-wrap; line-height:1.6; }
+
         /* ── Print View ── */
         .print-view {
             background:#fff; color:#111; padding:36px;
@@ -535,6 +569,7 @@ const S = {
     pendingPdfFile: null,  // File object waiting to be saved
     pendingPdfRemove: false,
     pl: { source: 'all', platform: 'youtube', idx: 0 },
+    slActiveBlock: null,
 };
 
 // ═══════════════════════════════════════════════
@@ -616,6 +651,13 @@ function hydrate() {
         if (s)  S.songs    = JSON.parse(s);
         if (sl) S.setlists = JSON.parse(sl);
     } catch(e) { console.error(e); }
+    // Migrate old set lists (songIds → blocks)
+    S.setlists.forEach(sl => {
+        if (!sl.blocks) {
+            sl.blocks = [{ id: 'b'+uid(), name: 'Geral', songIds: sl.songIds || [] }];
+            delete sl.songIds;
+        }
+    });
 }
 
 // ═══════════════════════════════════════════════
@@ -840,15 +882,14 @@ function slPage() {
 }
 
 function slCard(sl) {
-    const songs = sl.songIds.map(id=>S.songs.find(s=>s.id===id)).filter(Boolean);
+    const allIds = (sl.blocks||[]).flatMap(b=>b.songIds||[]);
+    const songs = allIds.map(id=>S.songs.find(s=>s.id===id)).filter(Boolean);
+    const blockCount = (sl.blocks||[]).length;
     return `<div class="setlist-card" onclick="openSL('${sl.id}')">
         <div class="setlist-name">${sl.name}</div>
         ${sl.date?`<div class="setlist-date">📅 ${sl.date}</div>`:''}
-        <div class="setlist-count">🎵 ${songs.length} música${songs.length!==1?'s':''}</div>
-        ${songs.length>0?`<div class="setlist-preview">
-            ${songs.slice(0,3).map((s,i)=>`<div>${i+1}. ${s.title}</div>`).join('')}
-            ${songs.length>3?`<div style="color:var(--purple-light)">+${songs.length-3} mais…</div>`:''}
-        </div>`:''}
+        <div class="setlist-count">🎵 ${songs.length} música${songs.length!==1?'s':''} · ${blockCount} bloco${blockCount!==1?'s':''}</div>
+        ${songs.length>0?`<div class="setlist-preview">${songs.slice(0,3).map(s=>`<div>· ${s.title}</div>`).join('')}${songs.length>3?`<div style="color:var(--purple-light)">+${songs.length-3} mais…</div>`:''}</div>`:''}
     </div>`;
 }
 
@@ -859,6 +900,7 @@ function modalHtml() {
     const {type,data} = S.modal;
     if (type==='detail')  return detailModal(data);
     if (type==='add')     return addModal(data);
+    if (type==='newSL')   return newSLModal(data);
     if (type==='sl')      return slModal(data);
     if (type==='print')   return printModal(data);
     return '';
@@ -1102,10 +1144,12 @@ function addModal(v) {
 
 // ── Set List Editor ──
 function slModal(sl) {
-    const songs = sl.songIds.map(id=>S.songs.find(s=>s.id===id)).filter(Boolean);
-    const inSet = new Set(sl.songIds);
+    const allSongIds = (sl.blocks||[]).flatMap(b=>b.songIds||[]);
+    const inSet = new Set(allSongIds);
+    const activeBlock = sl.blocks?.[0]?.id||'';
+    const curBlock = S.slActiveBlock && sl.blocks?.find(b=>b.id===S.slActiveBlock) ? S.slActiveBlock : activeBlock;
     return `<div class="backdrop" onclick="closeModal(event)">
-    <div class="modal" style="max-width:920px">
+    <div class="modal" style="max-width:960px">
         <div class="modal-hd">
             <div style="flex:1">
                 <div class="modal-title">${sl.name}</div>
@@ -1121,24 +1165,44 @@ function slModal(sl) {
         <div class="modal-body">
             <div class="sl-editor">
                 <div>
-                    <div class="col-hd">🎵 Ordem — ${songs.length} música${songs.length!==1?'s':''}</div>
-                    ${songs.length===0?`<div style="color:var(--muted);font-size:13px;padding:20px 0;text-align:center">Selecione músicas ao lado →</div>`:''}
-                    ${songs.map((s,i)=>`<div class="sl-item">
-                        <span class="sl-num">${i+1}</span>
-                        <span class="sl-title">${s.title}</span>
-                        ${s.key?`<span class="sl-key">${s.key}</span>`:''}
-                        <div style="display:flex;gap:2px;margin-left:4px">
-                            ${i>0?`<button class="btn btn-ghost btn-sm btn-icon" onclick="slMove('${sl.id}','${s.id}',-1)">↑</button>`:'<span style="width:30px"></span>'}
-                            ${i<songs.length-1?`<button class="btn btn-ghost btn-sm btn-icon" onclick="slMove('${sl.id}','${s.id}',1)">↓</button>`:'<span style="width:30px"></span>'}
-                            <button class="btn btn-ghost btn-sm btn-icon" onclick="slDel('${sl.id}','${s.id}')">✕</button>
-                        </div></div>`).join('')}
+                    <div class="col-hd" style="display:flex;align-items:center;justify-content:space-between">
+                        <span>🎵 Blocos</span>
+                        <button class="btn btn-ghost btn-sm" onclick="slAddBlock('${sl.id}')">+ Bloco</button>
+                    </div>
+                    ${(sl.blocks||[]).map(block=>{
+                        const bsongs = (block.songIds||[]).map(id=>S.songs.find(s=>s.id===id)).filter(Boolean);
+                        return `<div class="sl-block">
+                            <div class="sl-block-hd">
+                                <span class="sl-block-hd-name">📌 ${block.name} <span style="opacity:.7;font-weight:400">(${bsongs.length})</span></span>
+                                <button class="sl-block-hd-btn" onclick="slRenameBlock('${sl.id}','${block.id}')">✏️</button>
+                                <button class="sl-block-hd-btn" onclick="slDelBlock('${sl.id}','${block.id}')">🗑</button>
+                            </div>
+                            <div class="sl-block-body">
+                                ${bsongs.length===0?`<div class="sl-block-empty">Clique em uma música ao lado para adicionar neste bloco</div>`:''}
+                                ${bsongs.map((s,i)=>`<div class="sl-item">
+                                    <span class="sl-num">${i+1}</span>
+                                    <span class="sl-title">${s.title}</span>
+                                    ${s.key?`<span class="sl-key">${s.key}</span>`:''}
+                                    <div style="display:flex;gap:2px;margin-left:4px">
+                                        ${i>0?`<button class="btn btn-ghost btn-sm btn-icon" onclick="slMoveInBlock('${sl.id}','${block.id}','${s.id}',-1)">↑</button>`:'<span style="width:30px"></span>'}
+                                        ${i<bsongs.length-1?`<button class="btn btn-ghost btn-sm btn-icon" onclick="slMoveInBlock('${sl.id}','${block.id}','${s.id}',1)">↓</button>`:'<span style="width:30px"></span>'}
+                                        <button class="btn btn-ghost btn-sm btn-icon" onclick="slDelFromBlock('${sl.id}','${block.id}','${s.id}')">✕</button>
+                                    </div></div>`).join('')}
+                            </div>
+                        </div>`;
+                    }).join('')}
                 </div>
                 <div>
-                    <div class="col-hd">📚 Biblioteca (clique para adicionar)</div>
+                    <div class="col-hd">📚 Adicionar música ao bloco:</div>
+                    <div style="margin-bottom:10px">
+                        <select onchange="S.slActiveBlock=this.value" style="width:100%" class="field">
+                            ${(sl.blocks||[]).map(b=>`<option value="${b.id}" ${curBlock===b.id?'selected':''}>${b.name}</option>`).join('')}
+                        </select>
+                    </div>
                     <div class="avail-list">
                         ${S.songs.length===0?`<div style="color:var(--muted);font-size:13px">Biblioteca vazia</div>`:''}
                         ${S.songs.map(s=>`<div class="avail-item ${inSet.has(s.id)?'in-list':''}"
-                            onclick="${inSet.has(s.id)?'':` slAdd('${sl.id}','${s.id}')`}">
+                            onclick="slAddToBlock('${sl.id}','${s.id}')">
                             <div style="flex:1">
                                 <div style="font-size:14px;font-weight:600">${s.title}</div>
                                 ${s.artist?`<div style="font-size:12px;color:var(--muted)">${s.artist}</div>`:''}
@@ -1156,10 +1220,9 @@ function slModal(sl) {
 
 // ── Print ──
 function printModal(sl) {
-    const songs = sl.songIds.map(id=>S.songs.find(s=>s.id===id)).filter(Boolean);
     const today = new Date().toLocaleDateString('pt-BR');
     return `<div class="backdrop" onclick="closeModal(event)">
-    <div class="modal" style="max-width:680px">
+    <div class="modal" style="max-width:700px">
         <div class="modal-hd">
             <div class="modal-title">🖨 Imprimir Set List</div>
             <button class="close-btn" onclick="closeModal()">✕</button>
@@ -1170,17 +1233,27 @@ function printModal(sl) {
                     <div class="ph-title">${sl.name}</div>
                     <div class="ph-sub">Ministério de Música Hallel — Alegraivos &nbsp;|&nbsp; ${sl.date||today}</div>
                 </div>
-                <ol class="plist">
-                    ${songs.map((s,i)=>`<li>
-                        <div class="pnum">${i+1}</div>
-                        <div class="p-title">${s.title}</div>
-                        ${s.artist?`<div style="color:#555;font-size:12px">${s.artist}</div>`:''}
-                        ${s.key?`<div class="p-key">${s.key}</div>`:''}
-                        ${s.bpm?`<div class="p-bpm">${s.bpm} BPM</div>`:''}
-                    </li>`).join('')}
-                </ol>
-                <div style="margin-top:28px;text-align:center;font-size:12px;color:#999">
-                    Total: ${songs.length} música${songs.length!==1?'s':''}
+                ${(sl.blocks||[]).map(block=>{
+                    const bsongs = (block.songIds||[]).map(id=>S.songs.find(s=>s.id===id)).filter(Boolean);
+                    if (!bsongs.length) return '';
+                    return `<div class="print-block">
+                        <div class="print-block-title">${block.name}</div>
+                        <ol class="plist" style="padding-left:0">
+                            ${bsongs.map((s,i)=>`<li style="display:block;padding:14px 0;border-bottom:1px solid #eee">
+                                <div style="display:flex;align-items:center;gap:12px">
+                                    <div class="pnum">${i+1}</div>
+                                    <div class="p-title">${s.title}</div>
+                                    ${s.artist?`<div style="font-size:12px;color:#777">${s.artist}</div>`:''}
+                                    ${s.key?`<div class="p-key">Tom: ${s.key}</div>`:''}
+                                    ${s.bpm?`<div class="p-bpm">${s.bpm} BPM</div>`:''}
+                                </div>
+                                ${s.chords?`<div class="print-chord">${tText(s.chords,0).replace(/</g,'&lt;')}</div>`:''}
+                            </li>`).join('')}
+                        </ol>
+                    </div>`;
+                }).join('')}
+                <div style="margin-top:20px;text-align:center;font-size:11px;color:#aaa">
+                    Total: ${(sl.blocks||[]).flatMap(b=>b.songIds||[]).length} músicas
                 </div>
             </div>
         </div>
@@ -1280,7 +1353,9 @@ async function saveSong(eid) {
 async function delSong(id) {
     if (!confirm('Excluir esta música?')) return;
     S.songs = S.songs.filter(s=>s.id!==id);
-    S.setlists.forEach(sl=>{ sl.songIds=sl.songIds.filter(x=>x!==id); });
+    S.setlists.forEach(sl=>{
+        (sl.blocks||[]).forEach(b=>{ b.songIds=b.songIds.filter(x=>x!==id); });
+    });
     if (S.hasPdf.has(id)) { await dbDeletePDF(id); S.hasPdf.delete(id); }
     persist(); S.modal=null; toast('🗑 Música excluída.'); render();
 }
@@ -1336,10 +1411,58 @@ async function setCifraTab(tab, songId) {
 
 // Set Lists
 function newSL() {
-    const name=prompt('Nome do set list (ex: Culto Dom 01/06/2026):');
-    if (!name?.trim()) return;
-    const date=prompt('Data (opcional):') || '';
-    const sl={id:uid(),name:name.trim(),date:date.trim(),songIds:[]};
+    S.modal={type:'newSL', data:{name:'',date:'',tpl:'livre'}}; render();
+}
+function newSLModal(d) {
+    return `<div class="backdrop" onclick="closeModal(event)">
+    <div class="modal" style="max-width:540px">
+        <div class="modal-hd">
+            <div class="modal-title">+ Novo Set List</div>
+            <button class="close-btn" onclick="closeModal()">✕</button>
+        </div>
+        <div class="modal-body" style="display:flex;flex-direction:column;gap:16px">
+            <div class="fg full">
+                <label>Nome do Set List</label>
+                <input type="text" id="nsl-name" value="${esc(d.name)}" placeholder="Ex: Missa Dom 01/06/2026">
+            </div>
+            <div class="fg full">
+                <label>Data (opcional)</label>
+                <input type="text" id="nsl-date" value="${esc(d.date)}" placeholder="01/06/2026">
+            </div>
+            <div class="fg full">
+                <label>Modelo</label>
+                <div class="newsl-templates">
+                    <div class="newsl-tpl ${d.tpl==='livre'?'sel':''}" onclick="nslTpl('livre')">
+                        <div class="newsl-tpl-icon">📋</div>
+                        <div class="newsl-tpl-name">Livre</div>
+                        <div class="newsl-tpl-desc">Blocos personalizados</div>
+                    </div>
+                    <div class="newsl-tpl ${d.tpl==='missa'?'sel':''}" onclick="nslTpl('missa')">
+                        <div class="newsl-tpl-icon">✝️</div>
+                        <div class="newsl-tpl-name">Santa Missa</div>
+                        <div class="newsl-tpl-desc">Entrada, Ofertório, Comunhão…</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="modal-ft">
+            <button class="btn btn-ghost" onclick="closeModal()">Cancelar</button>
+            <button class="btn btn-primary" onclick="createSL()">Criar Set List</button>
+        </div>
+    </div></div>`;
+}
+function nslTpl(tpl) {
+    if (S.modal?.type==='newSL') { S.modal.data.tpl=tpl; render(); }
+}
+function createSL() {
+    const name = document.getElementById('nsl-name')?.value?.trim();
+    const date = document.getElementById('nsl-date')?.value?.trim()||'';
+    const tpl  = S.modal?.data?.tpl||'livre';
+    if (!name) { alert('Digite o nome do set list'); return; }
+    const blocks = tpl==='missa'
+        ? MISSA_BLOCKS.map(n=>({id:'b'+uid(),name:n,songIds:[]}))
+        : [{id:'b'+uid(),name:'Geral',songIds:[]}];
+    const sl={id:uid(),name,date,blocks};
     S.setlists.push(sl); persist();
     S.modal={type:'sl',data:sl}; render();
 }
@@ -1358,19 +1481,57 @@ function delSL(id) {
     S.setlists=S.setlists.filter(x=>x.id!==id);
     persist(); S.modal=null; toast('🗑 Set list excluído.'); render();
 }
-function slAdd(slId,songId) {
-    const sl=S.setlists.find(x=>x.id===slId); if(!sl||sl.songIds.includes(songId))return;
-    sl.songIds.push(songId); persist(); S.modal={type:'sl',data:sl}; render();
-}
+// Legacy stubs (kept for safety)
+function slAdd(slId,songId) { slAddToBlock(slId,songId); }
 function slDel(slId,songId) {
     const sl=S.setlists.find(x=>x.id===slId); if(!sl)return;
-    sl.songIds=sl.songIds.filter(x=>x!==songId); persist(); S.modal={type:'sl',data:sl}; render();
+    (sl.blocks||[]).forEach(b=>{ b.songIds=b.songIds.filter(x=>x!==songId); });
+    persist(); S.modal={type:'sl',data:sl}; render();
 }
-function slMove(slId,songId,dir) {
-    const sl=S.setlists.find(x=>x.id===slId); if(!sl)return;
-    const i=sl.songIds.indexOf(songId); if(i===-1)return;
-    const j=i+dir; if(j<0||j>=sl.songIds.length)return;
-    [sl.songIds[i],sl.songIds[j]]=[sl.songIds[j],sl.songIds[i]];
+function slMove(slId,songId,dir) { /* deprecated — use slMoveInBlock */ }
+
+// Block-aware actions
+function slAddToBlock(slId, songId) {
+    const sl = S.setlists.find(x=>x.id===slId); if(!sl) return;
+    const blockId = S.slActiveBlock || sl.blocks?.[0]?.id;
+    const block = sl.blocks?.find(b=>b.id===blockId);
+    if (!block) return;
+    if (block.songIds.includes(songId)) return;
+    block.songIds.push(songId);
+    persist(); S.modal={type:'sl',data:sl}; render();
+}
+function slDelFromBlock(slId, blockId, songId) {
+    const sl = S.setlists.find(x=>x.id===slId); if(!sl) return;
+    const block = sl.blocks?.find(b=>b.id===blockId); if(!block) return;
+    block.songIds = block.songIds.filter(x=>x!==songId);
+    persist(); S.modal={type:'sl',data:sl}; render();
+}
+function slMoveInBlock(slId, blockId, songId, dir) {
+    const sl = S.setlists.find(x=>x.id===slId); if(!sl) return;
+    const block = sl.blocks?.find(b=>b.id===blockId); if(!block) return;
+    const i = block.songIds.indexOf(songId); if(i===-1) return;
+    const j = i+dir; if(j<0||j>=block.songIds.length) return;
+    [block.songIds[i],block.songIds[j]]=[block.songIds[j],block.songIds[i]];
+    persist(); S.modal={type:'sl',data:sl}; render();
+}
+function slAddBlock(slId) {
+    const sl = S.setlists.find(x=>x.id===slId); if(!sl) return;
+    const name = prompt('Nome do bloco:'); if(!name?.trim()) return;
+    sl.blocks = sl.blocks||[];
+    sl.blocks.push({id:'b'+uid(), name:name.trim(), songIds:[]});
+    persist(); S.modal={type:'sl',data:sl}; render();
+}
+function slRenameBlock(slId, blockId) {
+    const sl = S.setlists.find(x=>x.id===slId); if(!sl) return;
+    const block = sl.blocks?.find(b=>b.id===blockId); if(!block) return;
+    const name = prompt('Novo nome:', block.name); if(!name?.trim()) return;
+    block.name = name.trim();
+    persist(); S.modal={type:'sl',data:sl}; render();
+}
+function slDelBlock(slId, blockId) {
+    const sl = S.setlists.find(x=>x.id===slId); if(!sl) return;
+    if (!confirm('Excluir este bloco e suas músicas?')) return;
+    sl.blocks = sl.blocks.filter(b=>b.id!==blockId);
     persist(); S.modal={type:'sl',data:sl}; render();
 }
 
@@ -1388,7 +1549,8 @@ function plSongs() {
     if (S.pl.source === 'all') return S.songs.filter(hasUrl);
     const sl = S.setlists.find(x => x.id === S.pl.source);
     if (!sl) return S.songs.filter(hasUrl);
-    return sl.songIds.map(id => S.songs.find(s => s.id === id)).filter(Boolean).filter(hasUrl);
+    const allIds = (sl.blocks||[]).flatMap(b=>b.songIds||[]);
+    return allIds.map(id => S.songs.find(s => s.id === id)).filter(Boolean).filter(hasUrl);
 }
 
 function plInfoHtml(song) {
@@ -1573,6 +1735,12 @@ const STEM_META = {
     rhythm:        { label:'Guitarra Ritmo', emoji:'🎸' },
     other:         { label:'Outros',      emoji:'🔊' },
 };
+
+const MISSA_BLOCKS = [
+    'Canto de Entrada','Ato Penitencial','Hino de Louvor',
+    'Aclamação ao Evangelho','Ofertório','Santo','Amém',
+    'Cordeiro','Comunhão','Pós Comunhão','Canto Final','Outros'
+];
 
 async function initMixer(songId, stemsPath) {
     if (MIXERS[songId]) { showMixerUI(songId); return; }
