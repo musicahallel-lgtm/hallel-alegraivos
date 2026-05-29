@@ -1202,9 +1202,10 @@ function slModal(sl) {
                 ${sl.date?`<div style="color:var(--muted);font-size:13px;margin-top:2px">📅 ${sl.date}</div>`:''}
             </div>
             <div style="display:flex;gap:6px;flex-wrap:wrap">
-                <button class="btn btn-gold btn-sm"  onclick="openPrint('${sl.id}')">🖨 Imprimir</button>
-                <button class="btn btn-ghost btn-sm" onclick="editSLMeta('${sl.id}')">✏️ Editar</button>
-                <button class="btn btn-danger btn-sm" onclick="delSL('${sl.id}')">🗑</button>
+                <button class="btn btn-primary btn-sm" onclick="plFromSL('${sl.id}')">▶ Tocar</button>
+                <button class="btn btn-gold btn-sm"    onclick="openPrint('${sl.id}')">🖨 Imprimir</button>
+                <button class="btn btn-ghost btn-sm"   onclick="editSLMeta('${sl.id}')">✏️ Editar</button>
+                <button class="btn btn-danger btn-sm"  onclick="delSL('${sl.id}')">🗑</button>
             </div>
             <button class="close-btn" onclick="closeModal()">✕</button>
         </div>
@@ -1597,6 +1598,7 @@ function createSL() {
         : [{id:'b'+uid(),name:'Geral',songIds:[]}];
     const sl={id:uid(),name,date,blocks};
     S.setlists.push(sl); persist();
+    S.pl.source = sl.id; S.pl.idx = 0; // auto-link to playlist
     S.modal={type:'sl',data:sl}; render();
 }
 function openSL(id)  { const sl=S.setlists.find(x=>x.id===id); if(!sl)return; S.modal={type:'sl',data:sl}; render(); }
@@ -1862,6 +1864,7 @@ function afterPLRender() {
 // ── Playlist actions ──
 function plSetPlatform(p) { ytPL = null; S.pl.platform = p; S.pl.idx = 0; render(); }
 function plSetSource(v)   { ytPL = null; S.pl.source = v;   S.pl.idx = 0; render(); }
+function plFromSL(slId)   { ytPL = null; S.pl.source = slId; S.pl.idx = 0; S.modal = null; S.page = 'playlist'; render(); }
 
 function plGoTo(idx) {
     const songs = plSongs();
