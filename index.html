@@ -938,7 +938,7 @@ function header() {
             ${S.page==='library'  && isAdm() ? `<button class="btn btn-primary" onclick="openAdd()">+ Música</button>` : ''}
             ${S.page==='setlists' && isAdm() ? `<button class="btn btn-primary" onclick="newSL()">+ Set List</button>` : ''}
             <span class="role-badge ${S.role}">${roleLabel}</span>
-            <button class="btn btn-ghost btn-sm" onclick="doLogout()" title="Sair">⏏</button>
+            <button class="btn btn-ghost btn-sm" onclick="doLogout()" style="color:var(--muted)">Sair</button>
         </div>
     </div>`;
 }
