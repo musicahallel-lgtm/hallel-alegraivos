@@ -580,6 +580,51 @@
         .escal-input::placeholder { color:var(--bg4); }
         .escal-input:focus { background:var(--bg4); }
 
+        /* ── Agenda ── */
+        .agenda-wrap { max-width:1100px; margin:0 auto; }
+        .agenda-notif {
+            background:linear-gradient(135deg,#7c3a00,#c45a00);
+            border-radius:var(--radius-sm); padding:14px 18px; margin-bottom:20px;
+            display:flex; align-items:flex-start; gap:12px;
+        }
+        .agenda-notif-icon { font-size:22px; flex-shrink:0; margin-top:1px; }
+        .agenda-notif-title { font-size:14px; font-weight:800; color:#fff; margin-bottom:4px; }
+        .agenda-notif-item { font-size:13px; color:rgba(255,255,255,.9); margin-bottom:3px; line-height:1.5; }
+        .agenda-notif-dismiss { margin-left:auto; background:rgba(255,255,255,.2); border:none; color:#fff; border-radius:6px; padding:4px 10px; font-size:12px; cursor:pointer; flex-shrink:0; }
+        .year-grid {
+            display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-bottom:28px;
+        }
+        @media(max-width:900px){ .year-grid { grid-template-columns:repeat(3,1fr); } }
+        @media(max-width:600px){ .year-grid { grid-template-columns:repeat(2,1fr); } }
+        .month-card { background:var(--bg2); border:1px solid var(--border); border-radius:var(--radius-sm); overflow:hidden; }
+        .month-hd { background:var(--purple); color:#fff; text-align:center; padding:7px 4px; font-size:12px; font-weight:800; text-transform:uppercase; letter-spacing:.6px; }
+        .cal-week-hd { display:grid; grid-template-columns:repeat(7,1fr); padding:4px 4px 2px; gap:2px; }
+        .cal-wday { font-size:9px; font-weight:700; color:var(--muted); text-align:center; }
+        .cal-days { display:grid; grid-template-columns:repeat(7,1fr); padding:2px 4px 6px; gap:2px; }
+        .cal-day {
+            aspect-ratio:1; display:flex; align-items:center; justify-content:center;
+            font-size:10px; border-radius:50%; cursor:default; position:relative;
+        }
+        .cal-day.other { color:var(--border); }
+        .cal-day.today { background:var(--gold); color:#fff; font-weight:800; border-radius:50%; }
+        .cal-day.has-ev { background:rgba(0,150,63,.25); color:var(--purple-light); font-weight:700; border-radius:4px; cursor:pointer; }
+        .cal-day.has-ev.today { background:var(--gold); color:#fff; }
+        .cal-day.past { opacity:.45; }
+        .ev-list-section { margin-bottom:10px; }
+        .ev-month-title { font-size:13px; font-weight:800; text-transform:uppercase; letter-spacing:.7px; color:var(--muted); padding:8px 0 6px; border-bottom:1px solid var(--border); margin-bottom:8px; }
+        .ev-item {
+            display:flex; align-items:flex-start; gap:12px; padding:10px 14px;
+            background:var(--bg2); border:1px solid var(--border); border-radius:var(--radius-sm);
+            margin-bottom:6px; transition:border-color .15s;
+        }
+        .ev-item.upcoming { border-color:var(--gold); background:rgba(241,90,36,.06); }
+        .ev-item.past { opacity:.5; }
+        .ev-dot { width:10px; height:10px; border-radius:50%; background:var(--purple); flex-shrink:0; margin-top:4px; }
+        .ev-item.upcoming .ev-dot { background:var(--gold); }
+        .ev-date { font-size:11px; font-weight:700; color:var(--muted); white-space:nowrap; min-width:52px; margin-top:2px; }
+        .ev-title { font-size:13px; font-weight:600; color:var(--text); flex:1; }
+        .ev-badge { font-size:10px; font-weight:700; background:var(--gold); color:#fff; padding:2px 7px; border-radius:8px; flex-shrink:0; white-space:nowrap; }
+
         /* ── Login Screen ── */
         .login-screen {
             min-height:100vh; display:flex; align-items:center; justify-content:center;
@@ -622,6 +667,47 @@
 // ═══════════════════════════════════════════════
 //  STATE
 // ═══════════════════════════════════════════════
+// ── Agenda 2026 ──────────────────────────────────────────
+const EVENTOS_2026 = [
+  {id:'e01',title:'Retorno das atividades – Pré-Reavivamento',     start:'2026-01-23',end:'2026-01-23'},
+  {id:'e02',title:'Reavivamento',                                   start:'2026-01-30',end:'2026-02-01'},
+  {id:'e03',title:'Kerygma',                                        start:'2026-02-13',end:'2026-02-15'},
+  {id:'e04',title:'Curso de Consagração a Jesus pelas mãos de Maria',start:'2026-02-14',end:'2026-02-24'},
+  {id:'e05',title:'Novena de São José',                             start:'2026-03-09',end:'2026-03-18'},
+  {id:'e06',title:'Santa Missa às 19h – São José',                  start:'2026-03-19',end:'2026-03-19'},
+  {id:'e07',title:'Renovação da Consagração a Nossa Senhora',       start:'2026-03-25',end:'2026-03-25'},
+  {id:'e08',title:'Semana Santa – Reflexão e oração',               start:'2026-03-30',end:'2026-04-01'},
+  {id:'e09',title:'Encontro de Vocação – Vida, Aliança e Serviço',  start:'2026-04-11',end:'2026-04-12'},
+  {id:'e10',title:'Encontro de Liderança Hallel',                   start:'2026-04-25',end:'2026-04-26'},
+  {id:'e11',title:'Acampamento RD Jovens',                          start:'2026-05-01',end:'2026-05-03'},
+  {id:'e12',title:'1.000 Ave-Marias',                               start:'2026-05-09',end:'2026-05-09'},
+  {id:'e13',title:'Festa das Mães',                                 start:'2026-05-09',end:'2026-05-09'},
+  {id:'e14',title:'Encontro Vocacional – Lançai as redes!',         start:'2026-05-17',end:'2026-05-17'},
+  {id:'e15',title:'Despertar de Dons',                              start:'2026-05-24',end:'2026-05-24'},
+  {id:'e16',title:'Encontro para Mulheres',                         start:'2026-05-30',end:'2026-05-31'},
+  {id:'e17',title:'Acampamento RD Casais',                          start:'2026-06-12',end:'2026-06-14'},
+  {id:'e18',title:'Missa de Aniversário da Fundadora',              start:'2026-06-27',end:'2026-06-27'},
+  {id:'e19',title:'Festa Julina',                                   start:'2026-07-11',end:'2026-07-11'},
+  {id:'e20',title:'Congresso das Novas Comunidades',                start:'2026-07-18',end:'2026-07-19'},
+  {id:'e21',title:'Acampamento RD Teens',                           start:'2026-07-24',end:'2026-07-26'},
+  {id:'e22',title:'Missa de Acolhimento + Retiro de Vocacionados',  start:'2026-07-31',end:'2026-08-02'},
+  {id:'e23',title:'Festa dos Pais',                                 start:'2026-08-08',end:'2026-08-08'},
+  {id:'e24',title:'Missa de Compromisso – Vida, Aliança e Serviço', start:'2026-08-16',end:'2026-08-16'},
+  {id:'e25',title:'Retiro de Cura para a Comunidade',               start:'2026-08-28',end:'2026-08-30'},
+  {id:'e26',title:'Cerco de Jericó',                                start:'2026-09-16',end:'2026-09-22'},
+  {id:'e27',title:'Santa Missa – 31º Aniversário da Comunidade',    start:'2026-09-23',end:'2026-09-23'},
+  {id:'e28',title:'Retiro de Consagrados',                          start:'2026-09-25',end:'2026-09-27'},
+  {id:'e29',title:'Tríduo de Santa Teresinha',                      start:'2026-09-28',end:'2026-09-30'},
+  {id:'e30',title:'Missa de Consagração',                           start:'2026-10-01',end:'2026-10-01'},
+  {id:'e31',title:'Acampamento RD Kids',                            start:'2026-10-11',end:'2026-10-11'},
+  {id:'e32',title:'Mil Ave-Marias',                                 start:'2026-10-12',end:'2026-10-12'},
+  {id:'e33',title:'Retiro – Equipes e Ministérios de Serviço',      start:'2026-10-30',end:'2026-11-01'},
+  {id:'e34',title:'ALEGRAI-VOS',                                    start:'2026-11-20',end:'2026-11-21'},
+  {id:'e35',title:'Gesto concreto Hallel – Ação social SEDAM',      start:'2026-12-17',end:'2026-12-17'},
+  {id:'e36',title:'Confraternização de Natal e encerramento',       start:'2026-12-19',end:'2026-12-19'},
+];
+// ─────────────────────────────────────────────────────────
+
 // ── Credenciais ──────────────────────────────────────────
 // ⚠️ Altere os usuários e senhas antes de publicar!
 const CREDS = [
@@ -904,6 +990,17 @@ function doLogin() {
     S.role = cred.role;
     localStorage.setItem('hl_role', cred.role);
     render();
+    // Notificação de eventos próximos ao logar
+    setTimeout(() => {
+        const dismissed = JSON.parse(localStorage.getItem('hl_notif_dismissed')||'[]');
+        const near = EVENTOS_2026.filter(ev => { const d=evDaysUntil(ev); return d>=0&&d<=15&&!dismissed.includes(ev.id); });
+        if (near.length) {
+            const ev = near[0];
+            const d = evDaysUntil(ev);
+            const when = d===0?'HOJE':d===1?'amanhã':`em ${d} dias`;
+            toast(`🔔 ${ev.title} — ${when}! Veja a Agenda.`);
+        }
+    }, 800);
 }
 
 function doLogout() {
@@ -918,6 +1015,7 @@ function html() {
     if (S.page === 'library')  page = libPage();
     if (S.page === 'setlists') page = slPage();
     if (S.page === 'playlist') page = playlistPage();
+    if (S.page === 'agenda')   page = agendaPage();
     return header() + `<div class="main">${page}</div>` + (S.modal ? modalHtml() : '');
 }
 
@@ -931,6 +1029,7 @@ function header() {
             <button class="nav-btn ${S.page==='library'?'active':''}"  onclick="nav('library')">🎸 Biblioteca</button>
             <button class="nav-btn ${S.page==='setlists'?'active':''}" onclick="nav('setlists')">📋 Set Lists</button>
             <button class="nav-btn ${S.page==='playlist'?'active':''}" onclick="nav('playlist')">▶ Playlist</button>
+            <button class="nav-btn ${S.page==='agenda'?'active':''}"  onclick="nav('agenda')">📅 Agenda</button>
         </nav>
         <div class="header-actions" style="display:flex;align-items:center;gap:8px">
             ${S.page==='library'  && isAdm() ? `<button class="btn btn-primary" onclick="openAdd()">+ Música</button>` : ''}
@@ -1815,6 +1914,136 @@ function slDelBlock(slId, blockId) {
     if (!confirm('Excluir este bloco e suas músicas?')) return;
     sl.blocks = sl.blocks.filter(b=>b.id!==blockId);
     persist(); S.modal={type:'sl',data:sl}; render();
+}
+
+// ═══════════════════════════════════════════════
+//  AGENDA PAGE
+// ═══════════════════════════════════════════════
+const MESES_PT = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+const DIAS_PT  = ['D','S','T','Q','Q','S','S'];
+
+function evDaysUntil(ev) {
+    const today = new Date(); today.setHours(0,0,0,0);
+    const start = new Date(ev.start + 'T00:00:00');
+    return Math.round((start - today) / 86400000);
+}
+
+function evDateLabel(ev) {
+    const s = ev.start.split('-'); const e = ev.end.split('-');
+    const ds = parseInt(s[2]), ms = parseInt(s[1]);
+    const de = parseInt(e[2]), me = parseInt(e[1]);
+    if (ev.start === ev.end) return `${ds}/${ms < 10 ? '0'+ms : ms}`;
+    if (ms === me) return `${ds}–${de}/${ms < 10 ? '0'+ms : ms}`;
+    return `${ds}/${ms < 10?'0'+ms:ms}–${de}/${me < 10?'0'+me:me}`;
+}
+
+function agendaPage() {
+    const today = new Date(); today.setHours(0,0,0,0);
+    const dismissed = JSON.parse(localStorage.getItem('hl_notif_dismissed')||'[]');
+
+    // Events in next 15 days (not dismissed)
+    const upcoming = EVENTOS_2026.filter(ev => {
+        const d = evDaysUntil(ev);
+        return d >= 0 && d <= 15 && !dismissed.includes(ev.id);
+    });
+
+    // Build set of dates with events for quick lookup
+    const evByDate = {};
+    EVENTOS_2026.forEach(ev => {
+        const s = new Date(ev.start+'T00:00:00');
+        const e = new Date(ev.end+'T00:00:00');
+        for (let d = new Date(s); d <= e; d.setDate(d.getDate()+1)) {
+            const k = d.toISOString().slice(0,10);
+            if (!evByDate[k]) evByDate[k] = [];
+            evByDate[k].push(ev);
+        }
+    });
+
+    // Notification banner
+    let notifHtml = '';
+    if (upcoming.length) {
+        const items = upcoming.map(ev => {
+            const d = evDaysUntil(ev);
+            const when = d === 0 ? 'HOJE' : d === 1 ? 'amanhã' : `em ${d} dias`;
+            return `<div class="agenda-notif-item">🔔 <b>${ev.title}</b> — ${when} (${evDateLabel(ev)})<br>
+            <span style="font-size:12px;opacity:.85">Esteja disponível para esta missão da Comunidade Hallel!</span></div>`;
+        }).join('');
+        notifHtml = `<div class="agenda-notif">
+            <div class="agenda-notif-icon">⚠️</div>
+            <div style="flex:1">
+                <div class="agenda-notif-title">Eventos nos próximos 15 dias</div>
+                ${items}
+            </div>
+            <button class="agenda-notif-dismiss" onclick="agendaDismiss([${upcoming.map(e=>"'"+e.id+"'").join(',')}])">✕ Dispensar</button>
+        </div>`;
+    }
+
+    // Mini-calendar year (12 months)
+    let calHtml = '<div class="year-grid">';
+    for (let m = 0; m < 12; m++) {
+        const firstDay = new Date(2026, m, 1).getDay(); // 0=Sun
+        const daysInMonth = new Date(2026, m+1, 0).getDate();
+        calHtml += `<div class="month-card">
+            <div class="month-hd">${MESES_PT[m]}</div>
+            <div class="cal-week-hd">${DIAS_PT.map(d=>`<div class="cal-wday">${d}</div>`).join('')}</div>
+            <div class="cal-days">`;
+        // leading blanks
+        for (let i = 0; i < firstDay; i++) calHtml += '<div class="cal-day other"></div>';
+        for (let day = 1; day <= daysInMonth; day++) {
+            const dateStr = `2026-${String(m+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+            const isToday = dateStr === today.toISOString().slice(0,10);
+            const hasEv = !!evByDate[dateStr];
+            const isPast = new Date(dateStr+'T00:00:00') < today && !isToday;
+            const cls = [isToday?'today':'', hasEv?'has-ev':'', isPast?'past':''].filter(Boolean).join(' ');
+            const tip = hasEv ? evByDate[dateStr].map(e=>e.title).join(', ') : '';
+            calHtml += `<div class="cal-day ${cls}" title="${tip}">${day}</div>`;
+        }
+        calHtml += '</div></div>';
+    }
+    calHtml += '</div>';
+
+    // Event list grouped by month
+    const evByMonth = {};
+    EVENTOS_2026.forEach(ev => {
+        const mo = parseInt(ev.start.split('-')[1]) - 1;
+        if (!evByMonth[mo]) evByMonth[mo] = [];
+        evByMonth[mo].push(ev);
+    });
+    let listHtml = '';
+    for (let m = 0; m < 12; m++) {
+        const evs = evByMonth[m]; if (!evs) continue;
+        listHtml += `<div class="ev-list-section">
+            <div class="ev-month-title">📅 ${MESES_PT[m]}</div>`;
+        evs.forEach(ev => {
+            const d = evDaysUntil(ev);
+            const isPast = d < 0;
+            const isUp = d >= 0 && d <= 15;
+            listHtml += `<div class="ev-item ${isUp?'upcoming':''} ${isPast?'past':''}">
+                <div class="ev-dot"></div>
+                <div class="ev-date">${evDateLabel(ev)}</div>
+                <div class="ev-title">${ev.title}</div>
+                ${isUp ? `<div class="ev-badge">${d===0?'HOJE':d===1?'amanhã':d+' dias'}</div>` : ''}
+            </div>`;
+        });
+        listHtml += '</div>';
+    }
+
+    return `<div class="agenda-wrap">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
+            <h2 style="font-size:22px;font-weight:800">📅 Agenda Hallel 2026</h2>
+            <span style="font-size:13px;color:var(--muted)">${EVENTOS_2026.length} eventos</span>
+        </div>
+        ${notifHtml}
+        ${calHtml}
+        <div style="margin-top:4px">${listHtml}</div>
+    </div>`;
+}
+
+function agendaDismiss(ids) {
+    const dismissed = JSON.parse(localStorage.getItem('hl_notif_dismissed')||'[]');
+    ids.forEach(id => { if (!dismissed.includes(id)) dismissed.push(id); });
+    localStorage.setItem('hl_notif_dismissed', JSON.stringify(dismissed));
+    render();
 }
 
 // ═══════════════════════════════════════════════
