@@ -267,7 +267,7 @@
         .mixer-seek-input {
             -webkit-appearance:none; appearance:none;
             width:100%; height:8px; border-radius:4px; outline:none;
-            background: linear-gradient(to right, var(--purple) 0%, var(--border) 0%);
+            background: linear-gradient(to right, var(--purple) 0%, #444 0%);
             cursor:pointer; touch-action:manipulation;
         }
         .mixer-seek-input::-webkit-slider-thumb {
@@ -1202,6 +1202,7 @@ async function openDetail(id) {
         }
     }
     S.modal={type:'detail',data:s}; render();
+    maybeInitMixer(s);
 }
 
 function openAdd() {
@@ -1722,10 +1723,15 @@ function stemSolo(songId, name) {
     document.getElementById(`stem-s-${songId}-${name}`)?.classList.toggle('on', t.solo);
 }
 
-// Auto-init mixer when detail modal opens (if song has stemsPath)
+// Se mixer já foi carregado antes, restaura a UI sem recarregar
 function maybeInitMixer(song) {
-    if (!song.stemsPath) return;
-    setTimeout(() => initMixer(song.id, song.stemsPath), 100);
+    if (!song.stemsPath || !MIXERS[song.id]) return;
+    setTimeout(() => {
+        const loadBtn = document.getElementById(`mixer-load-btn-${song.id}`);
+        if (loadBtn) loadBtn.style.display = 'none';
+        buildMixerUI(song.id);
+        showMixerUI(song.id);
+    }, 60);
 }
 
 // ═══════════════════════════════════════════════
