@@ -958,6 +958,7 @@ function detailModal(song) {
             <div class="meta-row">
                 ${song.key?`<div class="meta-it"><span class="meta-lb">Tom</span><span class="meta-vl key">${song.key}</span></div>`:''}
                 ${song.bpm?`<div class="meta-it"><span class="meta-lb">BPM</span><span class="meta-vl">${song.bpm}</span></div>`:''}
+                ${song.vozPrincipal?`<div class="meta-it"><span class="meta-lb">🎤 Voz</span><span class="meta-vl">${song.vozPrincipal}</span></div>`:''}
             </div>
             <button class="close-btn" onclick="closeModal()">✕</button>
         </div>
@@ -1122,6 +1123,8 @@ function addModal(v) {
                     <input type="text" id="f_title" value="${esc(v.title)}" placeholder="Nome da música"></div>
                 <div class="fg"><label>Artista / Banda</label>
                     <input type="text" id="f_artist" value="${esc(v.artist)}" placeholder="ex: Hallel Ano 10"></div>
+                <div class="fg"><label>🎤 Voz Principal <span style="font-weight:400;text-transform:none">(opcional)</span></label>
+                    <input type="text" id="f_voz" value="${esc(v.vozPrincipal)}" placeholder="ex: Maria, João…"></div>
                 <div class="fg"><label>Categoria</label>
                     <input type="text" id="f_cat" value="${esc(v.category)}" placeholder="ex: Adoração, Louvor"></div>
                 <div class="fg"><label>Tom</label>
@@ -1262,7 +1265,9 @@ function slModal(sl) {
                         {k:'baixo',    emoji:'🎸', label:'Baixo'},
                         {k:'guitarra', emoji:'🎸', label:'Guitarra'},
                         {k:'sopro',    emoji:'🎷', label:'Sopro'},
-                        {k:'vocal',    emoji:'🎤', label:'Vocal'},
+                        {k:'vocal1',   emoji:'🎤', label:'Vocal 1'},
+                        {k:'vocal2',   emoji:'🎤', label:'Vocal 2'},
+                        {k:'vocal3',   emoji:'🎤', label:'Vocal 3'},
                         {k:'animador', emoji:'🎙', label:'Animador'},
                     ].map(({k,emoji,label})=>`
                     <div class="escal-row">
@@ -1300,7 +1305,8 @@ function printModal(sl) {
                         {k:'violao',emoji:'🎸',label:'Violão'},{k:'teclado',emoji:'🎹',label:'Teclado'},
                         {k:'bateria',emoji:'🥁',label:'Bateria'},{k:'baixo',emoji:'🎸',label:'Baixo'},
                         {k:'guitarra',emoji:'🎸',label:'Guitarra'},{k:'sopro',emoji:'🎷',label:'Sopro'},
-                        {k:'vocal',emoji:'🎤',label:'Vocal'},{k:'animador',emoji:'🎙',label:'Animador'},
+                        {k:'vocal1',emoji:'🎤',label:'Vocal 1'},{k:'vocal2',emoji:'🎤',label:'Vocal 2'},
+                        {k:'vocal3',emoji:'🎤',label:'Vocal 3'},{k:'animador',emoji:'🎙',label:'Animador'},
                     ];
                     const filled = INSTR.filter(i=>esc[i.k]);
                     if (!filled.length) return '';
@@ -1397,7 +1403,8 @@ async function saveSong(eid) {
     if (!title) { toast('⚠️ Título é obrigatório!'); return; }
     const d = {
         id: eid||uid(), title,
-        artist:   document.getElementById('f_artist')?.value?.trim()||'',
+        artist:      document.getElementById('f_artist')?.value?.trim()||'',
+        vozPrincipal:document.getElementById('f_voz')?.value?.trim()||'',
         key:      document.getElementById('f_key')?.value||'',
         bpm:      parseInt(document.getElementById('f_bpm')?.value)||0,
         category: document.getElementById('f_cat')?.value?.trim()||'',
