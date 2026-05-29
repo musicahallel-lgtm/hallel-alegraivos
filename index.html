@@ -733,6 +733,8 @@ const S = {
     pl: { source: 'all', platform: 'youtube', idx: 0 },
     slActiveBlock: null,
     role: localStorage.getItem('hl_role') || null,
+    escalas: {},   // { evId: { violao, teclado, ..., checklist: [{id,text,done}] } }
+    evTab: 'escala',
 };
 const isAdm   = () => S.role === 'adm';
 const isGeral = () => S.role === 'geral';
@@ -808,13 +810,16 @@ async function loadPdfIndex() {
 function persist() {
     localStorage.setItem('hl_songs',    JSON.stringify(S.songs));
     localStorage.setItem('hl_setlists', JSON.stringify(S.setlists));
+    localStorage.setItem('hl_escalas',  JSON.stringify(S.escalas));
 }
 function hydrate() {
     try {
         const s  = localStorage.getItem('hl_songs');
         const sl = localStorage.getItem('hl_setlists');
+        const es = localStorage.getItem('hl_escalas');
         if (s)  S.songs    = JSON.parse(s);
         if (sl) S.setlists = JSON.parse(sl);
+        if (es) S.escalas  = JSON.parse(es);
     } catch(e) { console.error(e); }
     // Migrate old set lists (songIds → blocks)
     S.setlists.forEach(sl => {
@@ -1129,6 +1134,7 @@ function modalHtml() {
     if (type==='newSL')   return newSLModal(data);
     if (type==='sl')      return slModal(data);
     if (type==='print')   return printModal(data);
+    if (type==='evento')  return eventoModal(data);
     return '';
 }
 
@@ -1996,7 +2002,8 @@ function agendaPage() {
             const isPast = new Date(dateStr+'T00:00:00') < today && !isToday;
             const cls = [isToday?'today':'', hasEv?'has-ev':'', isPast?'past':''].filter(Boolean).join(' ');
             const tip = hasEv ? evByDate[dateStr].map(e=>e.title).join(', ') : '';
-            calHtml += `<div class="cal-day ${cls}" title="${tip}">${day}</div>`;
+            const click = hasEv ? `onclick="openEvModal('${evByDate[dateStr][0].id}')"` : '';
+            calHtml += `<div class="cal-day ${cls}" title="${tip}" ${click}>${day}</div>`;
         }
         calHtml += '</div></div>';
     }
@@ -2018,11 +2025,18 @@ function agendaPage() {
             const d = evDaysUntil(ev);
             const isPast = d < 0;
             const isUp = d >= 0 && d <= 15;
-            listHtml += `<div class="ev-item ${isUp?'upcoming':''} ${isPast?'past':''}">
+            const esc = S.escalas[ev.id];
+            const hasCl = esc?.checklist?.length > 0;
+            const clDone = hasCl ? esc.checklist.filter(i=>i.done).length : 0;
+            const clTotal = hasCl ? esc.checklist.length : 0;
+            listHtml += `<div class="ev-item ${isUp?'upcoming':''} ${isPast?'past':''}" onclick="openEvModal('${ev.id}')" style="cursor:pointer">
                 <div class="ev-dot"></div>
                 <div class="ev-date">${evDateLabel(ev)}</div>
                 <div class="ev-title">${ev.title}</div>
-                ${isUp ? `<div class="ev-badge">${d===0?'HOJE':d===1?'amanhã':d+' dias'}</div>` : ''}
+                <div style="display:flex;gap:6px;align-items:center">
+                    ${hasCl?`<span style="font-size:11px;color:${clDone===clTotal?'var(--purple-light)':'var(--muted)'}">✅ ${clDone}/${clTotal}</span>`:''}
+                    ${isUp ? `<div class="ev-badge">${d===0?'HOJE':d===1?'amanhã':d+' dias'}</div>` : ''}
+                </div>
             </div>`;
         });
         listHtml += '</div>';
@@ -2037,6 +2051,153 @@ function agendaPage() {
         ${calHtml}
         <div style="margin-top:4px">${listHtml}</div>
     </div>`;
+}
+
+function openEvModal(evId) {
+    const ev = EVENTOS_2026.find(e=>e.id===evId); if(!ev) return;
+    S.modal = {type:'evento', data:ev}; S.evTab='escala'; render();
+}
+
+const EV_INSTR = [
+    {k:'violao',emoji:'🎸',label:'Violão'},{k:'teclado',emoji:'🎹',label:'Teclado'},
+    {k:'bateria',emoji:'🥁',label:'Bateria'},{k:'baixo',emoji:'🎸',label:'Baixo'},
+    {k:'guitarra',emoji:'🎸',label:'Guitarra'},{k:'sopro',emoji:'🎷',label:'Sopro'},
+    {k:'vocal1',emoji:'🎤',label:'Vocal 1'},{k:'vocal2',emoji:'🎤',label:'Vocal 2'},
+    {k:'vocal3',emoji:'🎤',label:'Vocal 3'},{k:'animador',emoji:'🎙',label:'Animador'},
+];
+
+function eventoModal(ev) {
+    const esc = S.escalas[ev.id] || {};
+    const cl  = esc.checklist || [];
+    const tab = S.evTab;
+    const done = cl.filter(i=>i.done).length;
+    const hasEsc = EV_INSTR.some(i=>esc[i.k]);
+
+    const escalaHtml = `
+        <div class="escal-grid" style="margin-bottom:16px">
+            ${EV_INSTR.map(({k,emoji,label})=>`
+            <div class="escal-row">
+                <div class="escal-inst">${emoji} ${label}</div>
+                <input class="escal-input" type="text" placeholder="—"
+                    value="${(esc[k]||'').replace(/"/g,'&quot;')}"
+                    onchange="saveEvEscalado('${ev.id}','${k}',this.value)"
+                    onblur="saveEvEscalado('${ev.id}','${k}',this.value)">
+            </div>`).join('')}
+        </div>
+        <button class="btn btn-primary" onclick="gerarChecklist('${ev.id}')">
+            ✅ ${cl.length?'Atualizar Checklist':'Gerar Checklist automaticamente'}
+        </button>`;
+
+    const checkHtml = cl.length === 0
+        ? `<div style="padding:28px;text-align:center;color:var(--muted)">
+            Nenhum item ainda.<br><br>
+            <button class="btn btn-ghost btn-sm" onclick="setEvTab('escala')">← Preencha a Escala primeiro</button>
+           </div>`
+        : `<div style="margin-bottom:12px;display:flex;align-items:center;gap:8px">
+            <span style="font-size:13px;color:var(--muted)">${done}/${cl.length} concluídos</span>
+            <div style="flex:1;height:6px;background:var(--bg4);border-radius:3px;overflow:hidden">
+                <div style="height:100%;width:${cl.length?Math.round(done/cl.length*100):0}%;background:var(--purple);transition:width .3s"></div>
+            </div>
+           </div>
+           <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:12px">
+               ${cl.map(item=>`
+               <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--bg3);border-radius:var(--radius-sm);border:1px solid ${item.done?'var(--purple)':'var(--border)'}">
+                   <input type="checkbox" ${item.done?'checked':''} onchange="toggleCheckItem('${ev.id}','${item.id}')"
+                       style="width:18px;height:18px;accent-color:var(--purple);cursor:pointer;flex-shrink:0">
+                   <span style="flex:1;font-size:13px;${item.done?'text-decoration:line-through;color:var(--muted)':''}">${item.text}</span>
+                   ${isAdm()?`<button class="btn btn-ghost btn-sm btn-icon" onclick="deleteCheckItem('${ev.id}','${item.id}')">✕</button>`:''}
+               </div>`).join('')}
+           </div>
+           ${isAdm()?`<div style="display:flex;gap:8px">
+               <input class="field" id="new-check-input" placeholder="Adicionar tarefa…" style="flex:1"
+                   onkeydown="if(event.key==='Enter')addCheckItem('${ev.id}')">
+               <button class="btn btn-ghost btn-sm" onclick="addCheckItem('${ev.id}')">+ Adicionar</button>
+           </div>`:''}`;
+
+    return `<div class="backdrop" onclick="closeModal(event)">
+    <div class="modal" style="max-width:600px">
+        <div class="modal-hd">
+            <div style="flex:1">
+                <div class="modal-title">📅 ${ev.title}</div>
+                <div style="font-size:13px;color:var(--muted);margin-top:2px">${evDateLabel(ev)}</div>
+            </div>
+            <button class="close-btn" onclick="closeModal()">✕</button>
+        </div>
+        <div class="modal-body">
+            <div style="display:flex;gap:4px;margin-bottom:16px">
+                <button class="btn ${tab==='escala'?'btn-primary':'btn-ghost'} btn-sm" onclick="setEvTab('escala')">🎼 Escala</button>
+                <button class="btn ${tab==='checklist'?'btn-primary':'btn-ghost'} btn-sm" onclick="setEvTab('checklist')">
+                    ✅ Checklist ${cl.length?`<span style="background:rgba(255,255,255,.25);border-radius:8px;padding:0 6px;font-size:11px">${done}/${cl.length}</span>`:''}
+                </button>
+            </div>
+            ${tab==='escala' ? escalaHtml : checkHtml}
+        </div>
+    </div></div>`;
+}
+
+function setEvTab(tab) { S.evTab=tab; render(); }
+
+function saveEvEscalado(evId, key, val) {
+    if (!S.escalas[evId]) S.escalas[evId] = {};
+    S.escalas[evId][key] = val.trim();
+    if (S.modal?.data?.id===evId) S.modal.data = EVENTOS_2026.find(e=>e.id===evId);
+    persist();
+}
+
+function gerarChecklist(evId) {
+    const ev = EVENTOS_2026.find(e=>e.id===evId); if(!ev) return;
+    if (!S.escalas[evId]) S.escalas[evId] = {};
+    const esc = S.escalas[evId];
+    const existing = esc.checklist || [];
+    const existingTexts = new Set(existing.map(i=>i.text));
+    const newItems = [];
+
+    // Auto-items from escala
+    EV_INSTR.forEach(({k,label}) => {
+        const nome = esc[k];
+        if (!nome) return;
+        const text = `Confirmar ${label} — ${nome}`;
+        if (!existingTexts.has(text)) newItems.push({id:'ck'+uid(),text,done:false});
+    });
+
+    // Default preparation items (only if not already present)
+    const defaults = [
+        `Preparar set list para: ${ev.title}`,
+        'Verificar e montar equipamentos',
+        'Passagem de som / soundcheck',
+        'Oração antes do evento',
+    ];
+    defaults.forEach(text => {
+        if (!existingTexts.has(text)) newItems.push({id:'ck'+uid(),text,done:false});
+    });
+
+    esc.checklist = [...existing, ...newItems];
+    persist();
+    S.evTab = 'checklist';
+    render();
+    toast(`✅ Checklist criado para: ${ev.title}`);
+}
+
+function toggleCheckItem(evId, itemId) {
+    const cl = S.escalas[evId]?.checklist; if(!cl) return;
+    const item = cl.find(i=>i.id===itemId); if(!item) return;
+    item.done = !item.done;
+    persist(); render();
+}
+
+function addCheckItem(evId) {
+    const input = document.getElementById('new-check-input');
+    const text = input?.value?.trim(); if(!text) return;
+    if (!S.escalas[evId]) S.escalas[evId] = {};
+    if (!S.escalas[evId].checklist) S.escalas[evId].checklist = [];
+    S.escalas[evId].checklist.push({id:'ck'+uid(), text, done:false});
+    persist(); render();
+}
+
+function deleteCheckItem(evId, itemId) {
+    const esc = S.escalas[evId]; if(!esc?.checklist) return;
+    esc.checklist = esc.checklist.filter(i=>i.id!==itemId);
+    persist(); render();
 }
 
 function agendaDismiss(ids) {
