@@ -551,6 +551,26 @@
             .nav-btn { padding:6px 10px; font-size:13px; }
         }
 
+        /* ── Escalados ── */
+        .escal-section { margin-top:14px; }
+        .escal-grid {
+            display:grid; grid-template-columns:repeat(auto-fill,minmax(210px,1fr));
+            gap:1px; background:var(--border);
+            border-radius:var(--radius-sm); overflow:hidden;
+        }
+        .escal-row { display:flex; align-items:center; background:var(--bg3); }
+        .escal-inst {
+            padding:9px 10px; font-size:12px; font-weight:700; color:var(--muted);
+            white-space:nowrap; display:flex; align-items:center; gap:6px;
+            min-width:108px; border-right:1px solid var(--border);
+        }
+        .escal-input {
+            background:transparent; border:none; color:var(--text);
+            font-size:13px; padding:9px 10px; flex:1; outline:none; min-width:0;
+        }
+        .escal-input::placeholder { color:var(--bg4); }
+        .escal-input:focus { background:var(--bg4); }
+
         /* ── Print media ── */
         @media print {
             body * { visibility:hidden; }
@@ -1039,6 +1059,31 @@ function detailModal(song) {
                         <div style="padding:12px;font-size:13px;line-height:1.7;color:var(--muted)">${song.notes}</div></div>`:''}
                 </div>
             </div>
+
+            <!-- Escalados — full width -->
+            <div class="dsec escal-section">
+                <div class="dsec-title">🎼 Escalados</div>
+                <div class="escal-grid">
+                    ${[
+                        {k:'violao',   emoji:'🎸', label:'Violão'},
+                        {k:'teclado',  emoji:'🎹', label:'Teclado'},
+                        {k:'bateria',  emoji:'🥁', label:'Bateria'},
+                        {k:'baixo',    emoji:'🎸', label:'Baixo'},
+                        {k:'guitarra', emoji:'🎸', label:'Guitarra'},
+                        {k:'sopro',    emoji:'🎷', label:'Sopro'},
+                        {k:'vocal',    emoji:'🎤', label:'Vocal'},
+                        {k:'animador', emoji:'🎙', label:'Animador'},
+                    ].map(({k,emoji,label})=>`
+                    <div class="escal-row">
+                        <div class="escal-inst">${emoji} ${label}</div>
+                        <input class="escal-input" type="text"
+                            placeholder="—"
+                            value="${(song.escalados?.[k]||'').replace(/"/g,'&quot;')}"
+                            onchange="saveEscalado('${song.id}','${k}',this.value)"
+                            onblur="saveEscalado('${song.id}','${k}',this.value)">
+                    </div>`).join('')}
+                </div>
+            </div>
         </div>
         <div class="modal-ft">
             <button class="btn btn-ghost btn-sm" onclick="openEdit('${song.id}')">✏️ Editar</button>
@@ -1357,12 +1402,27 @@ async function saveSong(eid) {
         toast(eid ? '✅ Música atualizada!' : '✅ Música adicionada!');
     }
 
-    if (eid) { const i=S.songs.findIndex(s=>s.id===eid); if(i!==-1) S.songs[i]=d; }
-    else     { S.songs.push(d); }
+    if (eid) {
+        const i=S.songs.findIndex(s=>s.id===eid);
+        if(i!==-1) {
+            d.escalados = S.songs[i].escalados || {};  // preserve escalados
+            d.stemsPath = d.stemsPath || S.songs[i].stemsPath; // preserve stemsPath
+            S.songs[i]=d;
+        }
+    } else { S.songs.push(d); }
 
     persist();
     S.modal=null; S.pendingPdfFile=null; S.pendingPdfRemove=false;
     render();
+}
+
+function saveEscalado(songId, key, val) {
+    const song = S.songs.find(s=>s.id===songId); if(!song) return;
+    if (!song.escalados) song.escalados = {};
+    song.escalados[key] = val.trim();
+    // also keep modal data in sync
+    if (S.modal?.data?.id === songId) S.modal.data.escalados = song.escalados;
+    persist();
 }
 
 async function delSong(id) {
