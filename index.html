@@ -607,8 +607,11 @@
         }
         .cal-day.other { color:var(--border); }
         .cal-day.today { background:var(--gold); color:#fff; font-weight:800; border-radius:50%; }
-        .cal-day.has-ev { background:rgba(0,150,63,.25); color:var(--purple-light); font-weight:700; border-radius:4px; cursor:pointer; }
+        .cal-day.has-ev  { background:rgba(0,150,63,.25); color:var(--purple-light); font-weight:700; border-radius:4px; cursor:pointer; }
         .cal-day.has-ev.today { background:var(--gold); color:#fff; }
+        .cal-day.has-rec { position:relative; cursor:pointer; }
+        .cal-day.has-rec::after { content:''; position:absolute; bottom:1px; left:50%; transform:translateX(-50%); width:4px; height:4px; border-radius:50%; background:var(--gold); }
+        .cal-day.has-ev.has-rec::after { background:#fff; }
         .cal-day.past { opacity:.45; }
         .ev-list-section { margin-bottom:10px; }
         .ev-month-title { font-size:13px; font-weight:800; text-transform:uppercase; letter-spacing:.7px; color:var(--muted); padding:8px 0 6px; border-bottom:1px solid var(--border); margin-bottom:8px; }
@@ -667,6 +670,27 @@
 // ═══════════════════════════════════════════════
 //  STATE
 // ═══════════════════════════════════════════════
+// ── Eventos Semanais Recorrentes ─────────────────────────
+const RECORRENTES = [
+    { id:'rec-sabado', title:'Tarde de Louvor',                       weekday:6, horario:'15:00 – 17:00', color:'#F15A24' },
+    { id:'rec-quinta', title:'Adoração e Missa no São Sebastião',     weekday:4, horario:'17:00 – 19:00', color:'#FFD400' },
+];
+function gerarRecorrentes(year) {
+    const all = [];
+    RECORRENTES.forEach(rec => {
+        const d = new Date(year, 0, 1);
+        while (d.getDay() !== rec.weekday) d.setDate(d.getDate()+1);
+        while (d.getFullYear() === year) {
+            const ds = d.toISOString().slice(0,10);
+            all.push({ ...rec, id: rec.id+'-'+ds, recId: rec.id, start: ds, end: ds, recurring: true });
+            d.setDate(d.getDate()+7);
+        }
+    });
+    return all;
+}
+const REC_2026 = gerarRecorrentes(2026);
+// ─────────────────────────────────────────────────────────
+
 // ── Agenda 2026 ──────────────────────────────────────────
 const EVENTOS_2026 = [
   {id:'e01',title:'Retorno das atividades – Pré-Reavivamento',     start:'2026-01-23',end:'2026-01-23'},
@@ -1954,7 +1978,8 @@ function agendaPage() {
     });
 
     // Build set of dates with events for quick lookup
-    const evByDate = {};
+    const evByDate = {};    // one-time events
+    const recByDate = {};   // recurring events
     EVENTOS_2026.forEach(ev => {
         const s = new Date(ev.start+'T00:00:00');
         const e = new Date(ev.end+'T00:00:00');
@@ -1963,6 +1988,10 @@ function agendaPage() {
             if (!evByDate[k]) evByDate[k] = [];
             evByDate[k].push(ev);
         }
+    });
+    REC_2026.forEach(ev => {
+        if (!recByDate[ev.start]) recByDate[ev.start] = [];
+        recByDate[ev.start].push(ev);
     });
 
     // Notification banner
@@ -2000,9 +2029,13 @@ function agendaPage() {
             const isToday = dateStr === today.toISOString().slice(0,10);
             const hasEv = !!evByDate[dateStr];
             const isPast = new Date(dateStr+'T00:00:00') < today && !isToday;
-            const cls = [isToday?'today':'', hasEv?'has-ev':'', isPast?'past':''].filter(Boolean).join(' ');
-            const tip = hasEv ? evByDate[dateStr].map(e=>e.title).join(', ') : '';
-            const click = hasEv ? `onclick="openEvModal('${evByDate[dateStr][0].id}')"` : '';
+            const hasRec = !!recByDate[dateStr];
+            const recTip = hasRec ? recByDate[dateStr].map(e=>e.title+' ('+e.horario+')').join(', ') : '';
+            const tip = [hasEv?evByDate[dateStr].map(e=>e.title).join(', '):'', recTip].filter(Boolean).join(' | ');
+            const cls = [isToday?'today':'', hasEv?'has-ev':'', hasRec?'has-rec':'', isPast?'past':''].filter(Boolean).join(' ');
+            const clickEv  = hasEv  ? `openEvModal('${evByDate[dateStr][0].id}')` : '';
+            const clickRec = hasRec ? `openRecModal('${recByDate[dateStr][0].recId}','${dateStr}')` : '';
+            const click = (hasEv||hasRec) ? `onclick="${clickEv||clickRec}"` : '';
             calHtml += `<div class="cal-day ${cls}" title="${tip}" ${click}>${day}</div>`;
         }
         calHtml += '</div></div>';
@@ -2042,11 +2075,22 @@ function agendaPage() {
         listHtml += '</div>';
     }
 
+    // Semanais
+    const recSumHtml = `<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:20px">
+        ${RECORRENTES.map(r=>`<div style="display:flex;align-items:center;gap:8px;padding:10px 14px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-sm);border-left:4px solid ${r.color}">
+            <div>
+                <div style="font-size:13px;font-weight:700">${r.weekday===6?'🟠 Todo Sábado':'🟡 Toda Quinta'} — ${r.title}</div>
+                <div style="font-size:12px;color:var(--muted)">⏰ ${r.horario}</div>
+            </div>
+        </div>`).join('')}
+    </div>`;
+
     return `<div class="agenda-wrap">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
             <h2 style="font-size:22px;font-weight:800">📅 Agenda Hallel 2026</h2>
-            <span style="font-size:13px;color:var(--muted)">${EVENTOS_2026.length} eventos</span>
+            <span style="font-size:13px;color:var(--muted)">${EVENTOS_2026.length} eventos + semanais</span>
         </div>
+        ${recSumHtml}
         ${notifHtml}
         ${calHtml}
         <div style="margin-top:4px">${listHtml}</div>
@@ -2055,6 +2099,16 @@ function agendaPage() {
 
 function openEvModal(evId) {
     const ev = EVENTOS_2026.find(e=>e.id===evId); if(!ev) return;
+    S.modal = {type:'evento', data:ev}; S.evTab='escala'; render();
+}
+
+function openRecModal(recId, dateStr) {
+    const rec = RECORRENTES.find(r=>r.id===recId); if(!rec) return;
+    const [y,m,d] = dateStr.split('-');
+    const label = `${parseInt(d)}/${parseInt(m)} — ${rec.horario}`;
+    // Reuse evento modal passing a synthetic event object
+    const ev = { id: recId+'-'+dateStr, recId, title: rec.title, start: dateStr, end: dateStr,
+                 horario: rec.horario, recurring: true, dateLabel: label };
     S.modal = {type:'evento', data:ev}; S.evTab='escala'; render();
 }
 
@@ -2118,8 +2172,12 @@ function eventoModal(ev) {
     <div class="modal" style="max-width:600px">
         <div class="modal-hd">
             <div style="flex:1">
-                <div class="modal-title">📅 ${ev.title}</div>
-                <div style="font-size:13px;color:var(--muted);margin-top:2px">${evDateLabel(ev)}</div>
+                <div class="modal-title">${ev.recurring?'🔄':'📅'} ${ev.title}</div>
+                <div style="font-size:13px;color:var(--muted);margin-top:2px">
+                    ${ev.dateLabel || evDateLabel(ev)}
+                    ${ev.horario?` · ⏰ ${ev.horario}`:''}
+                    ${ev.recurring?` · <span style="color:var(--gold)">Evento semanal</span>`:''}
+                </div>
             </div>
             <button class="close-btn" onclick="closeModal()">✕</button>
         </div>
