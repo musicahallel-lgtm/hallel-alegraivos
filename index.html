@@ -386,13 +386,22 @@
             letter-spacing:.5px; margin-bottom:10px; padding-bottom:8px; border-bottom:1px solid var(--border);
         }
         .sl-item {
-            display:flex; align-items:center; gap:8px; padding:10px 12px;
+            display:flex; align-items:center; gap:8px; padding:8px 12px;
             background:var(--bg3); border:1px solid var(--border);
             border-radius:var(--radius-sm); margin-bottom:6px;
         }
-        .sl-num { color:var(--gold); font-weight:700; font-size:14px; min-width:22px; }
-        .sl-title { flex:1; font-size:14px; font-weight:600; }
-        .sl-key { font-size:11px; color:var(--gold); background:var(--bg4); padding:2px 6px; border-radius:4px; }
+        .sl-num { color:var(--gold); font-weight:700; font-size:14px; min-width:22px; align-self:flex-start; padding-top:2px; }
+        .sl-info { flex:1; display:flex; flex-direction:column; gap:3px; min-width:0; }
+        .sl-title { font-size:14px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+        .sl-voz-row { display:flex; align-items:center; gap:4px; }
+        .sl-voz-input {
+            background:transparent; border:none; border-bottom:1px dashed var(--border);
+            color:var(--muted); font-size:11px; padding:1px 4px; outline:none;
+            width:100%; min-width:0;
+        }
+        .sl-voz-input::placeholder { color:var(--bg4); }
+        .sl-voz-input:focus { border-bottom-color:var(--purple); color:var(--text); }
+        .sl-key { font-size:11px; color:var(--gold); background:var(--bg4); padding:2px 6px; border-radius:4px; align-self:flex-start; margin-top:2px; }
         .avail-list { overflow-y:auto; max-height:460px; display:flex; flex-direction:column; gap:5px; }
         .avail-item {
             display:flex; align-items:center; gap:10px; padding:10px 12px;
@@ -1224,9 +1233,19 @@ function slModal(sl) {
                                 ${bsongs.length===0?`<div class="sl-block-empty">Arraste uma música até aqui, ou clique em + ao lado</div>`:''}
                                 ${bsongs.map((s,i)=>`<div class="sl-item">
                                     <span class="sl-num">${i+1}</span>
-                                    <span class="sl-title">${s.title}</span>
+                                    <div class="sl-info">
+                                        <span class="sl-title">${s.title}</span>
+                                        <div class="sl-voz-row">
+                                            <span style="font-size:11px;color:var(--muted)">🎤</span>
+                                            <input class="sl-voz-input" type="text"
+                                                placeholder="voz principal…"
+                                                value="${((block.vozes||{})[s.id]||'').replace(/"/g,'&quot;')}"
+                                                onchange="saveBlockVoz('${sl.id}','${block.id}','${s.id}',this.value)"
+                                                onblur="saveBlockVoz('${sl.id}','${block.id}','${s.id}',this.value)">
+                                        </div>
+                                    </div>
                                     ${s.key?`<span class="sl-key">${s.key}</span>`:''}
-                                    <div style="display:flex;gap:2px;margin-left:4px">
+                                    <div style="display:flex;gap:2px">
                                         ${i>0?`<button class="btn btn-ghost btn-sm btn-icon" onclick="slMoveInBlock('${sl.id}','${block.id}','${s.id}',-1)">↑</button>`:'<span style="width:30px"></span>'}
                                         ${i<bsongs.length-1?`<button class="btn btn-ghost btn-sm btn-icon" onclick="slMoveInBlock('${sl.id}','${block.id}','${s.id}',1)">↓</button>`:'<span style="width:30px"></span>'}
                                         <button class="btn btn-ghost btn-sm btn-icon" onclick="slDelFromBlock('${sl.id}','${block.id}','${s.id}')">✕</button>
@@ -1327,10 +1346,13 @@ function printModal(sl) {
                     return `<div class="print-block">
                         <div class="print-block-title">${block.name}</div>
                         <ol class="plist" style="padding-left:0">
-                            ${bsongs.map((s,i)=>`<li style="display:block;padding:14px 0;border-bottom:1px solid #eee">
-                                <div style="display:flex;align-items:center;gap:12px">
+                            ${bsongs.map((s,i)=>`<li style="display:block;padding:12px 0;border-bottom:1px solid #eee">
+                                <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
                                     <div class="pnum">${i+1}</div>
-                                    <div class="p-title">${s.title}</div>
+                                    <div>
+                                        <div class="p-title">${s.title}</div>
+                                        ${(block.vozes||{})[s.id]?`<div style="font-size:12px;color:#555;margin-top:2px">🎤 ${(block.vozes||{})[s.id]}</div>`:''}
+                                    </div>
                                     ${s.artist?`<div style="font-size:12px;color:#777">${s.artist}</div>`:''}
                                     ${s.key?`<div class="p-key">Tom: ${s.key}</div>`:''}
                                     ${s.bpm?`<div class="p-bpm">${s.bpm} BPM</div>`:''}
@@ -1442,6 +1464,15 @@ async function saveSong(eid) {
     persist();
     S.modal=null; S.pendingPdfFile=null; S.pendingPdfRemove=false;
     render();
+}
+
+function saveBlockVoz(slId, blockId, songId, val) {
+    const sl = S.setlists.find(x=>x.id===slId); if(!sl) return;
+    const block = sl.blocks?.find(b=>b.id===blockId); if(!block) return;
+    if (!block.vozes) block.vozes = {};
+    block.vozes[songId] = val.trim();
+    if (S.modal?.data?.id === slId) S.modal.data = sl;
+    persist();
 }
 
 function saveSlEscalado(slId, key, val) {
