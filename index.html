@@ -2,10 +2,15 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#080808">
     <title>Hallel — Alegraivos</title>
-    <!-- EmailJS SDK -->
-    <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+    <link rel="preload" href="logo.png" as="image">
+    <!-- EmailJS SDK — defer so it doesn't block first paint -->
+    <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js" defer></script>
     <style>
         :root {
             /* ── Identidade Visual Hallel ── */
@@ -26,10 +31,15 @@
             --radius: 12px;
             --radius-sm: 8px;
         }
-        * { margin:0; padding:0; box-sizing:border-box; }
-        html,body {
+        * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+        html { height: -webkit-fill-available; }
+        body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: var(--bg); color: var(--text); min-height:100vh; overflow-x:hidden;
+            background: var(--bg); color: var(--text);
+            min-height: 100vh; min-height: -webkit-fill-available;
+            overflow-x: hidden;
+            -webkit-text-size-adjust: 100%;
+            text-rendering: optimizeSpeed;
         }
 
         /* ── Header ── */
@@ -37,8 +47,12 @@
             background: #ffffff; border-bottom:1px solid #e0e0e0;
             padding: 0 20px; position:sticky; top:0; z-index:100;
             display:flex; align-items:center; height:64px; gap:16px;
-            box-shadow: 0 2px 8px rgba(0,0,0,.08);
+            box-shadow: 0 1px 4px rgba(0,0,0,.08);
+            transform: translateZ(0); /* GPU layer — prevents repaint on scroll */
+            overflow-x: auto; overflow-y: hidden;
+            scrollbar-width: none; /* Firefox */
         }
+        .header::-webkit-scrollbar { display:none; } /* Safari/Chrome */
         .logo {
             display:flex; align-items:center; gap:8px; white-space:nowrap; text-decoration:none;
         }
@@ -48,11 +62,14 @@
         .logo-alegraivos {
             font-size:17px; font-weight:800; color:#007a32; letter-spacing:.3px;
         }
-        .nav { display:flex; gap:4px; flex:1; }
+        .nav { display:flex; gap:4px; flex:1; overflow-x:auto; overflow-y:hidden; scrollbar-width:none; white-space:nowrap; -webkit-overflow-scrolling:touch; }
+        .nav::-webkit-scrollbar { display:none; }
         .nav-btn {
             padding:8px 16px; border-radius:var(--radius-sm); border:none;
             background:transparent; color:#555; cursor:pointer;
-            font-size:14px; font-weight:600; transition:all .15s;
+            font-size:14px; font-weight:600;
+            transition:background-color .15s, color .15s;
+            touch-action:manipulation;
         }
         .nav-btn:hover { background:#f0f0f0; color:#111; }
         .nav-btn.active { background:var(--purple); color:#fff; }
@@ -61,9 +78,10 @@
         /* ── Buttons ── */
         .btn {
             padding:9px 18px; border-radius:var(--radius-sm); border:none;
-            cursor:pointer; font-size:14px; font-weight:600; transition:all .15s;
+            cursor:pointer; font-size:14px; font-weight:600;
+            transition:background-color .15s, color .15s, opacity .15s;
             display:inline-flex; align-items:center; gap:6px; white-space:nowrap;
-            font-family:inherit;
+            font-family:inherit; touch-action:manipulation;
         }
         .btn-primary  { background:var(--purple); color:#fff; }
         .btn-primary:hover { background:var(--purple-light); color:#fff; }
@@ -683,10 +701,10 @@
         @media(max-width:480px) { .member-form-grid { grid-template-columns:1fr; } }
 
         /* ── Mission Alert ── */
-        @keyframes missionPulse { 0%,100%{box-shadow:0 0 30px rgba(255,212,0,.4)} 50%{box-shadow:0 0 60px rgba(255,212,0,.8),0 0 100px rgba(241,90,36,.3)} }
-        @keyframes missionEntry { from{opacity:0;transform:scale(.92)} to{opacity:1;transform:scale(1)} }
-        .mission-backdrop { position:fixed;inset:0;background:rgba(0,0,0,.93);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(4px); }
-        .mission-card { background:linear-gradient(160deg,#0f1923 0%,#1a1040 100%);border:2px solid var(--gold);border-radius:20px;padding:32px 28px;max-width:500px;width:100%;text-align:center;animation:missionEntry .4s ease, missionPulse 2.5s ease 1s infinite; }
+        @keyframes missionPulse { 0%,100%{opacity:1} 50%{opacity:.82} }
+        @keyframes missionEntry { from{opacity:0;transform:scale(.93) translateZ(0)} to{opacity:1;transform:scale(1) translateZ(0)} }
+        .mission-backdrop { position:fixed;inset:0;background:rgba(0,0,0,.93);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px; }
+        .mission-card { background:linear-gradient(160deg,#0f1923 0%,#1a1040 100%);border:2px solid var(--gold);border-radius:20px;padding:32px 28px;max-width:500px;width:100%;text-align:center;animation:missionEntry .35s ease forwards, missionPulse 3s ease 1s infinite;will-change:opacity; }
         .mission-icon { font-size:56px; margin-bottom:8px; }
         .mission-title { font-size:26px; font-weight:900; color:var(--gold); letter-spacing:1px; margin-bottom:4px; }
         .mission-sub { font-size:13px; color:var(--muted); margin-bottom:24px; }
@@ -696,8 +714,23 @@
         .mission-ev-date { font-size:12px; color:var(--gold); }
         .mission-ev-role { font-size:12px; color:#a5b4fc; margin-top:4px; }
         .mission-msg { font-size:13px; color:#d1d5db; line-height:1.6; margin-bottom:24px; padding:16px; background:rgba(255,255,255,.04); border-radius:10px; border-left:3px solid var(--purple); }
-        .mission-btn { width:100%; padding:15px; font-size:16px; font-weight:800; border-radius:12px; border:none; background:linear-gradient(90deg,var(--purple),var(--purple-light)); color:#fff; cursor:pointer; letter-spacing:.5px; transition:opacity .2s; }
+        .mission-btn { width:100%; padding:15px; font-size:16px; font-weight:800; border-radius:12px; border:none; background:linear-gradient(90deg,var(--purple),var(--purple-light)); color:#fff; cursor:pointer; letter-spacing:.5px; transition:opacity .2s; touch-action:manipulation; }
         .mission-btn:hover { opacity:.9; }
+
+        /* ── Mobile performance ── */
+        .main { overscroll-behavior-y: contain; }
+        .song-card, .member-card, .setlist-card, .ev-item {
+            contain: layout style;
+        }
+        /* Larger tap targets on mobile */
+        @media (max-width:600px) {
+            .btn { min-height:44px; }
+            .nav-btn { min-height:40px; padding:8px 12px; font-size:13px; }
+            .main { padding:16px 12px; }
+            .header { padding:0 12px; gap:8px; }
+            .mission-card { padding:24px 18px; }
+            .mission-title { font-size:22px; }
+        }
 
         /* ── Print media ── */
         @media print {
@@ -888,13 +921,25 @@ async function loadPdfIndex() {
 // ═══════════════════════════════════════════════
 //  PERSISTENCE  (songs + setlists in localStorage)
 // ═══════════════════════════════════════════════
-function persist() {
-    localStorage.setItem('hl_songs',    JSON.stringify(S.songs));
-    localStorage.setItem('hl_setlists', JSON.stringify(S.setlists));
-    localStorage.setItem('hl_escalas',  JSON.stringify(S.escalas));
-    localStorage.setItem('hl_members',  JSON.stringify(S.members));
-    localStorage.setItem('hl_activity',  JSON.stringify(S.activityLog.slice(-2000)));
-    localStorage.setItem('hl_requests',  JSON.stringify(S.accessRequests));
+let _persistTimer = null;
+function persist(immediate) {
+    if (immediate) { _doPersist(); return; }
+    clearTimeout(_persistTimer);
+    _persistTimer = setTimeout(_doPersist, 400);
+}
+function _doPersist() {
+    try {
+        localStorage.setItem('hl_songs',    JSON.stringify(S.songs));
+        localStorage.setItem('hl_setlists', JSON.stringify(S.setlists));
+        localStorage.setItem('hl_escalas',  JSON.stringify(S.escalas));
+        localStorage.setItem('hl_members',  JSON.stringify(S.members));
+        localStorage.setItem('hl_activity',  JSON.stringify(S.activityLog.slice(-500)));
+        localStorage.setItem('hl_requests',  JSON.stringify(S.accessRequests));
+    } catch(e) {
+        // localStorage quota exceeded — trim and retry
+        S.activityLog = S.activityLog.slice(-100);
+        try { localStorage.setItem('hl_activity', JSON.stringify(S.activityLog)); } catch(_) {}
+    }
 }
 function hydrate() {
     try {
@@ -907,7 +952,7 @@ function hydrate() {
         if (es) S.escalas  = JSON.parse(es);
         if (mb) S.members  = JSON.parse(mb);
         const ac = localStorage.getItem('hl_activity');
-        if (ac) S.activityLog = JSON.parse(ac);
+        if (ac) { S.activityLog = JSON.parse(ac).slice(-500); } // keep only last 500
         const rq = localStorage.getItem('hl_requests');
         if (rq) S.accessRequests = JSON.parse(rq);
     } catch(e) { console.error(e); }
@@ -1048,7 +1093,16 @@ function toast(msg) {
 // ═══════════════════════════════════════════════
 //  RENDER
 // ═══════════════════════════════════════════════
+let _renderPending = false;
 function render() {
+    if (_renderPending) return;
+    _renderPending = true;
+    requestAnimationFrame(() => {
+        _renderPending = false;
+        _doRender();
+    });
+}
+function _doRender() {
     if (!S.role) {
         document.getElementById('app').innerHTML = loginScreen();
         return;
@@ -1250,7 +1304,7 @@ function doLogin() {
         // Track login
         S.activityLog.push({ id: uid(), memberId: member.id, memberName: member.name,
             type: 'login', at: Date.now(), duration: 0 });
-        localStorage.setItem('hl_activity', JSON.stringify(S.activityLog.slice(-2000)));
+        persist();
         render();
         // Primeiro acesso → pede WhatsApp e email antes do alert de missão
         setTimeout(() => {
@@ -1320,7 +1374,7 @@ function header() {
     const roleLabel = isAdm() ? 'ADM' : isMembro() ? (S.currentMember?.name || 'Membro') : 'Equipe';
     return `<div class="header">
         <div class="logo">
-            <img src="logo.png" alt="Comunidade Católica Hallel">
+            <img src="logo.png" alt="Comunidade Católica Hallel" loading="eager" decoding="async">
         </div>
         <nav class="nav">
             ${isMembro() ? `
@@ -2271,8 +2325,8 @@ function trackActivity(type, data = {}) {
     const entry = { id: uid(), memberId: S.currentMember.id,
         memberName: S.currentMember.name, type, at: Date.now(), duration: 0, ...data };
     S.activityLog.push(entry);
-    if (S.activityLog.length > 2000) S.activityLog = S.activityLog.slice(-2000);
-    localStorage.setItem('hl_activity', JSON.stringify(S.activityLog));
+    if (S.activityLog.length > 500) S.activityLog = S.activityLog.slice(-500);
+    persist(); // debounced
 }
 
 function startActTimer(type, data = {}) {
