@@ -1500,6 +1500,7 @@ function modalHtml() {
     if (type==='mission-alert') return missionAlertModal(data);
     if (type==='member-form')  return memberFormModal(data);
     if (type==='first-access') return firstAccessModal(data);
+    if (type==='wa-escala')    return waEscalaModal(data);
     return '';
 }
 
@@ -3260,7 +3261,10 @@ function eventoModal(ev) {
             ${linkedSl
                 ? `<button class="btn" style="flex:1;min-width:160px;background:#1a7a3c;color:#fff;display:flex;align-items:center;gap:6px;justify-content:center" onclick="verSetListDoEvento('${ev.id}')">✅ Ver Set List →</button>`
                 : `<button class="btn btn-ghost btn-sm" style="flex:1;min-width:160px;border:1px solid var(--purple);color:var(--purple-light)" onclick="subirParaSetList('${ev.id}')">📋 Subir para Set List</button>`}
-        </div>`;
+        </div>
+        ${hasEsc ? `<button class="btn btn-sm" style="margin-top:10px;width:100%;background:#25d366;color:#fff;font-weight:700;font-size:14px" onclick="openWaEscala('${ev.id}')">
+            📲 Notificar escalados via WhatsApp
+        </button>` : ''}`;
     } else {
         // Read-only view for membros/geral
         const myName = S.currentMember?.name?.toLowerCase() || '';
@@ -3334,6 +3338,136 @@ function eventoModal(ev) {
 }
 
 function setEvTab(tab) { S.evTab=tab; render(); }
+
+// ── WhatsApp Escala ──────────────────────────────────────────────────────
+function openWaEscala(evId) {
+    S.modal = { type: 'wa-escala', data: { evId } };
+    render();
+}
+
+function waEscalaModal({ evId }) {
+    const ev  = EVENTOS_2026.find(e=>e.id===evId) || REC_2026.find(e=>e.id===evId);
+    const esc = S.escalas[evId] || {};
+    if (!ev) return '';
+
+    const instrEmoji = {violao:'🎸',teclado:'🎹',bateria:'🥁',baixo:'🎸',guitarra:'🎸',sopro:'🎷',vocal1:'🎤',vocal2:'🎤',vocal3:'🎤',animador:'🎙'};
+    const instrLabel = {violao:'Violão',teclado:'Teclado',bateria:'Bateria',baixo:'Baixo',guitarra:'Guitarra',sopro:'Sopro',vocal1:'Vocal 1',vocal2:'Vocal 2',vocal3:'Vocal 3',animador:'Animador'};
+
+    const dateStr = evDateLabel(ev);
+    const horario = ev.horario || '';
+
+    // Full team list (filled slots only)
+    const teamLines = EV_INSTR.filter(({k})=>esc[k])
+        .map(({k})=>`${instrEmoji[k]} *${instrLabel[k]}:* ${esc[k]}`);
+
+    // ── Group message ────────────────────────────────────────────────────
+    const groupMsg =
+`🎼 *ESCALA — ${ev.title.toUpperCase()}*
+📅 ${dateStr}${horario ? `\n⏰ ${horario}` : ''}
+
+${teamLines.join('\n')}
+
+Preparados para glorificar! 🙌🏻
+_— Ministério de Música Hallel_`;
+
+    const groupUrl = `https://wa.me/?text=${encodeURIComponent(groupMsg)}`;
+
+    // ── Individual messages ──────────────────────────────────────────────
+    const individuals = EV_INSTR.filter(({k})=>esc[k]).map(({k}) => {
+        const name = esc[k];
+        const member = S.members.find(m => m.name.toLowerCase() === name.toLowerCase());
+        const phone = member?.whatsapp?.replace(/\D/g,'');
+        const myRole = `${instrEmoji[k]} ${instrLabel[k]}`;
+
+        const msg =
+`Olá, *${name}*! 🎶
+
+Você está escalado(a) para:
+📅 *${ev.title}* — ${dateStr}${horario ? `\n⏰ ${horario}` : ''}
+
+🎯 *Sua função:* ${myRole}
+
+*Time escalado:*
+${teamLines.join('\n')}
+
+Se prepare com carinho! 🙏
+_— Ministério de Música Hallel_`;
+
+        const url = phone
+            ? `https://wa.me/55${phone}?text=${encodeURIComponent(msg)}`
+            : `https://wa.me/?text=${encodeURIComponent(msg)}`;
+
+        return { name, role: myRole, phone, url, hasPhone: !!phone };
+    });
+
+    const allHavePhone = individuals.every(i=>i.hasPhone);
+    const missingPhone = individuals.filter(i=>!i.hasPhone);
+
+    return `<div class="backdrop" onclick="closeModal(event)">
+    <div class="modal" style="max-width:520px">
+        <div class="modal-hd">
+            <div class="modal-title">📲 Notificar via WhatsApp</div>
+            <button class="close-btn" onclick="closeModal()">✕</button>
+        </div>
+        <div class="modal-body" style="display:flex;flex-direction:column;gap:18px">
+
+            <!-- Mensagem para grupo -->
+            <div style="background:rgba(37,211,102,.07);border:1px solid rgba(37,211,102,.25);border-radius:var(--radius);padding:16px">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+                    <span style="font-size:18px">👥</span>
+                    <div>
+                        <div style="font-size:14px;font-weight:800">Mensagem para o grupo</div>
+                        <div style="font-size:11px;color:var(--muted)">Abre o WhatsApp — você escolhe o grupo para enviar</div>
+                    </div>
+                </div>
+                <div style="background:var(--bg3);border-radius:8px;padding:12px;font-size:12px;font-family:monospace;color:var(--muted);white-space:pre-wrap;line-height:1.6;max-height:160px;overflow-y:auto;margin-bottom:12px">${groupMsg.replace(/\*/g,'').replace(/_/g,'')}</div>
+                <div style="display:flex;gap:8px">
+                    <button class="btn btn-sm" style="background:#25d366;color:#fff;flex:1;font-weight:700" onclick="window.open('${groupUrl}','_blank')">
+                        💬 Abrir no WhatsApp
+                    </button>
+                    <button class="btn btn-ghost btn-sm" onclick="copyWaText(${JSON.stringify(groupMsg).replace(/'/g,'&apos;')})" style="flex:1">
+                        📋 Copiar texto
+                    </button>
+                </div>
+            </div>
+
+            <!-- Mensagens individuais -->
+            <div>
+                <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:10px">📨 Mensagem individual por escalado</div>
+                <div style="display:flex;flex-direction:column;gap:8px">
+                    ${individuals.map(ind=>`
+                    <div style="display:flex;align-items:center;gap:10px;background:var(--bg2);border:1px solid ${ind.hasPhone?'var(--border)':'rgba(239,68,68,.2)'};border-radius:var(--radius-sm);padding:10px 12px">
+                        <div style="flex:1;min-width:0">
+                            <div style="font-size:13px;font-weight:700">${ind.name}</div>
+                            <div style="font-size:11px;color:var(--muted)">${ind.role}${ind.hasPhone?' · 📱 '+ind.phone:' · <span style="color:#f87171">sem WhatsApp</span>'}</div>
+                        </div>
+                        <a href="${ind.url}" target="_blank" class="btn btn-sm"
+                            style="background:${ind.hasPhone?'#25d366':'var(--bg3)'};color:${ind.hasPhone?'#fff':'var(--muted)'};text-decoration:none;white-space:nowrap;flex-shrink:0">
+                            ${ind.hasPhone?'💬 Enviar':'💬 Abrir'}
+                        </a>
+                    </div>`).join('')}
+                </div>
+                ${missingPhone.length ? `<div style="margin-top:10px;font-size:11px;color:#f87171">
+                    ⚠️ ${missingPhone.map(i=>i.name).join(', ')} não tem WhatsApp cadastrado.
+                    <a onclick="closeModal();nav('membros')" style="color:var(--gold);cursor:pointer;text-decoration:underline">Cadastrar →</a>
+                </div>` : ''}
+            </div>
+
+        </div>
+    </div></div>`;
+}
+
+function copyWaText(text) {
+    if (navigator.clipboard) {
+        navigator.clipboard.writeText(text).then(()=>toast('📋 Texto copiado!'));
+    } else {
+        const ta = document.createElement('textarea');
+        ta.value = text; document.body.appendChild(ta);
+        ta.select(); document.execCommand('copy');
+        document.body.removeChild(ta);
+        toast('📋 Texto copiado!');
+    }
+}
 
 function saveEvEscalado(evId, key, val) {
     if (!S.escalas[evId]) S.escalas[evId] = {};
