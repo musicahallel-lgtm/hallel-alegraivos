@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Hallel — Alegraivos</title>
+    <!-- EmailJS SDK -->
+    <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
     <style>
         :root {
             /* ── Identidade Visual Hallel ── */
@@ -654,6 +656,10 @@
         .login-err.show { display:block; }
         .login-btn { width:100%; padding:13px; font-size:15px; font-weight:700; border-radius:var(--radius-sm); border:none; background:var(--purple); color:#fff; cursor:pointer; margin-top:6px; }
         .login-btn:hover { background:var(--purple-light); }
+        .login-forgot { text-align:center; margin-top:14px; font-size:13px; color:#888; }
+        .login-forgot a { color:var(--purple); cursor:pointer; text-decoration:underline; }
+        .recovery-success { background:#f0fdf4; border:1px solid #86efac; border-radius:8px; padding:16px; text-align:center; font-size:13px; color:#166534; margin-top:12px; display:none; }
+        .recovery-success.show { display:block; }
         /* Role badge in header */
         .role-badge {
             font-size:11px; font-weight:700; padding:3px 9px; border-radius:10px; letter-spacing:.4px;
@@ -772,6 +778,13 @@ const CREDS = [
     { user: 'admin',  pass: 'hallel194',   role: 'adm'   },
     { user: 'equipe', pass: 'equipenico',  role: 'geral' },
 ];
+
+// ── EmailJS — preencha após criar a conta em emailjs.com ──
+const EMAILJS_CFG = {
+    publicKey:  'SEU_PUBLIC_KEY',   // Account > API Keys > Public Key
+    serviceId:  'SEU_SERVICE_ID',   // Email Services > seu serviço Gmail
+    templateId: 'SEU_TEMPLATE_ID',  // Email Templates > hallel_senha
+};
 // ─────────────────────────────────────────────────────────
 
 const S = {
@@ -1026,7 +1039,8 @@ function render() {
     if (S.page === 'playlist') afterPLRender();
 }
 
-function loginScreen() {
+function loginScreen(view) {
+    if (view === 'recovery') return recoveryScreen();
     return `<div class="login-screen">
     <div class="login-card">
         <div class="login-logo"><img src="logo.png" alt="Hallel"></div>
@@ -1043,8 +1057,76 @@ function loginScreen() {
                 onkeydown="if(event.key==='Enter')doLogin()">
         </div>
         <button class="login-btn" onclick="doLogin()">Entrar</button>
+        <div class="login-forgot">Esqueceu sua senha? <a onclick="showRecovery()">Recuperar acesso</a></div>
     </div>
     </div>`;
+}
+
+function recoveryScreen() {
+    return `<div class="login-screen">
+    <div class="login-card">
+        <div class="login-logo"><img src="logo.png" alt="Hallel"></div>
+        <div class="login-sub">Recuperar senha</div>
+        <div style="font-size:13px;color:#666;text-align:center;margin-bottom:20px;line-height:1.5">
+            Digite seu nome de usuário e enviaremos a senha para o seu email cadastrado. 📧
+        </div>
+        <div class="login-err" id="rec-err" style="display:none"></div>
+        <div class="login-field">
+            <label>Usuário</label>
+            <input class="field" id="rec-user" type="text" placeholder="seu usuário"
+                onkeydown="if(event.key==='Enter')doRecovery()">
+        </div>
+        <div class="recovery-success" id="rec-ok">
+            ✅ Email enviado com sucesso!<br>
+            <span id="rec-ok-msg"></span>
+        </div>
+        <button class="login-btn" id="rec-btn" onclick="doRecovery()">📧 Enviar senha por email</button>
+        <div class="login-forgot" style="margin-top:14px"><a onclick="showLogin()">← Voltar para o login</a></div>
+    </div>
+    </div>`;
+}
+
+function showRecovery() {
+    document.getElementById('app').innerHTML = loginScreen('recovery');
+}
+function showLogin() {
+    document.getElementById('app').innerHTML = loginScreen();
+}
+
+async function doRecovery() {
+    const userInput = document.getElementById('rec-user')?.value?.trim().toLowerCase();
+    if (!userInput) { showRecErr('Digite seu nome de usuário.'); return; }
+    const member = S.members.find(m => m.user.toLowerCase() === userInput);
+    if (!member) { showRecErr('Usuário não encontrado. Verifique o nome ou contate o ADM.'); return; }
+    if (!member.email) { showRecErr('Nenhum email cadastrado para este usuário. Contate o administrador.'); return; }
+
+    const btn = document.getElementById('rec-btn');
+    if (btn) { btn.disabled = true; btn.textContent = 'Enviando…'; }
+
+    try {
+        emailjs.init(EMAILJS_CFG.publicKey);
+        await emailjs.send(EMAILJS_CFG.serviceId, EMAILJS_CFG.templateId, {
+            to_email:    member.email,
+            member_name: member.name,
+            username:    member.user,
+            password:    member.pass,
+            app_url:     'https://musicahallel-lgtm.github.io/hallel-alegraivos/',
+        });
+        const okDiv = document.getElementById('rec-ok');
+        const okMsg = document.getElementById('rec-ok-msg');
+        if (okDiv) okDiv.classList.add('show');
+        if (okMsg) okMsg.textContent = `Email enviado para ${member.email.replace(/(.{2}).+(@.+)/, '$1***$2')}`;
+        if (btn) { btn.style.display='none'; }
+    } catch(err) {
+        if (btn) { btn.disabled=false; btn.textContent='📧 Tentar novamente'; }
+        showRecErr('Erro ao enviar email. Verifique a configuração do EmailJS ou contate o ADM.');
+        console.error('EmailJS error:', err);
+    }
+}
+
+function showRecErr(msg) {
+    const el = document.getElementById('rec-err');
+    if (el) { el.textContent=msg; el.style.display='block'; }
 }
 
 function doLogin() {
@@ -2083,7 +2165,10 @@ function membrosPage() {
                 <div class="member-info">
                     <div class="member-name">${m.name}</div>
                     <div class="member-meta">${instrLabel[m.instrument]||m.instrument} · @${m.user}
-                        ${escalas.length?`<span style="margin-left:8px;background:rgba(255,212,0,.15);border:1px solid rgba(255,212,0,.4);color:var(--gold);border-radius:8px;padding:1px 7px;font-size:11px">🎯 ${escalas.length} missão${escalas.length>1?'ões':''} próxima${escalas.length>1?'s':''}</span>`:''}
+                        ${m.email?`<span style="margin-left:6px;color:var(--muted)">· 📧 ${m.email}</span>`:`<span style="margin-left:6px;color:#f87171;font-size:11px">⚠️ sem email</span>`}
+                    </div>
+                    <div class="member-meta" style="margin-top:2px">
+                        ${escalas.length?`<span style="background:rgba(255,212,0,.15);border:1px solid rgba(255,212,0,.4);color:var(--gold);border-radius:8px;padding:1px 7px;font-size:11px">🎯 ${escalas.length} missão${escalas.length>1?'ões':''} próxima${escalas.length>1?'s':''}</span>`:'<span style="font-size:11px;color:var(--muted)">Sem missões futuras</span>'}
                     </div>
                 </div>
                 <div style="display:flex;gap:6px">
@@ -2120,6 +2205,10 @@ function memberFormModal(data) {
                     <label style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;display:block;margin-bottom:4px">Instrumento principal</label>
                     <select class="field" id="mf-instr">${instrOpts}</select>
                 </div>
+                <div>
+                    <label style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;display:block;margin-bottom:4px">Email <span style="opacity:.6">(para recuperação de senha)</span></label>
+                    <input class="field" id="mf-email" type="email" placeholder="Ex: raquel@email.com" value="${data.email||''}">
+                </div>
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
                     <div>
                         <label style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;display:block;margin-bottom:4px">Usuário (login)</label>
@@ -2147,17 +2236,17 @@ function memberFormModal(data) {
 function saveMember(id) {
     const name  = document.getElementById('mf-name')?.value?.trim();
     const instr = document.getElementById('mf-instr')?.value;
+    const email = document.getElementById('mf-email')?.value?.trim().toLowerCase();
     const user  = document.getElementById('mf-user')?.value?.trim().toLowerCase();
     const pass  = document.getElementById('mf-pass')?.value?.trim();
     if (!name||!user||!pass) { toast('⚠️ Preencha nome, usuário e senha.'); return; }
-    // Check user conflict
     const conflict = S.members.find(m => m.user===user && m.id!==id);
     if (conflict) { toast('⚠️ Esse nome de usuário já existe.'); return; }
     if (id) {
         const m = S.members.find(x=>x.id===id);
-        if (m) { m.name=name; m.instrument=instr; m.user=user; m.pass=pass; }
+        if (m) { m.name=name; m.instrument=instr; m.email=email; m.user=user; m.pass=pass; }
     } else {
-        S.members.push({ id:'mb'+uid(), name, instrument:instr, user, pass });
+        S.members.push({ id:'mb'+uid(), name, instrument:instr, email, user, pass });
     }
     persist(); closeModal(); render();
     toast(id ? `✅ ${name} atualizado!` : `✅ ${name} cadastrado no ministério!`);
