@@ -732,6 +732,14 @@
             .mission-title { font-size:22px; }
         }
 
+        /* ── Relatório mensal ── */
+        .rel-event-card {
+            background:var(--bg2); border:1px solid var(--border);
+            border-left:4px solid var(--purple); border-radius:var(--radius-sm);
+            padding:14px 16px; margin-bottom:14px;
+        }
+        .rel-alegrai { border-left-color:#F15A24 !important; background:linear-gradient(90deg,rgba(255,212,0,.06),transparent) !important; }
+
         /* ── Print media ── */
         @media print {
             body * { visibility:hidden; }
@@ -848,6 +856,7 @@ const S = {
     activityLog: [],     // { id, memberId, memberName, type, at, duration, songId, songTitle, tab }
     membrosTab: 'lista', // 'lista' | 'atividade' | 'cadastros'
     accessRequests: [],  // { id, name, instrument, whatsapp, email, msg, at, status:'pending'|'approved'|'rejected' }
+    _relMonth: new Date().getMonth(), // selected month for report (0=Jan)
 };
 const isAdm    = () => S.role === 'adm';
 const isGeral  = () => S.role === 'geral';
@@ -1366,6 +1375,7 @@ function html() {
     if (S.page === 'membros')      page = membrosPage();
     if (S.page === 'atividade')    page = atividadePage();
     if (S.page === 'cadastros')    page = cadastrosPage();
+    if (S.page === 'relatorio')    page = relatorioPage();
     if (S.page === 'minha-escala') page = minhaEscalaPage();
     return header() + `<div class="main">${page}</div>` + (S.modal ? modalHtml() : '');
 }
@@ -1394,6 +1404,7 @@ function header() {
                 </button>
                 <button class="nav-btn ${S.page==='atividade'?'active':''}" onclick="nav('atividade')">📊 Atividade</button>
                 <button class="nav-btn ${S.page==='cadastros'?'active':''}" onclick="nav('cadastros')">👁 Cadastros</button>
+                <button class="nav-btn ${S.page==='relatorio'?'active':''}" onclick="nav('relatorio')">📄 Relatório</button>
                 ` : ''}
             `}
         </nav>
@@ -3038,6 +3049,268 @@ function togglePw(id, pass) {
 }
 
 // ════════════════════════════════════════════════════
+//  RELATÓRIO MENSAL
+// ════════════════════════════════════════════════════
+function relatorioPage() {
+    const MESES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho',
+                   'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+    const instrEmoji = {violao:'🎸',teclado:'🎹',bateria:'🥁',baixo:'🎸',guitarra:'🎸',sopro:'🎷',vocal1:'🎤',vocal2:'🎤',vocal3:'🎤',animador:'🎙'};
+    const instrLabel = {violao:'Violão',teclado:'Teclado',bateria:'Bateria',baixo:'Baixo',guitarra:'Guitarra',sopro:'Sopro',vocal1:'Vocal 1',vocal2:'Vocal 2',vocal3:'Vocal 3',animador:'Animador'};
+
+    const selMonth = S._relMonth ?? new Date().getMonth();
+
+    function eventsForMonth(mo) {
+        // One-time events
+        const evs = EVENTOS_2026.filter(ev => {
+            const m = parseInt(ev.start.split('-')[1]) - 1;
+            return m === mo;
+        });
+        // Recurring for this month (unique by recId to show pattern once)
+        const recDates = REC_2026.filter(ev => parseInt(ev.start.split('-')[1])-1 === mo);
+        // Group recurring by recId
+        const recGroups = {};
+        recDates.forEach(ev => {
+            if (!recGroups[ev.recId]) recGroups[ev.recId] = [];
+            recGroups[ev.recId].push(ev);
+        });
+        return { evs, recGroups };
+    }
+
+    function fmtDate(ds) {
+        const [y,m,d] = ds.split('-');
+        return `${parseInt(d)}/${parseInt(m)}/${y}`;
+    }
+
+    function escalaBlock(esc, compact) {
+        if (!esc) return '';
+        const filled = EV_INSTR.filter(({k})=>esc[k]);
+        if (!filled.length) return compact ? '' : `<span style="color:var(--muted);font-size:12px;font-style:italic">Sem escala definida</span>`;
+        if (compact) {
+            return filled.map(({k})=>`<span style="font-size:11px;margin-right:6px">${instrEmoji[k]} ${esc[k]}</span>`).join('');
+        }
+        return `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:4px 12px;margin-top:6px">
+            ${filled.map(({k})=>`<div style="display:flex;gap:6px;align-items:center;font-size:12px">
+                <span style="color:var(--muted);white-space:nowrap">${instrEmoji[k]} ${instrLabel[k]}</span>
+                <span style="font-weight:700;color:var(--text)">${esc[k]}</span>
+            </div>`).join('')}
+        </div>`;
+    }
+
+    function setListBlock(esc) {
+        const slId = esc?.setListId;
+        if (!slId) return '';
+        const sl = S.setlists.find(x=>x.id===slId);
+        if (!sl) return '';
+        const songs = (sl.blocks||[]).flatMap(b=>(b.songIds||[]).map(id=>({
+            song: S.songs.find(s=>s.id===id),
+            voz: (b.vozes||{})[id]||''
+        }))).filter(x=>x.song);
+        if (!songs.length) return '';
+        return `<div style="margin-top:8px;padding:8px 10px;background:rgba(0,150,63,.06);border-left:3px solid var(--purple);border-radius:0 6px 6px 0">
+            <div style="font-size:10px;font-weight:700;color:var(--purple-light);text-transform:uppercase;margin-bottom:4px">🎵 Set List</div>
+            ${songs.map((x,i)=>`<div style="font-size:12px;padding:1px 0">${i+1}. ${x.song.title}${x.song.key?` <span style="color:var(--muted)">(${x.song.key})</span>`:''}${x.voz?` <span style="color:var(--muted)">— 🎤 ${x.voz}</span>`:''}</div>`).join('')}
+        </div>`;
+    }
+
+    const { evs, recGroups } = eventsForMonth(selMonth);
+    const totalEvents = evs.length + Object.keys(recGroups).length;
+
+    // Build event cards
+    const eventCards = evs.map(ev => {
+        const esc = S.escalas[ev.id]||{};
+        const hasEsc = EV_INSTR.some(({k})=>esc[k]);
+        const multiDay = ev.start !== ev.end;
+        const dateLabel = multiDay ? `${fmtDate(ev.start)} a ${fmtDate(ev.end)}` : fmtDate(ev.start);
+        return `<div class="rel-event-card ${ev.alegrai?'rel-alegrai':''}">
+            <div style="display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap">
+                <div style="flex:1;min-width:180px">
+                    <div style="font-size:15px;font-weight:800;margin-bottom:2px;color:${ev.alegrai?'#F15A24':'var(--text)'}">${ev.alegrai?'⭐ ':''}${ev.title}</div>
+                    <div style="font-size:12px;color:var(--muted)">📅 ${dateLabel}${ev.horario?' · ⏰ '+ev.horario:''}</div>
+                </div>
+                ${hasEsc?`<div style="font-size:10px;font-weight:700;background:rgba(0,150,63,.15);color:var(--purple-light);border:1px solid rgba(0,150,63,.25);padding:2px 8px;border-radius:8px;white-space:nowrap">✅ Com escala</div>`:'<div style="font-size:10px;color:var(--muted);background:var(--bg3);border:1px solid var(--border);padding:2px 8px;border-radius:8px;white-space:nowrap">Sem escala</div>'}
+            </div>
+            ${escalaBlock(esc, false)}
+            ${setListBlock(esc)}
+        </div>`;
+    });
+
+    // Recurring groups
+    const recCards = Object.entries(recGroups).map(([recId, dates]) => {
+        const rec = RECORRENTES.find(r=>r.id===recId);
+        if (!rec) return '';
+        const weekName = rec.weekday===6?'Sábados':'Quintas';
+        // Dates with individual escalas
+        const dateRows = dates.map(ev => {
+            const esc = S.escalas[ev.id]||{};
+            const hasEsc = EV_INSTR.some(({k})=>esc[k]);
+            return `<div style="padding:7px 10px;border-bottom:1px solid var(--border);${dates.indexOf(ev)===dates.length-1?'border-bottom:none':''}">
+                <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                    <span style="font-size:12px;font-weight:700;color:var(--muted);min-width:60px">${fmtDate(ev.start)}</span>
+                    <span style="font-size:11px;color:var(--muted)">${rec.horario}</span>
+                    <span style="margin-left:auto;font-size:10px;font-weight:700;${hasEsc?'color:var(--purple-light)':'color:var(--muted)'}">
+                        ${hasEsc?'✅ escalado':'—'}
+                    </span>
+                </div>
+                ${hasEsc ? `<div style="margin-top:4px">${escalaBlock(esc, true)}</div>` : ''}
+                ${setListBlock(esc)}
+            </div>`;
+        }).join('');
+        return `<div class="rel-event-card">
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+                <div style="width:10px;height:10px;border-radius:50%;background:${rec.color};flex-shrink:0"></div>
+                <div>
+                    <div style="font-size:15px;font-weight:800">${rec.title}</div>
+                    <div style="font-size:12px;color:var(--muted)">Toda ${weekName} · ${rec.horario} · ${dates.length} ocorrência${dates.length>1?'s':''}</div>
+                </div>
+            </div>
+            <div style="border:1px solid var(--border);border-radius:8px;overflow:hidden">${dateRows}</div>
+        </div>`;
+    });
+
+    const allCards = [...eventCards, ...recCards];
+
+    // Month selector
+    const monthSelector = `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:24px">
+        ${MESES.map((m,i)=>`<button onclick="S._relMonth=${i};render()"
+            class="btn btn-sm ${selMonth===i?'btn-primary':'btn-ghost'}">${m}</button>`).join('')}
+    </div>`;
+
+    return `<div style="max-width:860px;margin:0 auto" id="rel-page">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:10px">
+            <h2 style="font-size:22px;font-weight:800">📄 Relatório Mensal</h2>
+            <button class="btn btn-ghost btn-sm" style="color:#22c55e;border-color:#22c55e"
+                onclick="printRelatorio('${MESES[selMonth]}')">
+                🖨 Imprimir / Salvar PDF
+            </button>
+        </div>
+        ${monthSelector}
+        <div id="rel-content">
+            <div style="display:flex;align-items:center;gap:12px;margin-bottom:18px;padding:14px 18px;background:linear-gradient(90deg,rgba(0,150,63,.12),transparent);border-left:4px solid var(--purple);border-radius:0 var(--radius) var(--radius) 0">
+                <div style="font-size:28px">📅</div>
+                <div>
+                    <div style="font-size:20px;font-weight:900">${MESES[selMonth]} 2026</div>
+                    <div style="font-size:13px;color:var(--muted)">${totalEvents} atividade${totalEvents!==1?'s':''} neste mês</div>
+                </div>
+            </div>
+            ${allCards.length === 0
+                ? `<div style="text-align:center;padding:48px;color:var(--muted)">Nenhuma atividade registrada para ${MESES[selMonth]}.</div>`
+                : allCards.join('')}
+        </div>
+    </div>`;
+}
+
+function printRelatorio(mesNome) {
+    const MESES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho',
+                   'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+    const selMonth = (S._relMonth !== undefined) ? S._relMonth : 0;
+    const content = document.getElementById('rel-content');
+    if (!content) return;
+
+    const instrEmoji = {violao:'🎸',teclado:'🎹',bateria:'🥁',baixo:'🎸',guitarra:'🎸',sopro:'🎷',vocal1:'🎤',vocal2:'🎤',vocal3:'🎤',animador:'🎙'};
+    const instrLabel = {violao:'Violão',teclado:'Teclado',bateria:'Bateria',baixo:'Baixo',guitarra:'Guitarra',sopro:'Sopro',vocal1:'Vocal 1',vocal2:'Vocal 2',vocal3:'Vocal 3',animador:'Animador'};
+
+    // Build a clean print window
+    const win = window.open('','_blank','width=900,height=700');
+    const evs = EVENTOS_2026.filter(ev => parseInt(ev.start.split('-')[1])-1 === selMonth);
+    const recDates = REC_2026.filter(ev => parseInt(ev.start.split('-')[1])-1 === selMonth);
+    const recGroups = {};
+    recDates.forEach(ev => { if (!recGroups[ev.recId]) recGroups[ev.recId]=[];  recGroups[ev.recId].push(ev); });
+
+    function fmtD(ds) { const [y,m,d]=ds.split('-'); return `${parseInt(d)}/${parseInt(m)}/${y}`; }
+    function escHtml(esc) {
+        if (!esc) return '<em style="color:#999">Sem escala</em>';
+        const filled = EV_INSTR.filter(({k})=>esc[k]);
+        if (!filled.length) return '<em style="color:#999">Sem escala definida</em>';
+        return filled.map(({k})=>`<span style="display:inline-block;margin:2px 6px 2px 0;font-size:12px">${instrEmoji[k]} <b>${instrLabel[k]}:</b> ${esc[k]}</span>`).join('');
+    }
+    function slHtml(esc) {
+        const sl = esc?.setListId && S.setlists.find(x=>x.id===esc.setListId);
+        if (!sl) return '';
+        const songs = (sl.blocks||[]).flatMap(b=>(b.songIds||[]).map(id=>({s:S.songs.find(x=>x.id===id),v:(b.vozes||{})[id]||''}))).filter(x=>x.s);
+        if (!songs.length) return '';
+        return `<div style="margin:8px 0 0;padding:8px;background:#f0faf4;border-left:3px solid #00963F;font-size:12px">
+            <b style="color:#00963F">🎵 Set List:</b><br>
+            ${songs.map((x,i)=>`${i+1}. ${x.s.title}${x.s.key?` (${x.s.key})`:''}${x.v?` — 🎤 ${x.v}`:''}`).join('<br>')}
+        </div>`;
+    }
+
+    const evRows = evs.map(ev => {
+        const esc = S.escalas[ev.id]||{};
+        const multiDay = ev.start!==ev.end;
+        const dt = multiDay?`${fmtD(ev.start)} a ${fmtD(ev.end)}`:fmtD(ev.start);
+        return `<div class="ev-block">
+            <div class="ev-title">${ev.alegrai?'⭐ ':''}${ev.title}</div>
+            <div class="ev-meta">📅 ${dt}${ev.horario?' · ⏰ '+ev.horario:''}</div>
+            <div class="ev-escala">${escHtml(esc)}</div>
+            ${slHtml(esc)}
+        </div>`;
+    }).join('');
+
+    const recRows = Object.entries(recGroups).map(([recId,dates])=>{
+        const rec = RECORRENTES.find(r=>r.id===recId);
+        if (!rec) return '';
+        const rows = dates.map(ev => {
+            const esc = S.escalas[ev.id]||{};
+            return `<tr>
+                <td style="padding:5px 10px;font-weight:600;white-space:nowrap;border-bottom:1px solid #eee">${fmtD(ev.start)}</td>
+                <td style="padding:5px 10px;border-bottom:1px solid #eee">${escHtml(esc)}</td>
+                <td style="padding:5px 10px;border-bottom:1px solid #eee">${slHtml(esc)}</td>
+            </tr>`;
+        }).join('');
+        return `<div class="ev-block">
+            <div class="ev-title">${rec.title}</div>
+            <div class="ev-meta">Toda ${rec.weekday===6?'Sábado':'Quinta-feira'} · ${rec.horario}</div>
+            <table style="width:100%;border-collapse:collapse;margin-top:8px;font-size:12px">
+                <thead><tr style="background:#f5f5f5">
+                    <th style="padding:5px 10px;text-align:left;font-size:11px;text-transform:uppercase;color:#666">Data</th>
+                    <th style="padding:5px 10px;text-align:left;font-size:11px;text-transform:uppercase;color:#666">Escalados</th>
+                    <th style="padding:5px 10px;text-align:left;font-size:11px;text-transform:uppercase;color:#666">Set List</th>
+                </tr></thead>
+                <tbody>${rows}</tbody>
+            </table>
+        </div>`;
+    }).join('');
+
+    win.document.write(`<!DOCTYPE html><html lang="pt-BR"><head>
+    <meta charset="UTF-8">
+    <title>Relatório ${mesNome} 2026 — Ministério de Música Hallel</title>
+    <style>
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body { font-family: Arial, sans-serif; color:#1a1a1a; padding:32px; font-size:13px; }
+        .header { border-bottom:3px solid #00963F; padding-bottom:16px; margin-bottom:28px; }
+        .header h1 { font-size:22px; color:#00963F; margin-bottom:4px; }
+        .header p { color:#666; font-size:13px; }
+        .ev-block { margin-bottom:20px; padding:14px 16px; border:1px solid #e0e0e0; border-left:4px solid #00963F; border-radius:4px; page-break-inside:avoid; }
+        .ev-title { font-size:16px; font-weight:700; margin-bottom:4px; }
+        .ev-meta { font-size:12px; color:#666; margin-bottom:8px; }
+        .ev-escala { margin-top:6px; line-height:2; }
+        .footer { margin-top:40px; border-top:1px solid #e0e0e0; padding-top:12px; font-size:11px; color:#999; display:flex; justify-content:space-between; }
+        @media print {
+            body { padding:16px; }
+            .no-print { display:none; }
+        }
+    </style>
+    </head><body>
+    <div class="header">
+        <h1>📄 Relatório — ${mesNome} 2026</h1>
+        <p>Ministério de Música Hallel · Gerado em ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}</p>
+    </div>
+    <div class="no-print" style="margin-bottom:20px">
+        <button onclick="window.print()" style="background:#00963F;color:#fff;border:none;padding:10px 20px;border-radius:6px;font-size:14px;font-weight:700;cursor:pointer">🖨 Imprimir / Salvar como PDF</button>
+        <button onclick="window.close()" style="background:#eee;border:none;padding:10px 20px;border-radius:6px;font-size:14px;cursor:pointer;margin-left:8px">✕ Fechar</button>
+    </div>
+    ${evRows || '<p style="color:#999;font-style:italic">Nenhum evento avulso neste mês.</p>'}
+    ${recRows}
+    <div class="footer">
+        <span>Ministério de Música Hallel — Alegraivos</span>
+        <span>${mesNome} 2026</span>
+    </div>
+    </body></html>`);
+    win.document.close();
+    win.focus();
+}
+
+// ════════════════════════════════════════════════════
 
 function agendaPage() {
     const today = new Date(); today.setHours(0,0,0,0);
@@ -3367,7 +3640,7 @@ function waEscalaModal({ evId }) {
 
 ${teamLines.join('\n')}
 
-Preparados para glorificar! 🙌🏻
+Preparados para servir! 🙌🏻
 _— Ministério de Música Hallel_`;
 
     const groupUrl = `https://wa.me/?text=${encodeURIComponent(groupMsg)}`;
