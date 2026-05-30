@@ -621,6 +621,10 @@
         .ev-alegrai-card { background:linear-gradient(135deg,rgba(255,212,0,.12),rgba(241,90,36,.12)) !important; border:2px solid #FFD400 !important; border-left:5px solid #F15A24 !important; }
         .ev-alegrai-card .ev-title { color:#F15A24 !important; font-size:15px !important; font-weight:900 !important; }
         .ev-alegrai-card .ev-dot { background:linear-gradient(135deg,#FFD400,#F15A24); width:13px; height:13px; box-shadow:0 0 5px rgba(241,90,36,.5); }
+        /* Membro escalado — destaque na agenda */
+        .cal-day.my-escala { background:var(--purple) !important; color:#fff !important; font-weight:900; border-radius:5px; box-shadow:0 0 6px rgba(0,150,63,.6); }
+        .ev-item.ev-mine { border-color:var(--purple) !important; background:rgba(0,150,63,.08) !important; border-left:4px solid var(--purple) !important; }
+        .ev-item.ev-mine .ev-dot { background:var(--purple-light); box-shadow:0 0 4px rgba(0,150,63,.5); }
         .ev-list-section { margin-bottom:10px; }
         .ev-month-title { font-size:13px; font-weight:800; text-transform:uppercase; letter-spacing:.7px; color:var(--muted); padding:8px 0 6px; border-bottom:1px solid var(--border); margin-bottom:8px; }
         .ev-item {
@@ -1323,6 +1327,8 @@ function header() {
                 <button class="nav-btn ${S.page==='minha-escala'?'active':''}" onclick="nav('minha-escala')">🎯 Minha Escala</button>
                 <button class="nav-btn ${S.page==='library'?'active':''}"      onclick="nav('library')">🎸 Biblioteca</button>
                 <button class="nav-btn ${S.page==='setlists'?'active':''}"     onclick="nav('setlists')">📋 Set Lists</button>
+                <button class="nav-btn ${S.page==='playlist'?'active':''}"     onclick="nav('playlist')">▶ Playlist</button>
+                <button class="nav-btn ${S.page==='agenda'?'active':''}"       onclick="nav('agenda')">📅 Agenda</button>
             ` : `
                 <button class="nav-btn ${S.page==='library'?'active':''}"  onclick="nav('library')">🎸 Biblioteca</button>
                 <button class="nav-btn ${S.page==='setlists'?'active':''}" onclick="nav('setlists')">📋 Set Lists</button>
@@ -2518,14 +2524,27 @@ function minhaEscalaPage() {
     function evCard(item, isPast) {
         const {ev, roles, daysUntil} = item;
         const whenLabel = daysUntil===0?'🔴 HOJE':daysUntil===1?'🟡 Amanhã':daysUntil<=7?`🟡 Em ${daysUntil} dias`:`Em ${daysUntil} dias`;
+        const esc = S.escalas[ev.id] || {};
+        // Full team for this event
+        const instrEmoji2 = {violao:'🎸',teclado:'🎹',bateria:'🥁',baixo:'🎸',guitarra:'🎸',sopro:'🎷',vocal1:'🎤',vocal2:'🎤',vocal3:'🎤',animador:'🎙'};
+        const myRoleKeys = new Set(roles.map(r=>r.k));
+        const teamMembers = EV_INSTR.filter(({k})=>esc[k] && !myRoleKeys.has(k));
+        const teamHtml = teamMembers.length ? `
+            <div style="margin-top:12px;padding:10px 12px;background:rgba(255,255,255,.04);border-radius:8px;border:1px solid var(--border)">
+                <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:7px">👥 Time escalado</div>
+                <div style="display:flex;flex-wrap:wrap;gap:6px">
+                    ${teamMembers.map(({k,emoji,label})=>`<span style="display:inline-flex;align-items:center;gap:4px;background:rgba(255,255,255,.05);border:1px solid var(--border);border-radius:8px;padding:3px 9px;font-size:12px;color:var(--muted)"><span>${instrEmoji2[k]||emoji}</span><span>${esc[k]}</span></span>`).join('')}
+                </div>
+            </div>` : '';
         return `<div style="background:var(--bg2);border:1px solid ${isPast?'var(--border)':'var(--gold)'};border-left:4px solid ${isPast?'var(--border)':'var(--gold)'};border-radius:var(--radius-sm);padding:14px 16px;margin-bottom:10px;opacity:${isPast?.6:1}">
             <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap">
-                <div>
+                <div style="flex:1">
                     <div style="font-size:15px;font-weight:800;color:${isPast?'var(--muted)':'var(--text)'};margin-bottom:3px">${ev.title}</div>
                     <div style="font-size:12px;color:var(--muted)">📅 ${evDateLabel(ev)}${ev.horario?' · ⏰ '+ev.horario:''}</div>
                     <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px">
-                        ${roles.map(({emoji,label})=>`<span style="display:inline-flex;align-items:center;gap:4px;background:rgba(94,96,206,.15);border:1px solid rgba(94,96,206,.3);border-radius:8px;padding:3px 10px;font-size:12px;font-weight:700;color:#a5b4fc">${emoji} ${label}</span>`).join('')}
+                        ${roles.map(({emoji,label})=>`<span style="display:inline-flex;align-items:center;gap:4px;background:rgba(94,96,206,.15);border:1px solid rgba(94,96,206,.3);border-radius:8px;padding:3px 10px;font-size:12px;font-weight:700;color:#a5b4fc">${emoji} ${label} — você</span>`).join('')}
                     </div>
+                    ${teamHtml}
                 </div>
                 ${!isPast?`<div style="font-size:12px;font-weight:700;background:rgba(255,212,0,.1);border:1px solid rgba(255,212,0,.3);color:var(--gold);padding:4px 10px;border-radius:8px;white-space:nowrap">${whenLabel}</div>`:''}
             </div>
@@ -2954,6 +2973,11 @@ function agendaPage() {
     const today = new Date(); today.setHours(0,0,0,0);
     const dismissed = JSON.parse(localStorage.getItem('hl_notif_dismissed')||'[]');
 
+    // Member context: which events is the current member escalated for?
+    const myEscalas = isMembro() && S.currentMember
+        ? new Set(getMemberEscalas(S.currentMember.name).map(x => x.ev.id))
+        : new Set();
+
     // Events in next 15 days (not dismissed)
     const upcoming = EVENTOS_2026.filter(ev => {
         const d = evDaysUntil(ev);
@@ -3017,7 +3041,8 @@ function agendaPage() {
             const tip = [hasEv?evByDate[dateStr].map(e=>e.title).join(', '):'', recTip].filter(Boolean).join(' | ');
             const isAlegrai = hasEv && evByDate[dateStr].some(e=>e.alegrai);
             const isMissa = hasRec && recByDate[dateStr].some(e=>e.missa);
-            const cls = [isToday?'today':'', isAlegrai?'has-alegrai':hasEv?'has-ev':'', hasRec?'has-rec':'', isMissa?'rec-missa':'', isPast?'past':''].filter(Boolean).join(' ');
+            const isMy = hasEv && evByDate[dateStr].some(e => myEscalas.has(e.id));
+            const cls = [isToday?'today':'', isAlegrai?'has-alegrai':hasEv?'has-ev':'', hasRec?'has-rec':'', isMissa?'rec-missa':'', isPast?'past':'', isMy?'my-escala':''].filter(Boolean).join(' ');
             const clickEv  = hasEv  ? `openEvModal('${evByDate[dateStr][0].id}')` : '';
             const clickRec = hasRec ? `openRecModal('${recByDate[dateStr][0].recId}','${dateStr}')` : '';
             const click = (hasEv||hasRec) ? `onclick="${clickEv||clickRec}"` : '';
@@ -3047,16 +3072,28 @@ function agendaPage() {
             const hasCl = esc?.checklist?.length > 0;
             const clDone = hasCl ? esc.checklist.filter(i=>i.done).length : 0;
             const clTotal = hasCl ? esc.checklist.length : 0;
+            const isMine = myEscalas.has(ev.id);
             const alegraiBadge = ev.alegrai ? `<div style="font-size:10px;font-weight:800;background:linear-gradient(90deg,#FFD400,#F15A24);color:#fff;padding:2px 8px;border-radius:8px;white-space:nowrap">⭐ DESTAQUE</div>` : '';
-            listHtml += `<div class="ev-item ${ev.alegrai?'ev-alegrai-card':''} ${isUp&&!ev.alegrai?'upcoming':''} ${isPast?'past':''}" onclick="openEvModal('${ev.id}')" style="cursor:pointer">
+            const myBadge = isMine ? `<div style="font-size:10px;font-weight:800;background:linear-gradient(90deg,var(--purple),var(--purple-light));color:#fff;padding:2px 8px;border-radius:8px;white-space:nowrap">🎯 Você está escalado</div>` : '';
+            // Show team for member when escalated
+            let teamHtml = '';
+            if (isMine && esc) {
+                const team = EV_INSTR.filter(({k})=>esc[k]).map(({k,emoji,label})=>`<span style="font-size:11px;color:var(--muted)">${emoji} <b style="color:var(--text)">${esc[k]}</b></span>`);
+                if (team.length) teamHtml = `<div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:6px;padding:6px 8px;background:rgba(0,150,63,.06);border-radius:6px;border:1px solid rgba(0,150,63,.15)">${team.join('')}</div>`;
+            }
+            listHtml += `<div class="ev-item ${ev.alegrai?'ev-alegrai-card':''} ${isMine&&!isPast?'ev-mine':''} ${isUp&&!ev.alegrai&&!isMine?'upcoming':''} ${isPast?'past':''}" onclick="openEvModal('${ev.id}')" style="cursor:pointer">
                 <div class="ev-dot"></div>
-                <div class="ev-date" style="${ev.alegrai?'color:#F15A24;font-weight:800':''}">${evDateLabel(ev)}</div>
+                <div class="ev-date" style="${ev.alegrai?'color:#F15A24;font-weight:800':isMine?'color:var(--purple-light);font-weight:700':''}">
+                    ${isMine&&!isPast?'📍 ':''} ${evDateLabel(ev)}
+                </div>
                 <div class="ev-title">${ev.title}</div>
-                <div style="display:flex;gap:6px;align-items:center">
+                <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
                     ${alegraiBadge}
-                    ${hasCl?`<span style="font-size:11px;color:${clDone===clTotal?'var(--purple-light)':'var(--muted)'}">✅ ${clDone}/${clTotal}</span>`:''}
+                    ${myBadge}
+                    ${hasCl&&!isMembro()?`<span style="font-size:11px;color:${clDone===clTotal?'var(--purple-light)':'var(--muted)'}">✅ ${clDone}/${clTotal}</span>`:''}
                     ${isUp ? `<div class="ev-badge">${d===0?'HOJE':d===1?'amanhã':d+' dias'}</div>` : ''}
                 </div>
+                ${teamHtml}
             </div>`;
         });
         listHtml += '</div>';
