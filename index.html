@@ -907,6 +907,11 @@ function hydrate() {
         const rq = localStorage.getItem('hl_requests');
         if (rq) S.accessRequests = JSON.parse(rq);
     } catch(e) { console.error(e); }
+    // Migrate: instrument (string) → instruments (array)
+    S.members.forEach(m => {
+        if (!m.instruments) m.instruments = m.instrument ? [m.instrument] : [];
+        if (!m.memberType) m.memberType = 'membro'; // Migrate: default type = membro
+    });
     // Migrate old set lists (songIds → blocks)
     S.setlists.forEach(sl => {
         if (!sl.blocks) {
@@ -2299,10 +2304,17 @@ function membrosPage() {
         </div>` : mbs.map(m => {
             const escalas = getMemberEscalas(m.name).filter(e=>e.daysUntil>=0);
             return `<div class="member-card">
-                <div class="member-avatar">${instrEmoji[m.instrument]||'🎵'}</div>
+                <div class="member-avatar">${instrEmoji[(m.instruments||[m.instrument])[0]]||'🎵'}</div>
                 <div class="member-info">
                     <div class="member-name">${m.name}</div>
-                    <div class="member-meta">${instrLabel[m.instrument]||m.instrument} · @${m.user}
+                    <div class="member-meta">
+                        ${(m.instruments||[m.instrument]).map(i=>`<span style="display:inline-flex;align-items:center;gap:3px;background:rgba(0,150,63,.12);border:1px solid rgba(0,150,63,.2);border-radius:6px;padding:1px 7px;font-size:11px;font-weight:600;margin-right:3px">${instrEmoji[i]||'🎵'} ${instrLabel[i]||i}</span>`).join('')}
+                    </div>
+                    <div class="member-meta" style="margin-top:3px">
+                        <span style="display:inline-flex;align-items:center;gap:3px;border-radius:6px;padding:1px 7px;font-size:11px;font-weight:700;margin-right:4px;${(m.memberType||'membro')==='colaborador'?'background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.3);color:#f59e0b':'background:rgba(0,150,63,.12);border:1px solid rgba(0,150,63,.25);color:var(--purple-light)'}">
+                            ${(m.memberType||'membro')==='colaborador'?'🤝 Colaborador':'🎼 Membro'}
+                        </span>
+                        @${m.user}
                         ${m.whatsapp?`<span style="margin-left:6px;color:var(--muted)">· 📱 ${m.whatsapp}</span>`:''}
                         ${m.email?`<span style="margin-left:6px;color:var(--muted)">· 📧 ${m.email}</span>`:`<span style="margin-left:6px;color:#f87171;font-size:11px">⚠️ sem email</span>`}
                         ${!m.firstAccessDone?`<span style="margin-left:6px;background:rgba(241,90,36,.15);border:1px solid rgba(241,90,36,.3);color:#f97316;border-radius:8px;padding:1px 7px;font-size:11px">⏳ aguardando 1º acesso</span>`:''}
@@ -2381,7 +2393,8 @@ function openMemberForm(id) {
 
 function memberFormModal(data) {
     const isEdit = !!data.id;
-    const instrOpts = EV_INSTR.map(({k,emoji,label})=>`<option value="${k}" ${data.instrument===k?'selected':''}>${emoji} ${label}</option>`).join('');
+    const curInstrs = data.instruments || (data.instrument ? [data.instrument] : []);
+    const curType = data.memberType || 'membro';
     return `<div class="backdrop" onclick="closeModal(event)">
     <div class="modal" style="max-width:460px">
         <div class="modal-hd">
@@ -2395,8 +2408,40 @@ function memberFormModal(data) {
                     <input class="field" id="mf-name" type="text" placeholder="Ex: Raquel Silva" value="${data.name||''}">
                 </div>
                 <div>
-                    <label style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;display:block;margin-bottom:4px">Instrumento principal</label>
-                    <select class="field" id="mf-instr">${instrOpts}</select>
+                    <label style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;display:block;margin-bottom:6px">Tipo de participação</label>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+                        <label id="mf-tl-membro" style="display:flex;align-items:center;gap:8px;padding:10px 12px;background:var(--bg3);border:2px solid ${curType==='membro'?'var(--purple)':'var(--border)'};border-radius:10px;cursor:pointer;transition:.15s">
+                            <input type="radio" name="mf-type" value="membro" id="mf-tr-membro" ${curType==='membro'?'checked':''}
+                                onchange="document.getElementById('mf-tl-membro').style.borderColor='var(--purple)';document.getElementById('mf-tl-colaborador').style.borderColor='var(--border)'"
+                                style="accent-color:var(--purple);width:15px;height:15px;cursor:pointer;flex-shrink:0">
+                            <div>
+                                <div style="font-size:13px;font-weight:700">🎼 Membro</div>
+                                <div style="font-size:11px;color:var(--muted)">Faz parte do ministério</div>
+                            </div>
+                        </label>
+                        <label id="mf-tl-colaborador" style="display:flex;align-items:center;gap:8px;padding:10px 12px;background:var(--bg3);border:2px solid ${curType==='colaborador'?'#f59e0b':'var(--border)'};border-radius:10px;cursor:pointer;transition:.15s">
+                            <input type="radio" name="mf-type" value="colaborador" id="mf-tr-colaborador" ${curType==='colaborador'?'checked':''}
+                                onchange="document.getElementById('mf-tl-colaborador').style.borderColor='#f59e0b';document.getElementById('mf-tl-membro').style.borderColor='var(--border)'"
+                                style="accent-color:#f59e0b;width:15px;height:15px;cursor:pointer;flex-shrink:0">
+                            <div>
+                                <div style="font-size:13px;font-weight:700">🤝 Colaborador</div>
+                                <div style="font-size:11px;color:var(--muted)">Colabora eventualmente</div>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+                <div>
+                    <label style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;display:block;margin-bottom:6px">Instrumentos <span style="font-weight:400;text-transform:none;font-size:11px">(selecione todos que toca)</span></label>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px" id="mf-instr-grid">
+                        ${EV_INSTR.map(({k,emoji,label})=>`
+                        <label style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--bg3);border:1px solid ${curInstrs.includes(k)?'var(--purple)':'var(--border)'};border-radius:8px;cursor:pointer;transition:.15s" id="mf-il-${k}">
+                            <input type="checkbox" value="${k}" id="mf-ic-${k}" ${curInstrs.includes(k)?'checked':''}
+                                onchange="document.getElementById('mf-il-${k}').style.borderColor=this.checked?'var(--purple)':'var(--border)'"
+                                style="accent-color:var(--purple);width:15px;height:15px;cursor:pointer;flex-shrink:0">
+                            <span style="font-size:13px">${emoji} ${label}</span>
+                        </label>`).join('')}
+                    </div>
+                    <div style="font-size:11px;color:var(--muted);margin-top:6px">💡 Primeiro selecionado = instrumento principal no perfil</div>
                 </div>
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
                     <div>
@@ -2433,20 +2478,23 @@ function memberFormModal(data) {
 }
 
 function saveMember(id) {
-    const name  = document.getElementById('mf-name')?.value?.trim();
-    const instr = document.getElementById('mf-instr')?.value;
-    const whats = document.getElementById('mf-whats')?.value?.trim();
-    const email = document.getElementById('mf-email')?.value?.trim().toLowerCase();
-    const user  = document.getElementById('mf-user')?.value?.trim().toLowerCase();
-    const pass  = document.getElementById('mf-pass')?.value?.trim();
+    const name   = document.getElementById('mf-name')?.value?.trim();
+    const instrs = EV_INSTR.map(({k})=>k).filter(k=>document.getElementById('mf-ic-'+k)?.checked);
+    const whats  = document.getElementById('mf-whats')?.value?.trim();
+    const email  = document.getElementById('mf-email')?.value?.trim().toLowerCase();
+    const user   = document.getElementById('mf-user')?.value?.trim().toLowerCase();
+    const pass   = document.getElementById('mf-pass')?.value?.trim();
+    const typeEl = document.querySelector('input[name="mf-type"]:checked');
+    const memberType = typeEl ? typeEl.value : 'membro';
     if (!name||!user||!pass) { toast('⚠️ Preencha nome, usuário e senha.'); return; }
+    if (!instrs.length) { toast('⚠️ Selecione pelo menos um instrumento.'); return; }
     const conflict = S.members.find(m => m.user===user && m.id!==id);
     if (conflict) { toast('⚠️ Esse nome de usuário já existe.'); return; }
     if (id) {
         const m = S.members.find(x=>x.id===id);
-        if (m) { m.name=name; m.instrument=instr; m.whatsapp=whats; m.email=email; m.user=user; m.pass=pass; }
+        if (m) { m.name=name; m.instruments=instrs; m.instrument=instrs[0]; m.whatsapp=whats; m.email=email; m.user=user; m.pass=pass; m.memberType=memberType; }
     } else {
-        S.members.push({ id:'mb'+uid(), name, instrument:instr, whatsapp:whats, email, user, pass });
+        S.members.push({ id:'mb'+uid(), name, instruments:instrs, instrument:instrs[0], whatsapp:whats, email, user, pass, memberType });
     }
     persist(); closeModal(); render();
     toast(id ? `✅ ${name} atualizado!` : `✅ ${name} cadastrado no ministério!`);
@@ -2600,7 +2648,10 @@ function atividadePage() {
         return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
     }
 
-    const cards = mbs.map(m => {
+    const instrEmoji = {violao:'🎸',teclado:'🎹',bateria:'🥁',baixo:'🎸',guitarra:'🎸',sopro:'🎷',vocal1:'🎤',vocal2:'🎤',vocal3:'🎤',animador:'🎙'};
+
+    // ── compute stats per member ──────────────────────────────────────────
+    function memberStats(m) {
         const acts = S.activityLog.filter(a => a.memberId === m.id);
         const logins     = acts.filter(a=>a.type==='login');
         const cifraActs  = acts.filter(a=>a.type==='cifra_view'||a.type==='pdf_view');
@@ -2613,29 +2664,109 @@ function atividadePage() {
         const uniqueSongs= new Set([...cifraActs,...musicActs,...songViews].map(a=>a.songId).filter(Boolean)).size;
         const lastAct    = acts.length ? Math.max(...acts.map(a=>a.at)) : 0;
         const lastLogin  = logins.length ? Math.max(...logins.map(a=>a.at)) : 0;
-
-        // Score de preparação (0–100)
         let score = 0;
-        score += Math.min(30, logins.length * 5);           // até 30 pts — logins
-        score += Math.min(30, uniqueSongs * 5);              // até 30 pts — músicas estudadas
-        score += Math.min(20, Math.floor(totalCifra/60)*4); // até 20 pts — tempo de cifra
-        score += Math.min(20, Math.floor(totalMusic/60)*3); // até 20 pts — tempo de música
+        score += Math.min(30, logins.length * 5);
+        score += Math.min(30, uniqueSongs * 5);
+        score += Math.min(20, Math.floor(totalCifra/60)*4);
+        score += Math.min(20, Math.floor(totalMusic/60)*3);
         score = Math.min(100, score);
+        return { acts, logins, cifraActs, musicActs, songViews, totalCifra, totalMusic, totalSong, totalTime, uniqueSongs, lastAct, lastLogin, score };
+    }
 
+    // ── general overview section ──────────────────────────────────────────
+    const allStats = mbs.map(m => ({ m, ...memberStats(m) }));
+    const totalSessions   = allStats.reduce((s,x)=>s+x.logins.length, 0);
+    const totalTimeAll    = allStats.reduce((s,x)=>s+x.totalTime, 0);
+    const totalCifraAll   = allStats.reduce((s,x)=>s+x.totalCifra, 0);
+    const totalMusicAll   = allStats.reduce((s,x)=>s+x.totalMusic, 0);
+    const activeMembers   = allStats.filter(x=>x.acts.length>0).length;
+    const avgScore        = allStats.length ? Math.round(allStats.reduce((s,x)=>s+x.score,0)/allStats.length) : 0;
+    const avgScoreColor   = avgScore>=80?'#22c55e':avgScore>=50?'#eab308':avgScore>=20?'#f97316':'#ef4444';
+    const topMembers      = [...allStats].sort((a,b)=>b.score-a.score).slice(0,3);
+    const membrosCount    = mbs.filter(m=>(m.memberType||'membro')==='membro').length;
+    const colaboradoresCount = mbs.filter(m=>m.memberType==='colaborador').length;
+
+    const overviewSection = `
+    <div style="background:linear-gradient(135deg,#0a1a10,#0f1520);border:1px solid rgba(0,150,63,.3);border-radius:var(--radius);padding:24px;margin-bottom:28px">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:20px">
+            <div style="font-size:28px">⛪</div>
+            <div>
+                <div style="font-size:18px;font-weight:900">Visão Geral do Ministério</div>
+                <div style="font-size:12px;color:var(--muted)">${mbs.length} integrante${mbs.length!==1?'s':''} · ${membrosCount} membro${membrosCount!==1?'s':''} · ${colaboradoresCount} colaborador${colaboradoresCount!==1?'es':''}</div>
+            </div>
+            <div style="margin-left:auto;text-align:center">
+                <div style="width:64px;height:64px;border-radius:50%;background:conic-gradient(${avgScoreColor} ${avgScore*3.6}deg, rgba(255,255,255,.08) 0deg);display:flex;align-items:center;justify-content:center;margin:0 auto 2px">
+                    <div style="width:48px;height:48px;border-radius:50%;background:#0a1a10;display:flex;align-items:center;justify-content:center">
+                        <div style="font-size:15px;font-weight:900;color:${avgScoreColor}">${avgScore}</div>
+                    </div>
+                </div>
+                <div style="font-size:10px;color:var(--muted)">score médio</div>
+            </div>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;margin-bottom:20px">
+            <div style="background:rgba(0,150,63,.1);border:1px solid rgba(0,150,63,.2);border-radius:10px;padding:14px;text-align:center">
+                <div style="font-size:24px;font-weight:900;color:var(--purple-light)">${totalSessions}</div>
+                <div style="font-size:10px;color:var(--muted);text-transform:uppercase;margin-top:2px">sessões</div>
+            </div>
+            <div style="background:rgba(165,180,252,.08);border:1px solid rgba(165,180,252,.18);border-radius:10px;padding:14px;text-align:center">
+                <div style="font-size:24px;font-weight:900;color:#a5b4fc">${fmtTime(totalCifraAll)}</div>
+                <div style="font-size:10px;color:var(--muted);text-transform:uppercase;margin-top:2px">cifra</div>
+            </div>
+            <div style="background:rgba(52,211,153,.08);border:1px solid rgba(52,211,153,.18);border-radius:10px;padding:14px;text-align:center">
+                <div style="font-size:24px;font-weight:900;color:#34d399">${fmtTime(totalMusicAll)}</div>
+                <div style="font-size:10px;color:var(--muted);text-transform:uppercase;margin-top:2px">ouvindo</div>
+            </div>
+            <div style="background:rgba(241,90,36,.08);border:1px solid rgba(241,90,36,.2);border-radius:10px;padding:14px;text-align:center">
+                <div style="font-size:24px;font-weight:900;color:var(--gold)">${fmtTime(totalTimeAll)}</div>
+                <div style="font-size:10px;color:var(--muted);text-transform:uppercase;margin-top:2px">total</div>
+            </div>
+            <div style="background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:10px;padding:14px;text-align:center">
+                <div style="font-size:24px;font-weight:900;color:var(--text)">${activeMembers}<span style="font-size:14px;color:var(--muted)">/${mbs.length}</span></div>
+                <div style="font-size:10px;color:var(--muted);text-transform:uppercase;margin-top:2px">ativos</div>
+            </div>
+        </div>
+        ${topMembers.filter(x=>x.acts.length>0).length ? `
+        <div style="border-top:1px solid rgba(255,255,255,.07);padding-top:16px">
+            <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:10px">🏆 Mais preparados</div>
+            <div style="display:flex;flex-direction:column;gap:8px">
+                ${topMembers.filter(x=>x.acts.length>0).map((x,i)=>{
+                    const medals=['🥇','🥈','🥉'];
+                    const sc=x.score;
+                    const sc_color=sc>=80?'#22c55e':sc>=50?'#eab308':sc>=20?'#f97316':'#ef4444';
+                    return `<div style="display:flex;align-items:center;gap:10px">
+                        <span style="font-size:16px;width:20px">${medals[i]||'🎵'}</span>
+                        <span style="font-size:13px;font-weight:700;flex:1">${x.m.name}</span>
+                        <span style="font-size:11px;color:var(--muted)">${(x.m.memberType||'membro')==='colaborador'?'🤝':'🎼'}</span>
+                        <div style="width:80px;height:6px;background:rgba(255,255,255,.08);border-radius:3px;overflow:hidden">
+                            <div style="height:100%;width:${sc}%;background:${sc_color};border-radius:3px"></div>
+                        </div>
+                        <span style="font-size:12px;font-weight:800;color:${sc_color};min-width:30px;text-align:right">${sc}</span>
+                    </div>`;
+                }).join('')}
+            </div>
+        </div>` : ''}
+    </div>`;
+
+    // ── per-member card ───────────────────────────────────────────────────
+    function memberCard(m) {
+        const { acts, logins, totalCifra, totalMusic, totalTime, uniqueSongs, lastAct, lastLogin, score } = memberStats(m);
         const scoreColor = score >= 80 ? '#22c55e' : score >= 50 ? '#eab308' : score >= 20 ? '#f97316' : '#ef4444';
         const scoreLabel = score >= 80 ? 'Ótimo' : score >= 50 ? 'Bom' : score >= 20 ? 'Regular' : 'Iniciando';
-
-        // Recent activity (last 5)
         const recent = acts.filter(a=>a.duration>0).sort((a,b)=>b.at-a.at).slice(0,4);
         const typeLabel = { song_view:'🎵 Abriu', cifra_view:'📄 Cifra', pdf_view:'📄 PDF', music_play:'▶ Ouviu', login:'🔐 Login' };
-
-        return `<div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:20px;margin-bottom:16px">
+        const isColab = (m.memberType||'membro') === 'colaborador';
+        return `<div style="background:var(--bg2);border:1px solid ${isColab?'rgba(245,158,11,.2)':'var(--border)'};border-left:4px solid ${isColab?'#f59e0b':'var(--purple)'};border-radius:var(--radius);padding:20px;margin-bottom:14px">
             <div style="display:flex;align-items:flex-start;gap:16px;flex-wrap:wrap">
-                <div style="width:52px;height:52px;border-radius:50%;background:var(--purple);display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0">
-                    ${{violao:'🎸',teclado:'🎹',bateria:'🥁',baixo:'🎸',guitarra:'🎸',sopro:'🎷',vocal1:'🎤',vocal2:'🎤',vocal3:'🎤',animador:'🎙'}[m.instrument]||'🎵'}
+                <div style="width:52px;height:52px;border-radius:50%;background:${isColab?'rgba(245,158,11,.2)':'var(--purple)'};display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0">
+                    ${instrEmoji[(m.instruments||[m.instrument])[0]]||'🎵'}
                 </div>
                 <div style="flex:1;min-width:200px">
-                    <div style="font-size:16px;font-weight:800;margin-bottom:2px">${m.name}</div>
+                    <div style="display:flex;align-items:center;gap:8px;margin-bottom:2px">
+                        <div style="font-size:16px;font-weight:800">${m.name}</div>
+                        <span style="font-size:10px;font-weight:700;padding:1px 7px;border-radius:6px;${isColab?'background:rgba(245,158,11,.15);color:#f59e0b;border:1px solid rgba(245,158,11,.3)':'background:rgba(0,150,63,.12);color:var(--purple-light);border:1px solid rgba(0,150,63,.25)'}">
+                            ${isColab?'🤝 Colaborador':'🎼 Membro'}
+                        </span>
+                    </div>
                     <div style="font-size:12px;color:var(--muted)">
                         Último acesso: ${fmtDate(lastLogin||lastAct)} · ${logins.length} login${logins.length!==1?'s':''}
                     </div>
@@ -2681,15 +2812,45 @@ function atividadePage() {
                 </div>
             </div>` : `<div style="margin-top:12px;font-size:12px;color:var(--muted);font-style:italic">Sem atividade registrada ainda.</div>`}
         </div>`;
-    });
+    }
+
+    // ── split by type ─────────────────────────────────────────────────────
+    const membros      = mbs.filter(m=>(m.memberType||'membro')==='membro');
+    const colaboradores= mbs.filter(m=>m.memberType==='colaborador');
+
+    const membrosSection = membros.length ? `
+        <div style="display:flex;align-items:center;gap:10px;margin:28px 0 14px">
+            <div style="flex:1;height:1px;background:rgba(0,150,63,.3)"></div>
+            <div style="display:flex;align-items:center;gap:8px;background:rgba(0,150,63,.1);border:1px solid rgba(0,150,63,.25);border-radius:20px;padding:5px 14px">
+                <span style="font-size:14px">🎼</span>
+                <span style="font-size:13px;font-weight:800;color:var(--purple-light)">Membros</span>
+                <span style="background:var(--purple);color:#fff;border-radius:10px;padding:0px 7px;font-size:11px;font-weight:700">${membros.length}</span>
+            </div>
+            <div style="flex:1;height:1px;background:rgba(0,150,63,.3)"></div>
+        </div>
+        ${membros.map(memberCard).join('')}` : '';
+
+    const colaboradoresSection = colaboradores.length ? `
+        <div style="display:flex;align-items:center;gap:10px;margin:28px 0 14px">
+            <div style="flex:1;height:1px;background:rgba(245,158,11,.25)"></div>
+            <div style="display:flex;align-items:center;gap:8px;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.25);border-radius:20px;padding:5px 14px">
+                <span style="font-size:14px">🤝</span>
+                <span style="font-size:13px;font-weight:800;color:#f59e0b">Colaboradores</span>
+                <span style="background:#f59e0b;color:#111;border-radius:10px;padding:0px 7px;font-size:11px;font-weight:700">${colaboradores.length}</span>
+            </div>
+            <div style="flex:1;height:1px;background:rgba(245,158,11,.25)"></div>
+        </div>
+        ${colaboradores.map(memberCard).join('')}` : '';
 
     return `<div style="max-width:800px;margin:0 auto">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:8px">
-            <h2 style="font-size:22px;font-weight:800">📊 Atividade dos Membros</h2>
+            <h2 style="font-size:22px;font-weight:800">📊 Atividade do Ministério</h2>
             <button class="btn btn-ghost btn-sm" onclick="if(confirm('Limpar todo o histórico de atividade?')){S.activityLog=[];persist();render();}"
                 style="color:#f87171;border-color:#f87171">🗑 Limpar histórico</button>
         </div>
-        ${cards.join('')}
+        ${overviewSection}
+        ${membrosSection}
+        ${colaboradoresSection}
     </div>`;
 }
 
@@ -2708,7 +2869,7 @@ function cadastrosPage() {
     const rows = mbs.map(m => `
         <tr style="border-bottom:1px solid var(--border)">
             <td style="padding:12px 10px;font-weight:700">${m.name}</td>
-            <td style="padding:12px 10px;color:var(--muted)">${instrLabel[m.instrument]||m.instrument}</td>
+            <td style="padding:12px 10px">${(m.instruments||[m.instrument]).map(i=>`<span style="white-space:nowrap;font-size:12px;color:var(--muted)">${{violao:'🎸',teclado:'🎹',bateria:'🥁',baixo:'🎸',guitarra:'🎸',sopro:'🎷',vocal1:'🎤',vocal2:'🎤',vocal3:'🎤',animador:'🎙'}[i]||'🎵'} ${{violao:'Violão',teclado:'Teclado',bateria:'Bateria',baixo:'Baixo',guitarra:'Guitarra',sopro:'Sopro',vocal1:'Voc.1',vocal2:'Voc.2',vocal3:'Voc.3',animador:'Animador'}[i]||i}</span>`).join('<br>')}</td>
             <td style="padding:12px 10px">
                 ${m.whatsapp
                     ? `<a href="https://wa.me/55${m.whatsapp.replace(/\D/g,'')}" target="_blank"
@@ -2719,6 +2880,11 @@ function cadastrosPage() {
                 ${m.email
                     ? `<a href="mailto:${m.email}" style="color:#a5b4fc;text-decoration:none">${m.email}</a>`
                     : `<span style="color:#f87171;font-size:12px">não informado</span>`}
+            </td>
+            <td style="padding:12px 10px">
+                <span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:8px;${(m.memberType||'membro')==='colaborador'?'background:rgba(245,158,11,.12);color:#f59e0b;border:1px solid rgba(245,158,11,.3)':'background:rgba(0,150,63,.12);color:var(--purple-light);border:1px solid rgba(0,150,63,.25)'}">
+                    ${(m.memberType||'membro')==='colaborador'?'🤝 Colaborador':'🎼 Membro'}
+                </span>
             </td>
             <td style="padding:12px 10px;font-family:monospace;font-size:13px;color:var(--purple-light)">${m.user}</td>
             <td style="padding:12px 10px">
@@ -2758,6 +2924,7 @@ function cadastrosPage() {
                     <tr style="background:var(--bg3);border-bottom:2px solid var(--border)">
                         <th style="padding:10px;text-align:left;font-size:11px;text-transform:uppercase;color:var(--muted);font-weight:700">Nome</th>
                         <th style="padding:10px;text-align:left;font-size:11px;text-transform:uppercase;color:var(--muted);font-weight:700">Instrumento</th>
+                        <th style="padding:10px;text-align:left;font-size:11px;text-transform:uppercase;color:var(--muted);font-weight:700">Tipo</th>
                         <th style="padding:10px;text-align:left;font-size:11px;text-transform:uppercase;color:var(--muted);font-weight:700">WhatsApp</th>
                         <th style="padding:10px;text-align:left;font-size:11px;text-transform:uppercase;color:var(--muted);font-weight:700">Email</th>
                         <th style="padding:10px;text-align:left;font-size:11px;text-transform:uppercase;color:var(--muted);font-weight:700">Usuário</th>
@@ -2960,8 +3127,9 @@ function eventoModal(ev) {
             ${EV_INSTR.map(({k,emoji,label})=>{
                 // Filter members whose instrument matches this role
                 const instrMatch = membersWithLogin.filter(m => {
-                    if (k==='vocal1'||k==='vocal2'||k==='vocal3') return m.instrument==='vocal1'||m.instrument==='vocal2'||m.instrument==='vocal3';
-                    return m.instrument===k;
+                    const instrs = m.instruments || (m.instrument ? [m.instrument] : []);
+                    if (k==='vocal1'||k==='vocal2'||k==='vocal3') return instrs.some(i=>i==='vocal1'||i==='vocal2'||i==='vocal3');
+                    return instrs.includes(k);
                 });
                 const thisDl = instrMatch.length ? `dl-${k}-${ev.id}` : dlId;
                 const dlHtml = instrMatch.length
