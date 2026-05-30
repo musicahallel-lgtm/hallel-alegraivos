@@ -658,8 +658,36 @@
         .role-badge {
             font-size:11px; font-weight:700; padding:3px 9px; border-radius:10px; letter-spacing:.4px;
         }
-        .role-badge.adm   { background:rgba(0,150,63,.2); color:var(--purple-light); border:1px solid rgba(0,150,63,.3); }
-        .role-badge.geral { background:rgba(241,90,36,.15); color:#f97316; border:1px solid rgba(241,90,36,.3); }
+        .role-badge.adm    { background:rgba(0,150,63,.2); color:var(--purple-light); border:1px solid rgba(0,150,63,.3); }
+        .role-badge.geral  { background:rgba(241,90,36,.15); color:#f97316; border:1px solid rgba(241,90,36,.3); }
+        .role-badge.membro { background:rgba(94,96,206,.2); color:#a5b4fc; border:1px solid rgba(94,96,206,.4); }
+
+        /* ── Membros page ── */
+        .member-card { display:flex; align-items:center; gap:12px; padding:12px 16px; background:var(--bg2); border:1px solid var(--border); border-radius:var(--radius-sm); margin-bottom:8px; }
+        .member-avatar { width:40px; height:40px; border-radius:50%; background:var(--purple); display:flex; align-items:center; justify-content:center; font-size:18px; flex-shrink:0; }
+        .member-info { flex:1; min-width:0; }
+        .member-name { font-size:14px; font-weight:700; color:var(--text); }
+        .member-meta { font-size:12px; color:var(--muted); margin-top:2px; }
+        .member-form { background:var(--bg2); border:1px solid var(--border); border-radius:var(--radius); padding:20px; margin-bottom:16px; }
+        .member-form-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+        @media(max-width:480px) { .member-form-grid { grid-template-columns:1fr; } }
+
+        /* ── Mission Alert ── */
+        @keyframes missionPulse { 0%,100%{box-shadow:0 0 30px rgba(255,212,0,.4)} 50%{box-shadow:0 0 60px rgba(255,212,0,.8),0 0 100px rgba(241,90,36,.3)} }
+        @keyframes missionEntry { from{opacity:0;transform:scale(.92)} to{opacity:1;transform:scale(1)} }
+        .mission-backdrop { position:fixed;inset:0;background:rgba(0,0,0,.93);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(4px); }
+        .mission-card { background:linear-gradient(160deg,#0f1923 0%,#1a1040 100%);border:2px solid var(--gold);border-radius:20px;padding:32px 28px;max-width:500px;width:100%;text-align:center;animation:missionEntry .4s ease, missionPulse 2.5s ease 1s infinite; }
+        .mission-icon { font-size:56px; margin-bottom:8px; }
+        .mission-title { font-size:26px; font-weight:900; color:var(--gold); letter-spacing:1px; margin-bottom:4px; }
+        .mission-sub { font-size:13px; color:var(--muted); margin-bottom:24px; }
+        .mission-ev-list { display:flex; flex-direction:column; gap:10px; margin-bottom:24px; text-align:left; }
+        .mission-ev-item { background:rgba(255,255,255,.05); border:1px solid rgba(255,212,0,.3); border-left:4px solid var(--gold); border-radius:10px; padding:12px 14px; }
+        .mission-ev-name { font-size:15px; font-weight:800; color:#fff; margin-bottom:3px; }
+        .mission-ev-date { font-size:12px; color:var(--gold); }
+        .mission-ev-role { font-size:12px; color:#a5b4fc; margin-top:4px; }
+        .mission-msg { font-size:13px; color:#d1d5db; line-height:1.6; margin-bottom:24px; padding:16px; background:rgba(255,255,255,.04); border-radius:10px; border-left:3px solid var(--purple); }
+        .mission-btn { width:100%; padding:15px; font-size:16px; font-weight:800; border-radius:12px; border:none; background:linear-gradient(90deg,var(--purple),var(--purple-light)); color:#fff; cursor:pointer; letter-spacing:.5px; transition:opacity .2s; }
+        .mission-btn:hover { opacity:.9; }
 
         /* ── Print media ── */
         @media print {
@@ -765,9 +793,12 @@ const S = {
     role: localStorage.getItem('hl_role') || null,
     escalas: {},   // { evId: { violao, teclado, ..., checklist: [{id,text,done}] } }
     evTab: 'escala',
+    members: [],   // { id, name, instrument, user, pass }
+    currentMember: null, // member object when role==='membro'
 };
-const isAdm   = () => S.role === 'adm';
-const isGeral = () => S.role === 'geral';
+const isAdm    = () => S.role === 'adm';
+const isGeral  = () => S.role === 'geral';
+const isMembro = () => S.role === 'membro';
 
 // ═══════════════════════════════════════════════
 //  INDEX DB  (PDF storage — no size limit)
@@ -841,15 +872,18 @@ function persist() {
     localStorage.setItem('hl_songs',    JSON.stringify(S.songs));
     localStorage.setItem('hl_setlists', JSON.stringify(S.setlists));
     localStorage.setItem('hl_escalas',  JSON.stringify(S.escalas));
+    localStorage.setItem('hl_members',  JSON.stringify(S.members));
 }
 function hydrate() {
     try {
         const s  = localStorage.getItem('hl_songs');
         const sl = localStorage.getItem('hl_setlists');
         const es = localStorage.getItem('hl_escalas');
+        const mb = localStorage.getItem('hl_members');
         if (s)  S.songs    = JSON.parse(s);
         if (sl) S.setlists = JSON.parse(sl);
         if (es) S.escalas  = JSON.parse(es);
+        if (mb) S.members  = JSON.parse(mb);
     } catch(e) { console.error(e); }
     // Migrate old set lists (songIds → blocks)
     S.setlists.forEach(sl => {
@@ -1016,59 +1050,109 @@ function loginScreen() {
 function doLogin() {
     const user = document.getElementById('lg-user')?.value?.trim().toLowerCase();
     const pass = document.getElementById('lg-pass')?.value;
+    // Check static credentials (ADM / Equipe)
     const cred = CREDS.find(c => c.user === user && c.pass === pass);
-    if (!cred) {
-        const err = document.getElementById('login-err');
-        if (err) err.classList.add('show');
+    if (cred) {
+        S.role = cred.role;
+        S.currentMember = null;
+        localStorage.setItem('hl_role', cred.role);
+        render();
+        setTimeout(() => {
+            const dismissed = JSON.parse(localStorage.getItem('hl_notif_dismissed')||'[]');
+            const near = EVENTOS_2026.filter(ev => { const d=evDaysUntil(ev); return d>=0&&d<=15&&!dismissed.includes(ev.id); });
+            if (near.length) {
+                const ev = near[0]; const d = evDaysUntil(ev);
+                toast(`🔔 ${ev.title} — ${d===0?'HOJE':d===1?'amanhã':'em '+d+' dias'}! Veja a Agenda.`);
+            }
+        }, 800);
         return;
     }
-    S.role = cred.role;
-    localStorage.setItem('hl_role', cred.role);
-    render();
-    // Notificação de eventos próximos ao logar
-    setTimeout(() => {
-        const dismissed = JSON.parse(localStorage.getItem('hl_notif_dismissed')||'[]');
-        const near = EVENTOS_2026.filter(ev => { const d=evDaysUntil(ev); return d>=0&&d<=15&&!dismissed.includes(ev.id); });
-        if (near.length) {
-            const ev = near[0];
-            const d = evDaysUntil(ev);
-            const when = d===0?'HOJE':d===1?'amanhã':`em ${d} dias`;
-            toast(`🔔 ${ev.title} — ${when}! Veja a Agenda.`);
-        }
-    }, 800);
+    // Check member credentials
+    const member = S.members.find(m => m.user.toLowerCase() === user && m.pass === pass);
+    if (member) {
+        S.role = 'membro';
+        S.currentMember = member;
+        localStorage.setItem('hl_role', 'membro');
+        localStorage.setItem('hl_current_member', member.id);
+        render();
+        // Show mission alert after render
+        setTimeout(() => showMissionAlert(member), 300);
+        return;
+    }
+    const err = document.getElementById('login-err');
+    if (err) err.classList.add('show');
 }
 
 function doLogout() {
     S.role = null;
+    S.currentMember = null;
     localStorage.removeItem('hl_role');
+    localStorage.removeItem('hl_current_member');
     S.modal = null;
     render();
 }
 
+function showMissionAlert(member) {
+    const escalas = getMemberEscalas(member.name);
+    const upcoming = escalas.filter(e => e.daysUntil >= 0);
+    if (!upcoming.length) {
+        toast(`Olá, ${member.name}! 👋 Nenhuma escala futura no momento.`);
+        return;
+    }
+    S.modal = { type: 'mission-alert', data: { member, escalas: upcoming } };
+    render();
+}
+
+function getMemberEscalas(memberName) {
+    const results = [];
+    const nameLower = memberName.toLowerCase().trim();
+    Object.entries(S.escalas).forEach(([evId, esc]) => {
+        const roles = EV_INSTR.filter(({k}) => {
+            const val = (esc[k]||'').toLowerCase().trim();
+            return val && (val === nameLower || val.includes(nameLower));
+        });
+        if (!roles.length) return;
+        const ev = EVENTOS_2026.find(e=>e.id===evId) || REC_2026.find(e=>e.id===evId);
+        if (!ev) return;
+        results.push({ ev, roles, daysUntil: evDaysUntil(ev) });
+    });
+    return results.sort((a,b) => a.daysUntil - b.daysUntil);
+}
+
 function html() {
     let page = '';
-    if (S.page === 'library')  page = libPage();
-    if (S.page === 'setlists') page = slPage();
-    if (S.page === 'playlist') page = playlistPage();
-    if (S.page === 'agenda')   page = agendaPage();
+    if (S.page === 'library')      page = libPage();
+    if (S.page === 'setlists')     page = slPage();
+    if (S.page === 'playlist')     page = playlistPage();
+    if (S.page === 'agenda')       page = agendaPage();
+    if (S.page === 'membros')      page = membrosPage();
+    if (S.page === 'minha-escala') page = minhaEscalaPage();
     return header() + `<div class="main">${page}</div>` + (S.modal ? modalHtml() : '');
 }
 
 function header() {
-    const roleLabel = isAdm() ? 'ADM' : 'Equipe';
+    const roleLabel = isAdm() ? 'ADM' : isMembro() ? (S.currentMember?.name || 'Membro') : 'Equipe';
     return `<div class="header">
         <div class="logo">
             <img src="logo.png" alt="Comunidade Católica Hallel">
         </div>
         <nav class="nav">
-            <button class="nav-btn ${S.page==='library'?'active':''}"  onclick="nav('library')">🎸 Biblioteca</button>
-            <button class="nav-btn ${S.page==='setlists'?'active':''}" onclick="nav('setlists')">📋 Set Lists</button>
-            <button class="nav-btn ${S.page==='playlist'?'active':''}" onclick="nav('playlist')">▶ Playlist</button>
-            <button class="nav-btn ${S.page==='agenda'?'active':''}"  onclick="nav('agenda')">📅 Agenda</button>
+            ${isMembro() ? `
+                <button class="nav-btn ${S.page==='minha-escala'?'active':''}" onclick="nav('minha-escala')">🎯 Minha Escala</button>
+                <button class="nav-btn ${S.page==='library'?'active':''}"      onclick="nav('library')">🎸 Biblioteca</button>
+                <button class="nav-btn ${S.page==='setlists'?'active':''}"     onclick="nav('setlists')">📋 Set Lists</button>
+            ` : `
+                <button class="nav-btn ${S.page==='library'?'active':''}"  onclick="nav('library')">🎸 Biblioteca</button>
+                <button class="nav-btn ${S.page==='setlists'?'active':''}" onclick="nav('setlists')">📋 Set Lists</button>
+                <button class="nav-btn ${S.page==='playlist'?'active':''}" onclick="nav('playlist')">▶ Playlist</button>
+                <button class="nav-btn ${S.page==='agenda'?'active':''}"   onclick="nav('agenda')">📅 Agenda</button>
+                ${isAdm() ? `<button class="nav-btn ${S.page==='membros'?'active':''}" onclick="nav('membros')">👥 Membros</button>` : ''}
+            `}
         </nav>
         <div class="header-actions" style="display:flex;align-items:center;gap:8px">
             ${S.page==='library'  && isAdm() ? `<button class="btn btn-primary" onclick="openAdd()">+ Música</button>` : ''}
             ${S.page==='setlists' && isAdm() ? `<button class="btn btn-primary" onclick="newSL()">+ Set List</button>` : ''}
+            ${isMembro() ? `<button class="btn btn-ghost btn-sm" style="border:1px solid var(--gold);color:var(--gold);font-size:11px" onclick="showMissionAlert(S.currentMember)">🎯 Ver Missões</button>` : ''}
             <span class="role-badge ${S.role}">${roleLabel}</span>
             <button class="btn btn-ghost btn-sm" onclick="doLogout()" style="color:var(--muted)">Sair</button>
         </div>
@@ -1164,7 +1248,9 @@ function modalHtml() {
     if (type==='newSL')   return newSLModal(data);
     if (type==='sl')      return slModal(data);
     if (type==='print')   return printModal(data);
-    if (type==='evento')  return eventoModal(data);
+    if (type==='evento')       return eventoModal(data);
+    if (type==='mission-alert') return missionAlertModal(data);
+    if (type==='member-form')  return memberFormModal(data);
     return '';
 }
 
@@ -1973,6 +2059,186 @@ function evDateLabel(ev) {
     return `${ds}/${ms < 10?'0'+ms:ms}–${de}/${me < 10?'0'+me:me}`;
 }
 
+// ════════════════════════════════════════════════════
+//  MEMBERS — Cadastro e Gestão
+// ════════════════════════════════════════════════════
+
+function membrosPage() {
+    const mbs = S.members;
+    const instrEmoji = {violao:'🎸',teclado:'🎹',bateria:'🥁',baixo:'🎸',guitarra:'🎸',sopro:'🎷',vocal1:'🎤',vocal2:'🎤',vocal3:'🎤',animador:'🎙'};
+    const instrLabel = {violao:'Violão',teclado:'Teclado',bateria:'Bateria',baixo:'Baixo',guitarra:'Guitarra',sopro:'Sopro',vocal1:'Vocal 1',vocal2:'Vocal 2',vocal3:'Vocal 3',animador:'Animador'};
+    return `<div style="max-width:700px;margin:0 auto;padding:8px 0">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+            <h2 style="font-size:22px;font-weight:800">👥 Membros do Ministério</h2>
+            <button class="btn btn-primary" onclick="openMemberForm(null)">+ Novo Membro</button>
+        </div>
+        ${mbs.length===0 ? `<div style="text-align:center;padding:40px;color:var(--muted);background:var(--bg2);border-radius:var(--radius);border:1px dashed var(--border)">
+            <div style="font-size:36px;margin-bottom:8px">👥</div>
+            Nenhum membro cadastrado ainda.<br>
+            <button class="btn btn-ghost btn-sm" style="margin-top:12px" onclick="openMemberForm(null)">+ Cadastrar primeiro membro</button>
+        </div>` : mbs.map(m => {
+            const escalas = getMemberEscalas(m.name).filter(e=>e.daysUntil>=0);
+            return `<div class="member-card">
+                <div class="member-avatar">${instrEmoji[m.instrument]||'🎵'}</div>
+                <div class="member-info">
+                    <div class="member-name">${m.name}</div>
+                    <div class="member-meta">${instrLabel[m.instrument]||m.instrument} · @${m.user}
+                        ${escalas.length?`<span style="margin-left:8px;background:rgba(255,212,0,.15);border:1px solid rgba(255,212,0,.4);color:var(--gold);border-radius:8px;padding:1px 7px;font-size:11px">🎯 ${escalas.length} missão${escalas.length>1?'ões':''} próxima${escalas.length>1?'s':''}</span>`:''}
+                    </div>
+                </div>
+                <div style="display:flex;gap:6px">
+                    <button class="btn btn-ghost btn-sm btn-icon" title="Editar" onclick="openMemberForm('${m.id}')">✏️</button>
+                    <button class="btn btn-ghost btn-sm btn-icon" title="Excluir" onclick="deleteMember('${m.id}')">🗑</button>
+                </div>
+            </div>`;
+        }).join('')}
+    </div>`;
+}
+
+function openMemberForm(id) {
+    const m = id ? S.members.find(x=>x.id===id) : null;
+    S.modal = { type:'member-form', data: m || { id:null, name:'', instrument:'violao', user:'', pass:'' } };
+    render();
+}
+
+function memberFormModal(data) {
+    const isEdit = !!data.id;
+    const instrOpts = EV_INSTR.map(({k,emoji,label})=>`<option value="${k}" ${data.instrument===k?'selected':''}>${emoji} ${label}</option>`).join('');
+    return `<div class="backdrop" onclick="closeModal(event)">
+    <div class="modal" style="max-width:460px">
+        <div class="modal-hd">
+            <div class="modal-title">${isEdit?'✏️ Editar Membro':'👤 Novo Membro'}</div>
+            <button class="close-btn" onclick="closeModal()">✕</button>
+        </div>
+        <div class="modal-body">
+            <div style="display:flex;flex-direction:column;gap:12px">
+                <div>
+                    <label style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;display:block;margin-bottom:4px">Nome completo</label>
+                    <input class="field" id="mf-name" type="text" placeholder="Ex: Raquel Silva" value="${data.name||''}">
+                </div>
+                <div>
+                    <label style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;display:block;margin-bottom:4px">Instrumento principal</label>
+                    <select class="field" id="mf-instr">${instrOpts}</select>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+                    <div>
+                        <label style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;display:block;margin-bottom:4px">Usuário (login)</label>
+                        <input class="field" id="mf-user" type="text" placeholder="Ex: raquel" value="${data.user||''}">
+                    </div>
+                    <div>
+                        <label style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;display:block;margin-bottom:4px">Senha</label>
+                        <input class="field" id="mf-pass" type="text" placeholder="••••••" value="${data.pass||''}">
+                    </div>
+                </div>
+                <div style="background:rgba(255,212,0,.08);border:1px solid rgba(255,212,0,.2);border-radius:8px;padding:10px 12px;font-size:12px;color:var(--muted)">
+                    💡 O membro usa esses dados para entrar no app e ver suas escalas e missões.
+                </div>
+            </div>
+            <div style="display:flex;gap:8px;margin-top:20px">
+                <button class="btn btn-ghost" style="flex:1" onclick="closeModal()">Cancelar</button>
+                <button class="btn btn-primary" style="flex:2" onclick="saveMember('${data.id||''}')">
+                    ${isEdit?'💾 Salvar alterações':'✅ Cadastrar membro'}
+                </button>
+            </div>
+        </div>
+    </div></div>`;
+}
+
+function saveMember(id) {
+    const name  = document.getElementById('mf-name')?.value?.trim();
+    const instr = document.getElementById('mf-instr')?.value;
+    const user  = document.getElementById('mf-user')?.value?.trim().toLowerCase();
+    const pass  = document.getElementById('mf-pass')?.value?.trim();
+    if (!name||!user||!pass) { toast('⚠️ Preencha nome, usuário e senha.'); return; }
+    // Check user conflict
+    const conflict = S.members.find(m => m.user===user && m.id!==id);
+    if (conflict) { toast('⚠️ Esse nome de usuário já existe.'); return; }
+    if (id) {
+        const m = S.members.find(x=>x.id===id);
+        if (m) { m.name=name; m.instrument=instr; m.user=user; m.pass=pass; }
+    } else {
+        S.members.push({ id:'mb'+uid(), name, instrument:instr, user, pass });
+    }
+    persist(); closeModal(); render();
+    toast(id ? `✅ ${name} atualizado!` : `✅ ${name} cadastrado no ministério!`);
+}
+
+function deleteMember(id) {
+    const m = S.members.find(x=>x.id===id); if(!m) return;
+    if (!confirm(`Remover ${m.name} do ministério?`)) return;
+    S.members = S.members.filter(x=>x.id!==id);
+    persist(); render();
+    toast(`🗑 ${m.name} removido.`);
+}
+
+// ── Minha Escala (view do membro logado) ──
+function minhaEscalaPage() {
+    const member = S.currentMember;
+    if (!member) return '<div style="padding:32px;text-align:center;color:var(--muted)">Nenhum membro logado.</div>';
+    const todos    = getMemberEscalas(member.name);
+    const upcoming = todos.filter(e=>e.daysUntil>=0);
+    const past     = todos.filter(e=>e.daysUntil<0);
+    function evCard(item, isPast) {
+        const {ev, roles, daysUntil} = item;
+        const whenLabel = daysUntil===0?'🔴 HOJE':daysUntil===1?'🟡 Amanhã':daysUntil<=7?`🟡 Em ${daysUntil} dias`:`Em ${daysUntil} dias`;
+        return `<div style="background:var(--bg2);border:1px solid ${isPast?'var(--border)':'var(--gold)'};border-left:4px solid ${isPast?'var(--border)':'var(--gold)'};border-radius:var(--radius-sm);padding:14px 16px;margin-bottom:10px;opacity:${isPast?.6:1}">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap">
+                <div>
+                    <div style="font-size:15px;font-weight:800;color:${isPast?'var(--muted)':'var(--text)'};margin-bottom:3px">${ev.title}</div>
+                    <div style="font-size:12px;color:var(--muted)">📅 ${evDateLabel(ev)}${ev.horario?' · ⏰ '+ev.horario:''}</div>
+                    <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px">
+                        ${roles.map(({emoji,label})=>`<span style="display:inline-flex;align-items:center;gap:4px;background:rgba(94,96,206,.15);border:1px solid rgba(94,96,206,.3);border-radius:8px;padding:3px 10px;font-size:12px;font-weight:700;color:#a5b4fc">${emoji} ${label}</span>`).join('')}
+                    </div>
+                </div>
+                ${!isPast?`<div style="font-size:12px;font-weight:700;background:rgba(255,212,0,.1);border:1px solid rgba(255,212,0,.3);color:var(--gold);padding:4px 10px;border-radius:8px;white-space:nowrap">${whenLabel}</div>`:''}
+            </div>
+        </div>`;
+    }
+    return `<div style="max-width:620px;margin:0 auto">
+        <div style="text-align:center;padding:20px 0 24px">
+            <div style="font-size:40px;margin-bottom:4px">🎯</div>
+            <div style="font-size:22px;font-weight:900">Olá, ${member.name}!</div>
+            <div style="font-size:13px;color:var(--muted);margin-top:4px">Suas escalas no Ministério de Música Hallel</div>
+        </div>
+        ${upcoming.length ? `
+            <div style="font-size:13px;font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">🎯 Próximas Missões (${upcoming.length})</div>
+            ${upcoming.map(e=>evCard(e,false)).join('')}
+        ` : `<div style="text-align:center;padding:24px;background:var(--bg2);border-radius:var(--radius);border:1px solid var(--border);margin-bottom:16px;color:var(--muted)">Nenhuma escala futura no momento 🙏</div>`}
+        ${past.length ? `
+            <div style="font-size:13px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin:20px 0 10px">📜 Missões Realizadas (${past.length})</div>
+            ${past.slice(0,5).map(e=>evCard(e,true)).join('')}
+        ` : ''}
+    </div>`;
+}
+
+// ── Mission Alert Modal ──
+function missionAlertModal({member, escalas}) {
+    const top = escalas.slice(0,3); // show up to 3 upcoming
+    function whenStr(d) { return d===0?'HOJE':d===1?'amanhã':`em ${d} dias`; }
+    return `<div class="mission-backdrop" onclick="if(event.target===this)closeModal()">
+    <div class="mission-card">
+        <div class="mission-icon">🎯</div>
+        <div class="mission-title">VOCÊ ESTÁ ESCALADO!</div>
+        <div class="mission-sub">Olá, ${member.name} — você tem missões confirmadas</div>
+        <div class="mission-ev-list">
+            ${top.map(({ev,roles,daysUntil})=>`
+            <div class="mission-ev-item">
+                <div class="mission-ev-name">📅 ${ev.title}</div>
+                <div class="mission-ev-date">${evDateLabel(ev)}${ev.horario?' · '+ev.horario:''} — <b>${whenStr(daysUntil)}</b></div>
+                <div class="mission-ev-role">🎵 Sua função: ${roles.map(r=>r.label).join(', ')}</div>
+            </div>`).join('')}
+            ${escalas.length>3?`<div style="text-align:center;font-size:12px;color:var(--muted)">+${escalas.length-3} outra${escalas.length-3>1?'s':''} missão${escalas.length-3>1?'ões':''}. Veja em "🎯 Minha Escala".</div>`:''}
+        </div>
+        <div class="mission-msg">
+            🙏 <b>Esta é a sua missão!</b> Prepare-se com oração, estude as músicas do set list e esteja disponível nesta data.<br><br>
+            A Comunidade Católica Hallel conta com a sua entrega e dedicação. Que Deus abençoe o seu serviço! ✨
+        </div>
+        <button class="mission-btn" onclick="closeModal();nav('minha-escala')">✅ Entendido — Vou me preparar!</button>
+    </div></div>`;
+}
+
+// ════════════════════════════════════════════════════
+
 function agendaPage() {
     const today = new Date(); today.setHours(0,0,0,0);
     const dismissed = JSON.parse(localStorage.getItem('hl_notif_dismissed')||'[]');
@@ -2724,6 +2990,12 @@ function maybeInitMixer(song) {
 // ═══════════════════════════════════════════════
 (async () => {
     hydrate();
+    // Restore logged-in member session
+    if (S.role === 'membro') {
+        const memberId = localStorage.getItem('hl_current_member');
+        S.currentMember = S.members.find(m=>m.id===memberId) || null;
+        if (!S.currentMember) { S.role = null; localStorage.removeItem('hl_role'); }
+    }
     // Remove músicas retiradas do repertório
     const removedSet = new Set(REMOVED.map(t => t.toLowerCase()));
     S.songs = S.songs.filter(s => !removedSet.has((s.title||'').toLowerCase()));
