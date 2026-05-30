@@ -808,8 +808,9 @@ const S = {
     evTab: 'escala',
     members: [],      // { id, name, instrument, user, pass, email, whatsapp, firstAccessDone }
     currentMember: null,
-    activityLog: [],  // { id, memberId, memberName, type, at, duration, songId, songTitle, tab }
+    activityLog: [],     // { id, memberId, memberName, type, at, duration, songId, songTitle, tab }
     membrosTab: 'lista', // 'lista' | 'atividade' | 'cadastros'
+    accessRequests: [],  // { id, name, instrument, whatsapp, email, msg, at, status:'pending'|'approved'|'rejected' }
 };
 const isAdm    = () => S.role === 'adm';
 const isGeral  = () => S.role === 'geral';
@@ -888,7 +889,8 @@ function persist() {
     localStorage.setItem('hl_setlists', JSON.stringify(S.setlists));
     localStorage.setItem('hl_escalas',  JSON.stringify(S.escalas));
     localStorage.setItem('hl_members',  JSON.stringify(S.members));
-    localStorage.setItem('hl_activity', JSON.stringify(S.activityLog.slice(-2000)));
+    localStorage.setItem('hl_activity',  JSON.stringify(S.activityLog.slice(-2000)));
+    localStorage.setItem('hl_requests',  JSON.stringify(S.accessRequests));
 }
 function hydrate() {
     try {
@@ -902,6 +904,8 @@ function hydrate() {
         if (mb) S.members  = JSON.parse(mb);
         const ac = localStorage.getItem('hl_activity');
         if (ac) S.activityLog = JSON.parse(ac);
+        const rq = localStorage.getItem('hl_requests');
+        if (rq) S.accessRequests = JSON.parse(rq);
     } catch(e) { console.error(e); }
     // Migrate old set lists (songIds → blocks)
     S.setlists.forEach(sl => {
@@ -1063,6 +1067,9 @@ function loginScreen(view) {
         </div>
         <button class="login-btn" onclick="doLogin()">Entrar</button>
         <div class="login-forgot">Esqueceu sua senha? <a onclick="showRecovery()">Recuperar acesso</a></div>
+        <div style="margin-top:10px;text-align:center;font-size:13px;color:#888">
+            Ainda não tem acesso? <a style="color:#F15A24;cursor:pointer;text-decoration:underline" onclick="showAccessRequest()">Solicitar entrada</a>
+        </div>
     </div>
     </div>`;
 }
@@ -1096,6 +1103,71 @@ function showRecovery() {
 }
 function showLogin() {
     document.getElementById('app').innerHTML = loginScreen();
+}
+function showAccessRequest() {
+    document.getElementById('app').innerHTML = accessRequestScreen();
+}
+
+function accessRequestScreen() {
+    const instrOpts = EV_INSTR.map(({k,emoji,label})=>`<option value="${k}">${emoji} ${label}</option>`).join('');
+    return `<div class="login-screen">
+    <div class="login-card" style="max-width:420px">
+        <div class="login-logo"><img src="logo.png" alt="Hallel"></div>
+        <div class="login-sub">Solicitar Acesso ao Ministério</div>
+        <div style="font-size:13px;color:#666;text-align:center;margin-bottom:20px;line-height:1.5">
+            Preencha seus dados e o coordenador irá liberar o seu acesso. 🙏
+        </div>
+        <div class="login-err" id="req-err" style="display:none"></div>
+        <div class="login-field">
+            <label>Nome completo *</label>
+            <input class="field" id="req-name" type="text" placeholder="Seu nome" style="background:#f5f5f5;border-color:#ddd;color:#111">
+        </div>
+        <div class="login-field">
+            <label>Instrumento principal *</label>
+            <select class="field" id="req-instr" style="background:#f5f5f5;border-color:#ddd;color:#111">${instrOpts}</select>
+        </div>
+        <div class="login-field">
+            <label>WhatsApp *</label>
+            <input class="field" id="req-whats" type="tel" placeholder="(00) 00000-0000" style="background:#f5f5f5;border-color:#ddd;color:#111">
+        </div>
+        <div class="login-field">
+            <label>Email</label>
+            <input class="field" id="req-email" type="email" placeholder="seu@email.com" style="background:#f5f5f5;border-color:#ddd;color:#111">
+        </div>
+        <div class="login-field">
+            <label>Mensagem (opcional)</label>
+            <input class="field" id="req-msg" type="text" placeholder="Ex: Toco violão há 3 anos..." style="background:#f5f5f5;border-color:#ddd;color:#111">
+        </div>
+        <div class="recovery-success" id="req-ok">
+            ✅ Solicitação enviada!<br>
+            <span style="font-size:12px">O coordenador irá liberar seu acesso em breve. Aguarde o contato. 🙏</span>
+        </div>
+        <button class="login-btn" id="req-btn" onclick="submitAccessRequest()" style="background:#F15A24">📨 Enviar solicitação</button>
+        <div class="login-forgot" style="margin-top:14px"><a onclick="showLogin()">← Voltar para o login</a></div>
+    </div>
+    </div>`;
+}
+
+function submitAccessRequest() {
+    const name  = document.getElementById('req-name')?.value?.trim();
+    const instr = document.getElementById('req-instr')?.value;
+    const whats = document.getElementById('req-whats')?.value?.trim();
+    const email = document.getElementById('req-email')?.value?.trim().toLowerCase();
+    const msg   = document.getElementById('req-msg')?.value?.trim();
+    if (!name)  { showReqErr('Informe seu nome completo.'); return; }
+    if (!whats) { showReqErr('Informe seu WhatsApp.'); return; }
+    // Check duplicate
+    const dup = S.accessRequests.find(r => r.name.toLowerCase()===name.toLowerCase() && r.status==='pending');
+    if (dup) { showReqErr('Já existe uma solicitação pendente com este nome.'); return; }
+    S.accessRequests.push({ id:'rq'+uid(), name, instrument:instr, whatsapp:whats, email, msg, at:Date.now(), status:'pending' });
+    persist();
+    document.getElementById('req-ok').classList.add('show');
+    document.getElementById('req-btn').style.display = 'none';
+    const err = document.getElementById('req-err'); if (err) err.style.display='none';
+}
+function showReqErr(msg) {
+    const el = document.getElementById('req-err');
+    if (el) { el.textContent=msg; el.style.display='block'; }
 }
 
 async function doRecovery() {
@@ -1145,6 +1217,11 @@ function doLogin() {
         localStorage.setItem('hl_role', cred.role);
         render();
         setTimeout(() => {
+            const pending = S.accessRequests.filter(r=>r.status==='pending');
+            if (pending.length) {
+                toast(`📨 ${pending.length} solicitação${pending.length>1?'ões':''} de acesso pendente${pending.length>1?'s':''}! Veja em 👥 Membros.`);
+                return;
+            }
             const dismissed = JSON.parse(localStorage.getItem('hl_notif_dismissed')||'[]');
             const near = EVENTOS_2026.filter(ev => { const d=evDaysUntil(ev); return d>=0&&d<=15&&!dismissed.includes(ev.id); });
             if (near.length) {
@@ -1247,7 +1324,9 @@ function header() {
                 <button class="nav-btn ${S.page==='playlist'?'active':''}" onclick="nav('playlist')">▶ Playlist</button>
                 <button class="nav-btn ${S.page==='agenda'?'active':''}"   onclick="nav('agenda')">📅 Agenda</button>
                 ${isAdm() ? `
-                <button class="nav-btn ${S.page==='membros'?'active':''}" onclick="nav('membros')">👥 Membros</button>
+                <button class="nav-btn ${S.page==='membros'?'active':''}" onclick="nav('membros')" style="position:relative">👥 Membros
+                    ${S.accessRequests.filter(r=>r.status==='pending').length?`<span style="position:absolute;top:2px;right:2px;width:8px;height:8px;border-radius:50%;background:#ef4444"></span>`:''}
+                </button>
                 <button class="nav-btn ${S.page==='atividade'?'active':''}" onclick="nav('atividade')">📊 Atividade</button>
                 <button class="nav-btn ${S.page==='cadastros'?'active':''}" onclick="nav('cadastros')">👁 Cadastros</button>
                 ` : ''}
@@ -2238,7 +2317,60 @@ function membrosPage() {
                 </div>
             </div>`;
         }).join('')}
+
+        ${(()=>{
+            const pending = S.accessRequests.filter(r=>r.status==='pending');
+            if (!pending.length) return '';
+            const instrLabel2 = {violao:'Violão',teclado:'Teclado',bateria:'Bateria',baixo:'Baixo',guitarra:'Guitarra',sopro:'Sopro',vocal1:'Vocal 1',vocal2:'Vocal 2',vocal3:'Vocal 3',animador:'Animador'};
+            return `<div style="margin-top:28px">
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+                    <h3 style="font-size:17px;font-weight:800">📨 Solicitações de Acesso</h3>
+                    <span style="background:#ef4444;color:#fff;border-radius:10px;padding:1px 8px;font-size:12px;font-weight:700">${pending.length}</span>
+                </div>
+                ${pending.map(r=>`
+                <div style="background:var(--bg2);border:1px solid rgba(255,212,0,.3);border-left:4px solid var(--gold);border-radius:var(--radius-sm);padding:14px 16px;margin-bottom:10px">
+                    <div style="display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap">
+                        <div style="flex:1;min-width:180px">
+                            <div style="font-size:15px;font-weight:800;margin-bottom:3px">${r.name}</div>
+                            <div style="font-size:12px;color:var(--muted)">
+                                ${instrLabel2[r.instrument]||r.instrument}
+                                ${r.whatsapp?` · 📱 <a href="https://wa.me/55${r.whatsapp.replace(/\D/g,'')}" target="_blank" style="color:#25d366">${r.whatsapp}</a>`:''}
+                                ${r.email?` · 📧 ${r.email}`:''}
+                            </div>
+                            ${r.msg?`<div style="font-size:12px;color:var(--muted);margin-top:4px;font-style:italic">"${r.msg}"</div>`:''}
+                            <div style="font-size:11px;color:var(--muted);margin-top:4px">
+                                ${new Date(r.at).toLocaleDateString('pt-BR')} ${new Date(r.at).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}
+                            </div>
+                        </div>
+                        <div style="display:flex;gap:8px;flex-shrink:0">
+                            <button class="btn btn-primary btn-sm" onclick="approveRequest('${r.id}')">✅ Aprovar</button>
+                            <button class="btn btn-ghost btn-sm" style="color:#f87171;border-color:#f87171" onclick="rejectRequest('${r.id}')">✕ Recusar</button>
+                        </div>
+                    </div>
+                </div>`).join('')}
+            </div>`;
+        })()}
     </div>`;
+}
+
+function approveRequest(rqId) {
+    const rq = S.accessRequests.find(r=>r.id===rqId); if(!rq) return;
+    // Pre-fill member form with request data
+    const newMember = { id:null, name:rq.name, instrument:rq.instrument,
+        whatsapp:rq.whatsapp, email:rq.email, user:'', pass:'' };
+    rq.status = 'approved';
+    persist();
+    S.modal = { type:'member-form', data: newMember };
+    render();
+    toast(`✅ Aprovando ${rq.name} — defina usuário e senha.`);
+}
+
+function rejectRequest(rqId) {
+    const rq = S.accessRequests.find(r=>r.id===rqId); if(!rq) return;
+    if (!confirm(`Recusar solicitação de ${rq.name}?`)) return;
+    rq.status = 'rejected';
+    persist(); render();
+    toast(`Solicitação de ${rq.name} recusada.`);
 }
 
 function openMemberForm(id) {
@@ -2816,17 +2948,42 @@ function eventoModal(ev) {
     const done = cl.filter(i=>i.done).length;
     const hasEsc = EV_INSTR.some(i=>esc[i.k]);
 
+    // Membros com login cadastrado — filtro por instrumento compatível
+    const membersWithLogin = S.members.filter(m => m.user && m.pass);
+    const dlId = 'dl-ev-'+ev.id;
+
     const escalaHtml = `
+        <datalist id="${dlId}">
+            ${membersWithLogin.map(m=>`<option value="${m.name}" label="${m.name}">`).join('')}
+        </datalist>
         <div class="escal-grid" style="margin-bottom:16px">
-            ${EV_INSTR.map(({k,emoji,label})=>`
-            <div class="escal-row">
-                <div class="escal-inst">${emoji} ${label}</div>
-                <input class="escal-input" type="text" placeholder="—"
-                    value="${(esc[k]||'').replace(/"/g,'&quot;')}"
-                    onchange="saveEvEscalado('${ev.id}','${k}',this.value)"
-                    onblur="saveEvEscalado('${ev.id}','${k}',this.value)">
-            </div>`).join('')}
+            ${EV_INSTR.map(({k,emoji,label})=>{
+                // Filter members whose instrument matches this role
+                const instrMatch = membersWithLogin.filter(m => {
+                    if (k==='vocal1'||k==='vocal2'||k==='vocal3') return m.instrument==='vocal1'||m.instrument==='vocal2'||m.instrument==='vocal3';
+                    return m.instrument===k;
+                });
+                const thisDl = instrMatch.length ? `dl-${k}-${ev.id}` : dlId;
+                const dlHtml = instrMatch.length
+                    ? `<datalist id="${thisDl}">${instrMatch.map(m=>`<option value="${m.name}">`).join('')}</datalist>`
+                    : '';
+                return `${dlHtml}
+                <div class="escal-row">
+                    <div class="escal-inst">${emoji} ${label}</div>
+                    <input class="escal-input" type="text" placeholder="—" list="${thisDl||dlId}"
+                        value="${(esc[k]||'').replace(/"/g,'&quot;')}"
+                        onchange="saveEvEscalado('${ev.id}','${k}',this.value)"
+                        onblur="saveEvEscalado('${ev.id}','${k}',this.value)">
+                </div>`;
+            }).join('')}
         </div>
+        ${membersWithLogin.length===0?`<div style="background:rgba(241,90,36,.08);border:1px solid rgba(241,90,36,.25);border-radius:8px;padding:10px 12px;font-size:12px;color:#f97316;margin-bottom:12px">
+            ⚠️ Nenhum membro com acesso cadastrado ainda. <button class="btn btn-ghost btn-sm" style="color:#f97316;border-color:#f97316;margin-left:6px" onclick="closeModal();nav('membros')">Cadastrar membros →</button>
+        </div>`:''}
+        ${membersWithLogin.length>0&&membersWithLogin.length<S.members.length?`<div style="background:rgba(255,212,0,.07);border:1px solid rgba(255,212,0,.2);border-radius:8px;padding:8px 12px;font-size:12px;color:var(--muted);margin-bottom:12px">
+            💡 Sugestões mostram apenas membros com acesso ao site (${membersWithLogin.length}/${S.members.length})
+        </div>`:''}
+
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">
             <button class="btn btn-primary" style="flex:1;min-width:160px" onclick="gerarChecklist('${ev.id}')">
                 ✅ ${cl.length?'Atualizar Checklist':'Gerar Checklist'}
