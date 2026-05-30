@@ -231,7 +231,7 @@
         .fg { display:flex; flex-direction:column; gap:6px; }
         .fg.full { grid-column:1/-1; }
         label { font-size:12px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.5px; }
-        input[type=text],input[type=url],input[type=number],select.field,textarea {
+        input[type=text],input[type=url],input[type=number],input[type=password],select.field,textarea {
             padding:10px 12px; background:var(--bg3); border:1px solid var(--border);
             border-radius:var(--radius-sm); color:var(--text); font-size:14px;
             font-family:inherit; width:100%;
@@ -1195,8 +1195,12 @@ function loginScreen(view) {
         </div>
         <div class="login-field">
             <label>Senha</label>
-            <input class="field" id="lg-pass" type="password" placeholder="••••••••" autocomplete="current-password"
-                onkeydown="if(event.key==='Enter')doLogin()">
+            <div style="position:relative">
+                <input class="field" id="lg-pass" type="password" placeholder="••••••••" autocomplete="current-password"
+                    onkeydown="if(event.key==='Enter')doLogin()" style="padding-right:48px">
+                <button type="button" id="pass-eye" onclick="togglePassVis()"
+                    style="position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:#999;font-size:20px;line-height:1;padding:4px;touch-action:manipulation">👁</button>
+            </div>
         </div>
         <button class="login-btn" onclick="doLogin()">Entrar</button>
         <div class="login-forgot">Esqueceu sua senha? <a onclick="showRecovery()">Recuperar acesso</a></div>
@@ -1229,6 +1233,16 @@ function recoveryScreen() {
         <div class="login-forgot" style="margin-top:14px"><a onclick="showLogin()">← Voltar para o login</a></div>
     </div>
     </div>`;
+}
+
+function togglePassVis() {
+    const f = document.getElementById('lg-pass');
+    const b = document.getElementById('pass-eye');
+    if (!f) return;
+    const show = f.type === 'password';
+    f.type = show ? 'text' : 'password';
+    b.textContent = show ? '🙈' : '👁';
+    f.focus();
 }
 
 function showRecovery() {
