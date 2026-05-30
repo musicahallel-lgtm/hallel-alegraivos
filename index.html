@@ -1767,7 +1767,7 @@ function slModal(sl) {
             <button class="close-btn" onclick="closeModal()">✕</button>
         </div>
         <div class="modal-body">
-            <div class="sl-editor" style="${isGeral()?'grid-template-columns:1fr':''}">
+            <div class="sl-editor" style="${!isAdm()?'grid-template-columns:1fr':''}">
                 <div>
                     <div class="col-hd" style="display:flex;align-items:center;justify-content:space-between">
                         <span>🎵 Blocos</span>
@@ -1777,37 +1777,40 @@ function slModal(sl) {
                         const bsongs = (block.songIds||[]).map(id=>S.songs.find(s=>s.id===id)).filter(Boolean);
                         const isActive = curBlock === block.id;
                         return `<div class="sl-block" style="${isActive?'border-color:var(--purple);':''}">
-                            <div class="sl-block-hd" style="${isActive?'background:var(--purple-dark);cursor:default;':'cursor:pointer;'}"
-                                onclick="slSetActive('${sl.id}','${block.id}')">
+                            <div class="sl-block-hd" style="${isActive?'background:var(--purple-dark);cursor:default;':isAdm()?'cursor:pointer;':'cursor:default;'}"
+                                ${isAdm()?`onclick="slSetActive('${sl.id}','${block.id}')"`:''}>
                                 <span class="sl-block-hd-name">
-                                    ${isActive?'🎯':'📌'} ${block.name}
+                                    📌 ${block.name}
                                     <span style="opacity:.7;font-weight:400">(${bsongs.length})</span>
-                                    ${isActive?`<span style="font-size:10px;background:rgba(255,255,255,.2);padding:1px 6px;border-radius:8px;margin-left:4px">alvo</span>`:''}
                                 </span>
                                 ${isAdm()?`<button class="sl-block-hd-btn" onclick="event.stopPropagation();slRenameBlock('${sl.id}','${block.id}')">✏️</button>`:''}
                                 ${isAdm()?`<button class="sl-block-hd-btn" onclick="event.stopPropagation();slDelBlock('${sl.id}','${block.id}')">🗑</button>`:''}
                             </div>
                             <div class="sl-block-body" data-block-id="${block.id}">
-                                ${bsongs.length===0?`<div class="sl-block-empty">Arraste uma música até aqui, ou clique em + ao lado</div>`:''}
-                                ${bsongs.map((s,i)=>`<div class="sl-item">
+                                ${bsongs.length===0 ? (isAdm()?`<div class="sl-block-empty">Arraste uma música até aqui, ou clique em + ao lado</div>`:`<div class="sl-block-empty" style="color:var(--muted);font-style:italic">Nenhuma música neste bloco.</div>`) : ''}
+                                ${bsongs.map((s,i)=>{
+                                    const voz = (block.vozes||{})[s.id]||'';
+                                    return `<div class="sl-item">
                                     <span class="sl-num">${i+1}</span>
                                     <div class="sl-info">
                                         <span class="sl-title">${s.title}</span>
-                                        <div class="sl-voz-row">
+                                        ${isAdm() ? `<div class="sl-voz-row">
                                             <span style="font-size:11px;color:var(--muted)">🎤</span>
                                             <input class="sl-voz-input" type="text"
                                                 placeholder="voz principal…"
-                                                value="${((block.vozes||{})[s.id]||'').replace(/"/g,'&quot;')}"
+                                                value="${voz.replace(/"/g,'&quot;')}"
                                                 onchange="saveBlockVoz('${sl.id}','${block.id}','${s.id}',this.value)"
                                                 onblur="saveBlockVoz('${sl.id}','${block.id}','${s.id}',this.value)">
-                                        </div>
+                                        </div>` : voz ? `<div style="font-size:11px;color:var(--muted);margin-top:2px">🎤 ${voz}</div>` : ''}
                                     </div>
                                     ${s.key?`<span class="sl-key">${s.key}</span>`:''}
-                                    <div style="display:flex;gap:2px">
+                                    ${isAdm() ? `<div style="display:flex;gap:2px">
                                         ${i>0?`<button class="btn btn-ghost btn-sm btn-icon" onclick="slMoveInBlock('${sl.id}','${block.id}','${s.id}',-1)">↑</button>`:'<span style="width:30px"></span>'}
                                         ${i<bsongs.length-1?`<button class="btn btn-ghost btn-sm btn-icon" onclick="slMoveInBlock('${sl.id}','${block.id}','${s.id}',1)">↓</button>`:'<span style="width:30px"></span>'}
                                         <button class="btn btn-ghost btn-sm btn-icon" onclick="slDelFromBlock('${sl.id}','${block.id}','${s.id}')">✕</button>
-                                    </div></div>`).join('')}
+                                    </div>` : ''}
+                                    </div>`;
+                                }).join('')}
                             </div>
                         </div>`;
                     }).join('')}
@@ -1846,15 +1849,27 @@ function slModal(sl) {
                         {k:'vocal2',   emoji:'🎤', label:'Vocal 2'},
                         {k:'vocal3',   emoji:'🎤', label:'Vocal 3'},
                         {k:'animador', emoji:'🎙', label:'Animador'},
-                    ].map(({k,emoji,label})=>`
-                    <div class="escal-row">
-                        <div class="escal-inst">${emoji} ${label}</div>
-                        <input class="escal-input" type="text"
-                            placeholder="—"
-                            value="${(sl.escalados?.[k]||'').replace(/"/g,'&quot;')}"
-                            onchange="saveSlEscalado('${sl.id}','${k}',this.value)"
-                            onblur="saveSlEscalado('${sl.id}','${k}',this.value)">
-                    </div>`).join('')}
+                    ].map(({k,emoji,label})=>{
+                        const val = sl.escalados?.[k]||'';
+                        if (isAdm()) return `
+                        <div class="escal-row">
+                            <div class="escal-inst">${emoji} ${label}</div>
+                            <input class="escal-input" type="text"
+                                placeholder="—"
+                                value="${val.replace(/"/g,'&quot;')}"
+                                onchange="saveSlEscalado('${sl.id}','${k}',this.value)"
+                                onblur="saveSlEscalado('${sl.id}','${k}',this.value)">
+                        </div>`;
+                        // Non-ADM: read-only display, hide empty slots
+                        if (!val) return '';
+                        const isMine = S.currentMember && val.toLowerCase().includes(S.currentMember.name.toLowerCase());
+                        return `<div class="escal-row" style="pointer-events:none">
+                            <div class="escal-inst">${emoji} ${label}</div>
+                            <div class="escal-input" style="display:flex;align-items:center;font-size:13px;font-weight:${isMine?'800':'500'};color:${isMine?'var(--purple-light)':'var(--text)'};background:${isMine?'rgba(0,150,63,.1)':'transparent'};border-color:${isMine?'rgba(0,150,63,.3)':'var(--border)'}">
+                                ${isMine?'⭐ ':''}${val}
+                            </div>
+                        </div>`;
+                    }).join('')}
                 </div>
             </div>
         </div>
@@ -3204,32 +3219,28 @@ function eventoModal(ev) {
     const cl  = esc.checklist || [];
     const tab = S.evTab;
     const done = cl.filter(i=>i.done).length;
-    const hasEsc = EV_INSTR.some(i=>esc[i.k]);
+    const hasEsc = EV_INSTR.some(({k})=>esc[k]);
 
-    // Membros com login cadastrado — filtro por instrumento compatível
-    const membersWithLogin = S.members.filter(m => m.user && m.pass);
-    const dlId = 'dl-ev-'+ev.id;
-
-    const escalaHtml = `
-        <datalist id="${dlId}">
-            ${membersWithLogin.map(m=>`<option value="${m.name}" label="${m.name}">`).join('')}
-        </datalist>
+    // ── Escala: ADM edits, others read-only ──────────────────────────────
+    let escalaHtml = '';
+    if (isAdm()) {
+        const membersWithLogin = S.members.filter(m => m.user && m.pass);
+        const dlId = 'dl-ev-'+ev.id;
+        const linkedSl = S.escalas[ev.id]?.setListId && S.setlists.find(x=>x.id===S.escalas[ev.id].setListId);
+        escalaHtml = `
+        <datalist id="${dlId}">${membersWithLogin.map(m=>`<option value="${m.name}">`).join('')}</datalist>
         <div class="escal-grid" style="margin-bottom:16px">
             ${EV_INSTR.map(({k,emoji,label})=>{
-                // Filter members whose instrument matches this role
                 const instrMatch = membersWithLogin.filter(m => {
                     const instrs = m.instruments || (m.instrument ? [m.instrument] : []);
                     if (k==='vocal1'||k==='vocal2'||k==='vocal3') return instrs.some(i=>i==='vocal1'||i==='vocal2'||i==='vocal3');
                     return instrs.includes(k);
                 });
                 const thisDl = instrMatch.length ? `dl-${k}-${ev.id}` : dlId;
-                const dlHtml = instrMatch.length
-                    ? `<datalist id="${thisDl}">${instrMatch.map(m=>`<option value="${m.name}">`).join('')}</datalist>`
-                    : '';
-                return `${dlHtml}
+                return `${instrMatch.length?`<datalist id="${thisDl}">${instrMatch.map(m=>`<option value="${m.name}">`).join('')}</datalist>`:''}
                 <div class="escal-row">
                     <div class="escal-inst">${emoji} ${label}</div>
-                    <input class="escal-input" type="text" placeholder="—" list="${thisDl||dlId}"
+                    <input class="escal-input" type="text" placeholder="—" list="${thisDl}"
                         value="${(esc[k]||'').replace(/"/g,'&quot;')}"
                         onchange="saveEvEscalado('${ev.id}','${k}',this.value)"
                         onblur="saveEvEscalado('${ev.id}','${k}',this.value)">
@@ -3240,24 +3251,41 @@ function eventoModal(ev) {
             ⚠️ Nenhum membro com acesso cadastrado ainda. <button class="btn btn-ghost btn-sm" style="color:#f97316;border-color:#f97316;margin-left:6px" onclick="closeModal();nav('membros')">Cadastrar membros →</button>
         </div>`:''}
         ${membersWithLogin.length>0&&membersWithLogin.length<S.members.length?`<div style="background:rgba(255,212,0,.07);border:1px solid rgba(255,212,0,.2);border-radius:8px;padding:8px 12px;font-size:12px;color:var(--muted);margin-bottom:12px">
-            💡 Sugestões mostram apenas membros com acesso ao site (${membersWithLogin.length}/${S.members.length})
+            💡 Sugestões: apenas membros com acesso (${membersWithLogin.length}/${S.members.length})
         </div>`:''}
-
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">
             <button class="btn btn-primary" style="flex:1;min-width:160px" onclick="gerarChecklist('${ev.id}')">
                 ✅ ${cl.length?'Atualizar Checklist':'Gerar Checklist'}
             </button>
-            ${(()=>{
-                const sl = S.escalas[ev.id]?.setListId && S.setlists.find(x=>x.id===S.escalas[ev.id].setListId);
-                if (sl) return `<button class="btn btn-success" style="flex:1;min-width:160px;background:#1a7a3c;border-color:#1a7a3c;display:flex;align-items:center;gap:6px;justify-content:center" onclick="verSetListDoEvento('${ev.id}')">✅ Ver Set List →</button>`;
-                return `<button class="btn btn-ghost btn-sm" style="flex:1;min-width:160px;border:1px solid var(--purple);color:var(--purple-light)" onclick="subirParaSetList('${ev.id}')">📋 Subir para Set List</button>`;
-            })()}
+            ${linkedSl
+                ? `<button class="btn" style="flex:1;min-width:160px;background:#1a7a3c;color:#fff;display:flex;align-items:center;gap:6px;justify-content:center" onclick="verSetListDoEvento('${ev.id}')">✅ Ver Set List →</button>`
+                : `<button class="btn btn-ghost btn-sm" style="flex:1;min-width:160px;border:1px solid var(--purple);color:var(--purple-light)" onclick="subirParaSetList('${ev.id}')">📋 Subir para Set List</button>`}
         </div>`;
+    } else {
+        // Read-only view for membros/geral
+        const myName = S.currentMember?.name?.toLowerCase() || '';
+        const filled = EV_INSTR.filter(({k})=>esc[k]);
+        escalaHtml = `
+        <div class="escal-grid" style="margin-bottom:12px">
+            ${filled.length === 0
+                ? `<div style="color:var(--muted);font-size:13px;font-style:italic;padding:10px 0">Escala ainda não definida para este evento.</div>`
+                : filled.map(({k,emoji,label})=>{
+                    const val = esc[k]||'';
+                    const isMine = myName && val.toLowerCase().includes(myName);
+                    return `<div class="escal-row" style="pointer-events:none">
+                        <div class="escal-inst">${emoji} ${label}</div>
+                        <div class="escal-input" style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:${isMine?'800':'500'};color:${isMine?'var(--purple-light)':'var(--text)'};background:${isMine?'rgba(0,150,63,.1)':'transparent'};border-color:${isMine?'rgba(0,150,63,.3)':'var(--border)'}">
+                            ${isMine?'⭐ ':''}${val}
+                        </div>
+                    </div>`;
+                }).join('')}
+        </div>`;
+    }
 
+    // ── Checklist ────────────────────────────────────────────────────────
     const checkHtml = cl.length === 0
         ? `<div style="padding:28px;text-align:center;color:var(--muted)">
-            Nenhum item ainda.<br><br>
-            <button class="btn btn-ghost btn-sm" onclick="setEvTab('escala')">← Preencha a Escala primeiro</button>
+            Nenhum item ainda.${isAdm()?`<br><br><button class="btn btn-ghost btn-sm" onclick="setEvTab('escala')">← Preencha a Escala primeiro</button>`:''}
            </div>`
         : `<div style="margin-bottom:12px;display:flex;align-items:center;gap:8px">
             <span style="font-size:13px;color:var(--muted)">${done}/${cl.length} concluídos</span>
