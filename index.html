@@ -857,6 +857,8 @@ const S = {
     membrosTab: 'lista', // 'lista' | 'atividade' | 'cadastros'
     accessRequests: [],  // { id, name, instrument, whatsapp, email, msg, at, status:'pending'|'approved'|'rejected' }
     _relMonth: new Date().getMonth(), // selected month for report (0=Jan)
+    availability: {},    // { evId: { memberId: 'can'|'cannot' } }
+    substitutions: [],   // [{ id, fromId, fromName, toId, toName, evId, evTitle, evDate, role, roleLabel, status:'pending'|'accepted'|'rejected', at, notifiedFrom, notifiedTo }]
 };
 const isAdm    = () => S.role === 'adm';
 const isGeral  = () => S.role === 'geral';
@@ -943,7 +945,9 @@ function _doPersist() {
         localStorage.setItem('hl_escalas',  JSON.stringify(S.escalas));
         localStorage.setItem('hl_members',  JSON.stringify(S.members));
         localStorage.setItem('hl_activity',  JSON.stringify(S.activityLog.slice(-500)));
-        localStorage.setItem('hl_requests',  JSON.stringify(S.accessRequests));
+        localStorage.setItem('hl_requests',     JSON.stringify(S.accessRequests));
+        localStorage.setItem('hl_availability', JSON.stringify(S.availability));
+        localStorage.setItem('hl_substitutions',JSON.stringify(S.substitutions));
     } catch(e) {
         // localStorage quota exceeded — trim and retry
         S.activityLog = S.activityLog.slice(-100);
@@ -964,6 +968,10 @@ function hydrate() {
         if (ac) { S.activityLog = JSON.parse(ac).slice(-500); } // keep only last 500
         const rq = localStorage.getItem('hl_requests');
         if (rq) S.accessRequests = JSON.parse(rq);
+        const av = localStorage.getItem('hl_availability');
+        if (av) S.availability = JSON.parse(av);
+        const sb = localStorage.getItem('hl_substitutions');
+        if (sb) S.substitutions = JSON.parse(sb);
     } catch(e) { console.error(e); }
     // Migrate: instrument (string) → instruments (array)
     S.members.forEach(m => {
@@ -1321,7 +1329,10 @@ function doLogin() {
                 S.modal = { type: 'first-access', data: member };
                 render();
             } else {
-                showMissionAlert(member);
+                // Check substitution notifications first, then mission alert
+                if (!checkSubNotifications(member)) {
+                    showMissionAlert(member);
+                }
             }
         }, 300);
         return;
@@ -1511,7 +1522,10 @@ function modalHtml() {
     if (type==='mission-alert') return missionAlertModal(data);
     if (type==='member-form')  return memberFormModal(data);
     if (type==='first-access') return firstAccessModal(data);
-    if (type==='wa-escala')    return waEscalaModal(data);
+    if (type==='wa-escala')        return waEscalaModal(data);
+    if (type==='sub-picker')       return subPickerModal(data);
+    if (type==='sub-request')      return subRequestModal(data);
+    if (type==='sub-result')       return subResultModal(data);
     return '';
 }
 
@@ -2606,7 +2620,6 @@ function minhaEscalaPage() {
         const {ev, roles, daysUntil} = item;
         const whenLabel = daysUntil===0?'🔴 HOJE':daysUntil===1?'🟡 Amanhã':daysUntil<=7?`🟡 Em ${daysUntil} dias`:`Em ${daysUntil} dias`;
         const esc = S.escalas[ev.id] || {};
-        // Full team for this event
         const instrEmoji2 = {violao:'🎸',teclado:'🎹',bateria:'🥁',baixo:'🎸',guitarra:'🎸',sopro:'🎷',vocal1:'🎤',vocal2:'🎤',vocal3:'🎤',animador:'🎙'};
         const myRoleKeys = new Set(roles.map(r=>r.k));
         const teamMembers = EV_INSTR.filter(({k})=>esc[k] && !myRoleKeys.has(k));
@@ -2617,6 +2630,43 @@ function minhaEscalaPage() {
                     ${teamMembers.map(({k,emoji,label})=>`<span style="display:inline-flex;align-items:center;gap:4px;background:rgba(255,255,255,.05);border:1px solid var(--border);border-radius:8px;padding:3px 9px;font-size:12px;color:var(--muted)"><span>${instrEmoji2[k]||emoji}</span><span>${esc[k]}</span></span>`).join('')}
                 </div>
             </div>` : '';
+
+        // ── Availability status ──────────────────────────────────────
+        let availHtml = '';
+        if (!isPast) {
+            const avail = (S.availability[ev.id]||{})[member.id];
+            const sub = S.substitutions.find(s=>s.fromId===member.id&&s.evId===ev.id&&s.status!=='rejected');
+            if (avail === 'can') {
+                availHtml = `<div style="margin-top:10px;display:flex;gap:6px;align-items:center">
+                    <span style="background:rgba(34,197,94,.15);border:1px solid rgba(34,197,94,.3);color:#22c55e;border-radius:8px;padding:3px 10px;font-size:12px;font-weight:700">✅ Confirmado — Vou estar presente</span>
+                    <button onclick="setAvailability('${ev.id}','${member.id}',null)" style="font-size:11px;background:none;border:none;color:var(--muted);cursor:pointer;text-decoration:underline">alterar</button>
+                </div>`;
+            } else if (avail === 'cannot') {
+                availHtml = `<div style="margin-top:10px">
+                    <span style="background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.3);color:#f87171;border-radius:8px;padding:3px 10px;font-size:12px;font-weight:700">❌ Não posso comparecer</span>
+                    ${sub ? `<div style="font-size:12px;color:var(--muted);margin-top:6px;padding:8px 10px;background:rgba(255,255,255,.04);border-radius:6px">
+                        👤 Substituto indicado: <b style="color:var(--text)">${sub.toName}</b>
+                        <span style="margin-left:6px;font-size:11px;font-weight:700;${sub.status==='accepted'?'color:#22c55e':sub.status==='rejected'?'color:#f87171':'color:#f59e0b'}">
+                            ${sub.status==='accepted'?'✅ Aceitou e está escalado':sub.status==='rejected'?'❌ Recusou — indique outro':'⏳ Aguardando resposta'}
+                        </span>
+                        ${sub.status==='rejected'?`<br><button class="btn btn-ghost btn-sm" style="margin-top:6px;border-color:var(--gold);color:var(--gold);font-size:11px"
+                            onclick="openSubPicker('${ev.id}','${member.id}','${roles.map(r=>r.k).join(',')}','${roles.map(r=>r.label).join(', ')}','${ev.title}','${evDateLabel(ev)}')"
+                            >👤 Indicar outro substituto</button>`:''}
+                    </div>` : `<button class="btn btn-ghost btn-sm" style="margin-top:6px;border-color:var(--gold);color:var(--gold);font-size:12px"
+                        onclick="openSubPicker('${ev.id}','${member.id}','${roles.map(r=>r.k).join(',')}','${roles.map(r=>r.label).join(', ')}','${ev.title}','${evDateLabel(ev)}')"
+                        >👤 Indicar substituto</button>`}
+                    <button onclick="setAvailability('${ev.id}','${member.id}',null)" style="font-size:11px;background:none;border:none;color:var(--muted);cursor:pointer;text-decoration:underline;margin-left:8px">alterar</button>
+                </div>`;
+            } else {
+                availHtml = `<div style="display:flex;gap:8px;margin-top:10px">
+                    <button class="btn btn-sm" style="background:rgba(34,197,94,.12);border:1px solid rgba(34,197,94,.3);color:#22c55e;font-weight:700"
+                        onclick="setAvailability('${ev.id}','${member.id}','can')">✅ Posso ir</button>
+                    <button class="btn btn-sm" style="background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.25);color:#f87171;font-weight:700"
+                        onclick="setAvailability('${ev.id}','${member.id}','cannot')">❌ Não posso ir</button>
+                </div>`;
+            }
+        }
+
         return `<div style="background:var(--bg2);border:1px solid ${isPast?'var(--border)':'var(--gold)'};border-left:4px solid ${isPast?'var(--border)':'var(--gold)'};border-radius:var(--radius-sm);padding:14px 16px;margin-bottom:10px;opacity:${isPast?.6:1}">
             <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap">
                 <div style="flex:1">
@@ -2626,6 +2676,7 @@ function minhaEscalaPage() {
                         ${roles.map(({emoji,label})=>`<span style="display:inline-flex;align-items:center;gap:4px;background:rgba(94,96,206,.15);border:1px solid rgba(94,96,206,.3);border-radius:8px;padding:3px 10px;font-size:12px;font-weight:700;color:#a5b4fc">${emoji} ${label} — você</span>`).join('')}
                     </div>
                     ${teamHtml}
+                    ${availHtml}
                 </div>
                 ${!isPast?`<div style="font-size:12px;font-weight:700;background:rgba(255,212,0,.1);border:1px solid rgba(255,212,0,.3);color:var(--gold);padding:4px 10px;border-radius:8px;white-space:nowrap">${whenLabel}</div>`:''}
             </div>
@@ -2701,27 +2752,243 @@ function saveFirstAccess(memberId) {
 
 // ── Mission Alert Modal ──
 function missionAlertModal({member, escalas}) {
-    const top = escalas.slice(0,3); // show up to 3 upcoming
-    function whenStr(d) { return d===0?'HOJE':d===1?'amanhã':`em ${d} dias`; }
+    const top = escalas.slice(0,4);
+    function whenStr(d) { return d===0?'🔴 HOJE':d===1?'🟡 amanhã':`em ${d} dias`; }
     return `<div class="mission-backdrop" onclick="if(event.target===this)closeModal()">
-    <div class="mission-card">
+    <div class="mission-card" style="max-width:520px">
         <div class="mission-icon">🎯</div>
         <div class="mission-title">VOCÊ ESTÁ ESCALADO!</div>
         <div class="mission-sub">Olá, ${member.name} — você tem missões confirmadas</div>
         <div class="mission-ev-list">
-            ${top.map(({ev,roles,daysUntil})=>`
-            <div class="mission-ev-item">
-                <div class="mission-ev-name">📅 ${ev.title}</div>
-                <div class="mission-ev-date">${evDateLabel(ev)}${ev.horario?' · '+ev.horario:''} — <b>${whenStr(daysUntil)}</b></div>
-                <div class="mission-ev-role">🎵 Sua função: ${roles.map(r=>r.label).join(', ')}</div>
-            </div>`).join('')}
-            ${escalas.length>3?`<div style="text-align:center;font-size:12px;color:var(--muted)">+${escalas.length-3} outra${escalas.length-3>1?'s':''} missão${escalas.length-3>1?'ões':''}. Veja em "🎯 Minha Escala".</div>`:''}
+            ${top.map(({ev,roles,daysUntil})=>{
+                const avail = (S.availability[ev.id]||{})[member.id];
+                const sub = S.substitutions.find(s=>s.fromId===member.id&&s.evId===ev.id&&s.status!=='rejected');
+                let statusHtml = '';
+                if (avail === 'can') {
+                    statusHtml = `<div style="margin-top:8px;display:flex;gap:6px;align-items:center">
+                        <span style="background:rgba(34,197,94,.15);border:1px solid rgba(34,197,94,.3);color:#22c55e;border-radius:8px;padding:3px 10px;font-size:12px;font-weight:700">✅ Confirmado</span>
+                        <button onclick="setAvailability('${ev.id}','${member.id}',null)" style="font-size:11px;background:none;border:none;color:var(--muted);cursor:pointer;text-decoration:underline">alterar</button>
+                    </div>`;
+                } else if (avail === 'cannot') {
+                    statusHtml = `<div style="margin-top:8px">
+                        <span style="background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.3);color:#f87171;border-radius:8px;padding:3px 10px;font-size:12px;font-weight:700">❌ Não posso ir</span>
+                        ${sub ? `<div style="font-size:12px;color:var(--muted);margin-top:4px">
+                            👤 Substituto indicado: <b style="color:var(--text)">${sub.toName}</b>
+                            <span style="margin-left:6px;font-size:11px;${sub.status==='accepted'?'color:#22c55e':sub.status==='rejected'?'color:#f87171':'color:#f59e0b'}">
+                                ${sub.status==='accepted'?'✅ Aceitou':sub.status==='rejected'?'❌ Recusou':'⏳ Aguardando resposta'}
+                            </span>
+                        </div>` : `<button class="btn btn-ghost btn-sm" style="margin-top:6px;border-color:var(--gold);color:var(--gold);font-size:12px"
+                            onclick="openSubPicker('${ev.id}','${member.id}','${roles.map(r=>r.k).join(',')}','${roles.map(r=>r.label).join(', ')}','${ev.title}','${evDateLabel(ev)}')">
+                            👤 Indicar substituto
+                        </button>`}
+                        <button onclick="setAvailability('${ev.id}','${member.id}',null)" style="font-size:11px;background:none;border:none;color:var(--muted);cursor:pointer;text-decoration:underline;margin-left:8px">alterar</button>
+                    </div>`;
+                } else {
+                    statusHtml = `<div style="display:flex;gap:6px;margin-top:8px">
+                        <button class="btn btn-sm" style="background:rgba(34,197,94,.15);border:1px solid rgba(34,197,94,.35);color:#22c55e;font-weight:700"
+                            onclick="setAvailability('${ev.id}','${member.id}','can')">✅ Posso</button>
+                        <button class="btn btn-sm" style="background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);color:#f87171;font-weight:700"
+                            onclick="setAvailability('${ev.id}','${member.id}','cannot')">❌ Não posso</button>
+                    </div>`;
+                }
+                return `<div class="mission-ev-item">
+                    <div class="mission-ev-name">📅 ${ev.title}</div>
+                    <div class="mission-ev-date">${evDateLabel(ev)}${ev.horario?' · '+ev.horario:''} — <b>${whenStr(daysUntil)}</b></div>
+                    <div class="mission-ev-role">🎵 Sua função: ${roles.map(r=>r.label).join(', ')}</div>
+                    ${statusHtml}
+                </div>`;
+            }).join('')}
+            ${escalas.length>4?`<div style="text-align:center;font-size:12px;color:var(--muted)">+${escalas.length-4} outra${escalas.length-4>1?'s':''} em "🎯 Minha Escala".</div>`:''}
         </div>
         <div class="mission-msg">
             🙏 <b>Esta é a sua missão!</b> Prepare-se com oração, estude as músicas do set list e esteja disponível nesta data.<br><br>
             A Comunidade Católica Hallel conta com a sua entrega e dedicação. Que Deus abençoe o seu serviço! ✨
         </div>
         <button class="mission-btn" onclick="closeModal();nav('minha-escala')">✅ Entendido — Vou me preparar!</button>
+    </div></div>`;
+}
+
+// ════════════════════════════════════════════════════
+//  DISPONIBILIDADE & SUBSTITUIÇÃO
+// ════════════════════════════════════════════════════
+
+function setAvailability(evId, memberId, status) {
+    if (!S.availability[evId]) S.availability[evId] = {};
+    if (status === null) {
+        delete S.availability[evId][memberId];
+    } else {
+        S.availability[evId][memberId] = status;
+    }
+    persist();
+    // Refresh mission alert if open
+    if (S.modal?.type === 'mission-alert') {
+        S.modal.data.escalas = getMemberEscalas(S.currentMember.name).filter(e=>e.daysUntil>=0);
+    }
+    render();
+}
+
+function openSubPicker(evId, fromId, rolesStr, roleLabel, evTitle, evDate) {
+    S.modal = { type: 'sub-picker', data: { evId, fromId, rolesStr, roleLabel, evTitle, evDate } };
+    render();
+}
+
+function subPickerModal({ evId, fromId, rolesStr, roleLabel, evTitle, evDate }) {
+    const fromMember = S.members.find(m=>m.id===fromId);
+    const fromName = fromMember?.name || '';
+    // Only show members with login, not the member themselves
+    const candidates = S.members.filter(m => m.user && m.pass && m.id !== fromId);
+    return `<div class="backdrop" onclick="closeModal(event)">
+    <div class="modal" style="max-width:440px">
+        <div class="modal-hd">
+            <div class="modal-title">👤 Indicar Substituto</div>
+            <button class="close-btn" onclick="closeModal()">✕</button>
+        </div>
+        <div class="modal-body">
+            <div style="background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);border-radius:8px;padding:10px 12px;margin-bottom:16px;font-size:13px">
+                <b>${fromName}</b> não poderá ir em <b>${evTitle}</b> (${evDate})<br>
+                <span style="color:var(--muted);font-size:12px">Função: ${roleLabel}</span>
+            </div>
+            <div style="font-size:13px;font-weight:700;margin-bottom:10px;color:var(--muted)">Escolha quem pode substituir:</div>
+            ${candidates.length === 0
+                ? `<div style="color:var(--muted);font-size:13px;padding:16px;text-align:center">Nenhum membro disponível para indicar.</div>`
+                : `<div style="display:flex;flex-direction:column;gap:6px;max-height:280px;overflow-y:auto">
+                    ${candidates.map(m => {
+                        const instrEmoji2 = {violao:'🎸',teclado:'🎹',bateria:'🥁',baixo:'🎸',guitarra:'🎸',sopro:'🎷',vocal1:'🎤',vocal2:'🎤',vocal3:'🎤',animador:'🎙'};
+                        return `<button class="btn btn-ghost" style="text-align:left;display:flex;align-items:center;gap:10px;padding:10px 12px"
+                            onclick="indicarSubstituto('${evId}','${fromId}','${m.id}','${rolesStr}','${roleLabel}','${evTitle}','${evDate}')">
+                            <span style="font-size:18px">${instrEmoji2[(m.instruments||[m.instrument])[0]]||'🎵'}</span>
+                            <div>
+                                <div style="font-size:14px;font-weight:700">${m.name}</div>
+                                <div style="font-size:11px;color:var(--muted)">${(m.instruments||[m.instrument]).map(k=>instrEmoji2[k]||'🎵').join(' ')}</div>
+                            </div>
+                        </button>`;
+                    }).join('')}
+                </div>`}
+        </div>
+    </div></div>`;
+}
+
+function indicarSubstituto(evId, fromId, toId, rolesStr, roleLabel, evTitle, evDate) {
+    const fromMember = S.members.find(m=>m.id===fromId);
+    const toMember   = S.members.find(m=>m.id===toId);
+    if (!fromMember || !toMember) return;
+    // Remove any previous pending substitution for this slot
+    S.substitutions = S.substitutions.filter(s => !(s.fromId===fromId && s.evId===evId));
+    S.substitutions.push({
+        id: 'sub'+uid(),
+        fromId, fromName: fromMember.name,
+        toId,   toName:   toMember.name,
+        evId, evTitle, evDate,
+        role: rolesStr, roleLabel,
+        status: 'pending',
+        at: Date.now(),
+        notifiedTo: false,
+        notifiedFrom: false
+    });
+    persist();
+    closeModal();
+    toast(`✅ ${toMember.name} foi indicado como substituto!`);
+    render();
+}
+
+function respondSubstitution(subId, accepted) {
+    const sub = S.substitutions.find(s=>s.id===subId);
+    if (!sub) return;
+    sub.status = accepted ? 'accepted' : 'rejected';
+    sub.notifiedFrom = false; // original member hasn't seen result yet
+    if (accepted) {
+        // Update the escala: replace the old member's name with the substitute's
+        const esc = S.escalas[sub.evId];
+        if (esc) {
+            const roles = sub.role.split(',');
+            roles.forEach(k => {
+                if (esc[k] && esc[k].toLowerCase() === sub.fromName.toLowerCase()) {
+                    esc[k] = sub.toName;
+                }
+            });
+        }
+    }
+    persist();
+    closeModal();
+    toast(accepted ? '✅ Você confirmou a substituição!' : '❌ Substituição recusada.');
+    render();
+}
+
+// Called on member login — check for pending notifications
+function checkSubNotifications(member) {
+    // 1. Substitution requests directed TO this member (pending)
+    const pendingReqs = S.substitutions.filter(s =>
+        s.toId === member.id && s.status === 'pending' && !s.notifiedTo
+    );
+    // 2. Results of substitutions FROM this member (accepted/rejected, not yet seen)
+    const pendingResults = S.substitutions.filter(s =>
+        s.fromId === member.id && (s.status==='accepted'||s.status==='rejected') && !s.notifiedFrom
+    );
+
+    if (pendingReqs.length > 0) {
+        // Mark as notified so we don't show again
+        pendingReqs.forEach(s => { s.notifiedTo = true; });
+        persist();
+        S.modal = { type: 'sub-request', data: { member, requests: pendingReqs } };
+        render();
+        return true;
+    }
+    if (pendingResults.length > 0) {
+        pendingResults.forEach(s => { s.notifiedFrom = true; });
+        persist();
+        S.modal = { type: 'sub-result', data: { member, results: pendingResults } };
+        render();
+        return true;
+    }
+    return false;
+}
+
+function subRequestModal({ member, requests }) {
+    return `<div class="mission-backdrop" onclick="">
+    <div class="mission-card" style="max-width:500px;text-align:left">
+        <div style="text-align:center;margin-bottom:16px">
+            <div style="font-size:42px">🔔</div>
+            <div class="mission-title" style="font-size:20px">PEDIDO DE SUBSTITUIÇÃO</div>
+            <div class="mission-sub">Alguém te indicou para cobrir uma missão</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:20px">
+            ${requests.map(sub=>`
+            <div style="background:rgba(255,255,255,.06);border:1px solid rgba(255,212,0,.3);border-left:4px solid var(--gold);border-radius:10px;padding:14px 16px">
+                <div style="font-size:14px;font-weight:800;color:var(--gold);margin-bottom:4px">📅 ${sub.evTitle}</div>
+                <div style="font-size:12px;color:var(--muted);margin-bottom:6px">📆 ${sub.evDate} · 🎵 ${sub.roleLabel}</div>
+                <div style="font-size:13px;margin-bottom:12px">
+                    <b style="color:var(--text)">${sub.fromName}</b> não poderá comparecer e te indicou como substituto(a).
+                </div>
+                <div style="display:flex;gap:8px">
+                    <button class="btn btn-sm" style="flex:1;background:rgba(34,197,94,.15);border:1px solid rgba(34,197,94,.4);color:#22c55e;font-weight:700"
+                        onclick="respondSubstitution('${sub.id}',true)">✅ Aceitar</button>
+                    <button class="btn btn-sm" style="flex:1;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);color:#f87171;font-weight:700"
+                        onclick="respondSubstitution('${sub.id}',false)">❌ Não aceitar</button>
+                </div>
+            </div>`).join('')}
+        </div>
+        <button class="mission-btn" onclick="closeModal()">Responder depois →</button>
+    </div></div>`;
+}
+
+function subResultModal({ member, results }) {
+    return `<div class="mission-backdrop" onclick="">
+    <div class="mission-card" style="max-width:460px;text-align:left">
+        <div style="text-align:center;margin-bottom:16px">
+            <div style="font-size:42px">${results.every(r=>r.status==='accepted')?'🎉':'😔'}</div>
+            <div class="mission-title" style="font-size:20px">ATUALIZAÇÃO DE ESCALA</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:20px">
+            ${results.map(sub=>`
+            <div style="background:rgba(255,255,255,.05);border:1px solid ${sub.status==='accepted'?'rgba(34,197,94,.3)':'rgba(239,68,68,.3)'};border-left:4px solid ${sub.status==='accepted'?'#22c55e':'#ef4444'};border-radius:10px;padding:12px 14px">
+                <div style="font-size:13px;font-weight:800;margin-bottom:3px">📅 ${sub.evTitle}</div>
+                <div style="font-size:12px;color:var(--muted);margin-bottom:6px">${sub.evDate} · ${sub.roleLabel}</div>
+                ${sub.status==='accepted'
+                    ? `<div style="font-size:13px;color:#22c55e">✅ <b>${sub.toName}</b> <span style="color:var(--text)">aceitou a substituição. A escala foi atualizada.</span></div>`
+                    : `<div style="font-size:13px;color:#f87171">❌ <b>${sub.toName}</b> <span style="color:var(--text)">não pôde aceitar. Você ainda está na escala — considere indicar outra pessoa.</span></div>`}
+            </div>`).join('')}
+        </div>
+        <button class="mission-btn" onclick="closeModal();nav('minha-escala')">Ver Minha Escala</button>
     </div></div>`;
 }
 
