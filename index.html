@@ -58,11 +58,14 @@
             display:flex; align-items:center; gap:8px; white-space:nowrap; text-decoration:none;
         }
         .logo img {
-            height:46px; width:auto; object-fit:contain; filter:drop-shadow(0 1px 4px rgba(0,0,0,.4));
+            height:42px; width:42px; object-fit:cover; border-radius:50%; flex-shrink:0;
+            border:2px solid rgba(255,255,255,.28);
+            background:rgba(255,255,255,.1);
+            box-shadow:0 2px 10px rgba(0,0,0,.35);
         }
         .logo-alegraivos {
-            font-size:17px; font-weight:800; color:#fff; letter-spacing:.3px;
-            text-shadow:0 1px 4px rgba(0,0,0,.4);
+            font-size:16px; font-weight:800; color:#fff; letter-spacing:.2px;
+            text-shadow:0 1px 4px rgba(0,0,0,.5);
         }
         .nav { display:flex; gap:2px; flex:1; overflow-x:auto; overflow-y:hidden; scrollbar-width:none; white-space:nowrap; -webkit-overflow-scrolling:touch; }
         .nav::-webkit-scrollbar { display:none; }
@@ -739,13 +742,49 @@
         }
         /* Larger tap targets on mobile */
         @media (max-width:600px) {
-            .btn { min-height:44px; }
-            .nav-btn { min-height:40px; padding:8px 12px; font-size:13px; }
-            .main { padding:16px 12px; }
-            .header { padding:0 12px; gap:8px; }
+            .btn { min-height:44px; font-size:15px; }
+            .main { padding:16px 12px 84px; }
+            .header { padding:0 12px; gap:8px; height:56px; }
+            .logo img { height:36px; width:36px; }
+            .logo-alegraivos { display:none; }
             .mission-card { padding:24px 18px; }
             .mission-title { font-size:22px; }
+            .section-title { font-size:20px; }
+            .song-title { font-size:16px; }
+            .songs-grid { grid-template-columns:1fr; gap:10px; }
+            .setlist-grid { grid-template-columns:1fr; gap:10px; }
+            .toolbar { gap:8px; }
         }
+
+        /* ── Bottom Navigation (mobile) ── */
+        .bottom-nav { display:none; }
+        @media (max-width:640px) {
+            .header .nav { display:none !important; }
+            .header-actions .btn-hide-mobile { display:none; }
+            .bottom-nav {
+                display:flex; position:fixed; bottom:0; left:0; right:0;
+                background:rgba(8,8,16,.96); backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px);
+                border-top:1px solid var(--border);
+                padding:4px 0 env(safe-area-inset-bottom,6px);
+                z-index:95; overflow-x:auto; scrollbar-width:none;
+                -webkit-overflow-scrolling:touch;
+            }
+            .bottom-nav::-webkit-scrollbar { display:none; }
+        }
+        .bn-item {
+            display:flex; flex-direction:column; align-items:center; gap:2px;
+            padding:5px 10px 4px; color:var(--muted); font-size:10px; font-weight:700;
+            cursor:pointer; border:none; background:transparent; min-width:64px; flex-shrink:0;
+            touch-action:manipulation; font-family:inherit; letter-spacing:.2px;
+            text-transform:uppercase; transition:color .12s;
+        }
+        .bn-item.active { color:var(--purple-light); }
+        .bn-icon {
+            font-size:22px; width:44px; height:32px; display:flex; align-items:center;
+            justify-content:center; border-radius:12px; transition:background .12s;
+        }
+        .bn-item.active .bn-icon { background:rgba(0,150,63,.18); }
+        .bn-label { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:64px; }
 
         /* ── Relatório mensal ── */
         .rel-event-card {
@@ -1403,7 +1442,39 @@ function html() {
     if (S.page === 'cadastros')    page = cadastrosPage();
     if (S.page === 'relatorio')    page = relatorioPage();
     if (S.page === 'minha-escala') page = minhaEscalaPage();
-    return header() + `<div class="main">${page}</div>` + (S.modal ? modalHtml() : '');
+    return header() + `<div class="main">${page}</div>` + (S.modal ? modalHtml() : '') + bottomNav();
+}
+
+function bottomNav() {
+    const adm = [
+        { p:'library',      i:'🎸', l:'Músicas'  },
+        { p:'setlists',     i:'📋', l:'Set Lists' },
+        { p:'agenda',       i:'📅', l:'Agenda'    },
+        { p:'membros',      i:'👥', l:'Membros', badge: S.accessRequests.filter(r=>r.status==='pending').length },
+        { p:'atividade',    i:'📊', l:'Atividade' },
+        { p:'relatorio',    i:'📄', l:'Relatório'  },
+    ];
+    const geral = [
+        { p:'library',  i:'🎸', l:'Músicas'  },
+        { p:'setlists', i:'📋', l:'Set Lists' },
+        { p:'playlist', i:'▶️', l:'Playlist'  },
+        { p:'agenda',   i:'📅', l:'Agenda'    },
+    ];
+    const membro = [
+        { p:'minha-escala', i:'🎯', l:'Escala'    },
+        { p:'library',      i:'🎸', l:'Músicas'   },
+        { p:'setlists',     i:'📋', l:'Set Lists' },
+        { p:'playlist',     i:'▶️', l:'Playlist'  },
+        { p:'agenda',       i:'📅', l:'Agenda'    },
+    ];
+    const items = isMembro() ? membro : isAdm() ? adm : geral;
+    return `<nav class="bottom-nav" role="navigation" aria-label="Navegação principal">
+        ${items.map(it => `
+        <button class="bn-item ${S.page===it.p?'active':''}" onclick="nav('${it.p}')" aria-label="${it.l}">
+            <span class="bn-icon" style="position:relative">${it.i}${it.badge?`<span style="position:absolute;top:0;right:0;width:8px;height:8px;border-radius:50%;background:#ef4444"></span>`:''}</span>
+            <span class="bn-label">${it.l}</span>
+        </button>`).join('')}
+    </nav>`;
 }
 
 function header() {
@@ -1456,6 +1527,7 @@ function libPage() {
     <div class="section-header">
         <h2 class="section-title">Biblioteca</h2>
         <span class="section-count">${S.songs.length} música${S.songs.length!==1?'s':''}</span>
+        ${isAdm() ? `<button class="btn btn-primary btn-sm mobile-fab" onclick="openAdd()">+ Música</button>` : ''}
     </div>
     <div class="toolbar">
         <div class="search-wrap">
