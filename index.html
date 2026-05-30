@@ -806,8 +806,10 @@ const S = {
     role: localStorage.getItem('hl_role') || null,
     escalas: {},   // { evId: { violao, teclado, ..., checklist: [{id,text,done}] } }
     evTab: 'escala',
-    members: [],   // { id, name, instrument, user, pass }
-    currentMember: null, // member object when role==='membro'
+    members: [],      // { id, name, instrument, user, pass, email, whatsapp, firstAccessDone }
+    currentMember: null,
+    activityLog: [],  // { id, memberId, memberName, type, at, duration, songId, songTitle, tab }
+    membrosTab: 'lista', // 'lista' | 'atividade' | 'cadastros'
 };
 const isAdm    = () => S.role === 'adm';
 const isGeral  = () => S.role === 'geral';
@@ -886,6 +888,7 @@ function persist() {
     localStorage.setItem('hl_setlists', JSON.stringify(S.setlists));
     localStorage.setItem('hl_escalas',  JSON.stringify(S.escalas));
     localStorage.setItem('hl_members',  JSON.stringify(S.members));
+    localStorage.setItem('hl_activity', JSON.stringify(S.activityLog.slice(-2000)));
 }
 function hydrate() {
     try {
@@ -897,6 +900,8 @@ function hydrate() {
         if (sl) S.setlists = JSON.parse(sl);
         if (es) S.escalas  = JSON.parse(es);
         if (mb) S.members  = JSON.parse(mb);
+        const ac = localStorage.getItem('hl_activity');
+        if (ac) S.activityLog = JSON.parse(ac);
     } catch(e) { console.error(e); }
     // Migrate old set lists (songIds → blocks)
     S.setlists.forEach(sl => {
@@ -1156,6 +1161,10 @@ function doLogin() {
         S.currentMember = member;
         localStorage.setItem('hl_role', 'membro');
         localStorage.setItem('hl_current_member', member.id);
+        // Track login
+        S.activityLog.push({ id: uid(), memberId: member.id, memberName: member.name,
+            type: 'login', at: Date.now(), duration: 0 });
+        localStorage.setItem('hl_activity', JSON.stringify(S.activityLog.slice(-2000)));
         render();
         // Primeiro acesso → pede WhatsApp e email antes do alert de missão
         setTimeout(() => {
@@ -1215,6 +1224,8 @@ function html() {
     if (S.page === 'playlist')     page = playlistPage();
     if (S.page === 'agenda')       page = agendaPage();
     if (S.page === 'membros')      page = membrosPage();
+    if (S.page === 'atividade')    page = atividadePage();
+    if (S.page === 'cadastros')    page = cadastrosPage();
     if (S.page === 'minha-escala') page = minhaEscalaPage();
     return header() + `<div class="main">${page}</div>` + (S.modal ? modalHtml() : '');
 }
@@ -1235,7 +1246,11 @@ function header() {
                 <button class="nav-btn ${S.page==='setlists'?'active':''}" onclick="nav('setlists')">📋 Set Lists</button>
                 <button class="nav-btn ${S.page==='playlist'?'active':''}" onclick="nav('playlist')">▶ Playlist</button>
                 <button class="nav-btn ${S.page==='agenda'?'active':''}"   onclick="nav('agenda')">📅 Agenda</button>
-                ${isAdm() ? `<button class="nav-btn ${S.page==='membros'?'active':''}" onclick="nav('membros')">👥 Membros</button>` : ''}
+                ${isAdm() ? `
+                <button class="nav-btn ${S.page==='membros'?'active':''}" onclick="nav('membros')">👥 Membros</button>
+                <button class="nav-btn ${S.page==='atividade'?'active':''}" onclick="nav('atividade')">📊 Atividade</button>
+                <button class="nav-btn ${S.page==='cadastros'?'active':''}" onclick="nav('cadastros')">👁 Cadastros</button>
+                ` : ''}
             `}
         </nav>
         <div class="header-actions" style="display:flex;align-items:center;gap:8px">
@@ -1346,6 +1361,8 @@ function modalHtml() {
 
 // ── Song Detail ──
 function detailModal(song) {
+    // Track song view for members
+    startActTimer('song_view', { songId: song.id, songTitle: song.title, tab: S.ptab });
     const yt=ytId(song.youtubeUrl), sp=spId(song.spotifyUrl), dz=dzId(song.deezerUrl);
     const tab = S.ptab;
     const transposed = tText(song.chords||'', S.transpose);
@@ -1780,7 +1797,7 @@ function doFilterKey(v) { S.filterKey=v; render(); }
 
 function closeModal(e) {
     if (e && e.target!==e.currentTarget) return;
-    // revoke blob URL to free memory
+    stopActTimer(); // save any active tracking session
     if (S.currentPdfUrl) { URL.revokeObjectURL(S.currentPdfUrl); S.currentPdfUrl=null; }
     S.modal=null; S.transpose=0; S.ptab='youtube'; S.cifraTab='texto';
     S.pendingPdfFile=null; S.pendingPdfRemove=false;
@@ -1921,14 +1938,19 @@ function doT(d, reset) {
 
 // Player tab
 function setPTab(tab, songId) {
+    stopActTimer();
     S.ptab=tab;
     const s=S.songs.find(x=>x.id===songId); if(!s)return;
+    startActTimer('music_play', { songId: s.id, songTitle: s.title, tab });
     S.modal={type:'detail',data:s}; render();
 }
 
 // Cifra tab
 async function setCifraTab(tab, songId) {
+    stopActTimer();
     S.cifraTab = tab;
+    const s=S.songs.find(x=>x.id===songId);
+    if (s) startActTimer(tab==='texto'?'cifra_view':'pdf_view', { songId: s.id, songTitle: s.title, tab });
     if (tab==='pdf' && S.hasPdf.has(songId) && !S.currentPdfUrl) {
         const rec = await dbGetPDF(songId);
         if (rec) {
@@ -2148,6 +2170,35 @@ function evDateLabel(ev) {
     if (ms === me) return `${ds}–${de}/${ms < 10 ? '0'+ms : ms}`;
     return `${ds}/${ms < 10?'0'+ms:ms}–${de}/${me < 10?'0'+me:me}`;
 }
+
+// ════════════════════════════════════════════════════
+//  ACTIVITY TRACKING
+// ════════════════════════════════════════════════════
+let _actTimer = null; // { type, songId, songTitle, tab, startAt }
+
+function trackActivity(type, data = {}) {
+    if (!isMembro() || !S.currentMember) return;
+    const entry = { id: uid(), memberId: S.currentMember.id,
+        memberName: S.currentMember.name, type, at: Date.now(), duration: 0, ...data };
+    S.activityLog.push(entry);
+    if (S.activityLog.length > 2000) S.activityLog = S.activityLog.slice(-2000);
+    localStorage.setItem('hl_activity', JSON.stringify(S.activityLog));
+}
+
+function startActTimer(type, data = {}) {
+    stopActTimer(); // save previous
+    _actTimer = { type, ...data, startAt: Date.now() };
+}
+
+function stopActTimer() {
+    if (!_actTimer) return;
+    const duration = Math.round((Date.now() - _actTimer.startAt) / 1000);
+    if (duration >= 3) trackActivity(_actTimer.type, { ..._actTimer, duration });
+    _actTimer = null;
+}
+
+// Called when modal closes
+const _origClose = window.closeModal;
 
 // ════════════════════════════════════════════════════
 //  MEMBERS — Cadastro e Gestão
@@ -2392,6 +2443,210 @@ function missionAlertModal({member, escalas}) {
         </div>
         <button class="mission-btn" onclick="closeModal();nav('minha-escala')">✅ Entendido — Vou me preparar!</button>
     </div></div>`;
+}
+
+// ════════════════════════════════════════════════════
+//  ATIVIDADE — Dashboard de comportamento
+// ════════════════════════════════════════════════════
+function atividadePage() {
+    const mbs = S.members;
+    if (!mbs.length) return `<div style="text-align:center;padding:60px;color:var(--muted)">
+        <div style="font-size:36px;margin-bottom:12px">📊</div>
+        Nenhum membro cadastrado ainda.<br>
+        <button class="btn btn-ghost btn-sm" style="margin-top:12px" onclick="nav('membros')">← Ir para Membros</button>
+    </div>`;
+
+    function fmtTime(sec) {
+        if (!sec) return '—';
+        if (sec < 60) return sec+'s';
+        if (sec < 3600) return Math.floor(sec/60)+'min '+(sec%60)+'s';
+        return Math.floor(sec/3600)+'h '+Math.floor((sec%3600)/60)+'min';
+    }
+    function fmtDate(ts) {
+        if (!ts) return '—';
+        const d = new Date(ts);
+        return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+    }
+
+    const cards = mbs.map(m => {
+        const acts = S.activityLog.filter(a => a.memberId === m.id);
+        const logins     = acts.filter(a=>a.type==='login');
+        const cifraActs  = acts.filter(a=>a.type==='cifra_view'||a.type==='pdf_view');
+        const musicActs  = acts.filter(a=>a.type==='music_play');
+        const songViews  = acts.filter(a=>a.type==='song_view');
+        const totalCifra = cifraActs.reduce((s,a)=>s+(a.duration||0),0);
+        const totalMusic = musicActs.reduce((s,a)=>s+(a.duration||0),0);
+        const totalSong  = songViews.reduce((s,a)=>s+(a.duration||0),0);
+        const totalTime  = totalCifra + totalMusic + totalSong;
+        const uniqueSongs= new Set([...cifraActs,...musicActs,...songViews].map(a=>a.songId).filter(Boolean)).size;
+        const lastAct    = acts.length ? Math.max(...acts.map(a=>a.at)) : 0;
+        const lastLogin  = logins.length ? Math.max(...logins.map(a=>a.at)) : 0;
+
+        // Score de preparação (0–100)
+        let score = 0;
+        score += Math.min(30, logins.length * 5);           // até 30 pts — logins
+        score += Math.min(30, uniqueSongs * 5);              // até 30 pts — músicas estudadas
+        score += Math.min(20, Math.floor(totalCifra/60)*4); // até 20 pts — tempo de cifra
+        score += Math.min(20, Math.floor(totalMusic/60)*3); // até 20 pts — tempo de música
+        score = Math.min(100, score);
+
+        const scoreColor = score >= 80 ? '#22c55e' : score >= 50 ? '#eab308' : score >= 20 ? '#f97316' : '#ef4444';
+        const scoreLabel = score >= 80 ? 'Ótimo' : score >= 50 ? 'Bom' : score >= 20 ? 'Regular' : 'Iniciando';
+
+        // Recent activity (last 5)
+        const recent = acts.filter(a=>a.duration>0).sort((a,b)=>b.at-a.at).slice(0,4);
+        const typeLabel = { song_view:'🎵 Abriu', cifra_view:'📄 Cifra', pdf_view:'📄 PDF', music_play:'▶ Ouviu', login:'🔐 Login' };
+
+        return `<div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:20px;margin-bottom:16px">
+            <div style="display:flex;align-items:flex-start;gap:16px;flex-wrap:wrap">
+                <div style="width:52px;height:52px;border-radius:50%;background:var(--purple);display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0">
+                    ${{violao:'🎸',teclado:'🎹',bateria:'🥁',baixo:'🎸',guitarra:'🎸',sopro:'🎷',vocal1:'🎤',vocal2:'🎤',vocal3:'🎤',animador:'🎙'}[m.instrument]||'🎵'}
+                </div>
+                <div style="flex:1;min-width:200px">
+                    <div style="font-size:16px;font-weight:800;margin-bottom:2px">${m.name}</div>
+                    <div style="font-size:12px;color:var(--muted)">
+                        Último acesso: ${fmtDate(lastLogin||lastAct)} · ${logins.length} login${logins.length!==1?'s':''}
+                    </div>
+                    <div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:12px">
+                        <div style="text-align:center;background:var(--bg3);border-radius:8px;padding:8px 14px">
+                            <div style="font-size:18px;font-weight:800;color:var(--purple-light)">${uniqueSongs}</div>
+                            <div style="font-size:10px;color:var(--muted);text-transform:uppercase">músicas</div>
+                        </div>
+                        <div style="text-align:center;background:var(--bg3);border-radius:8px;padding:8px 14px">
+                            <div style="font-size:18px;font-weight:800;color:#a5b4fc">${fmtTime(totalCifra)}</div>
+                            <div style="font-size:10px;color:var(--muted);text-transform:uppercase">cifra</div>
+                        </div>
+                        <div style="text-align:center;background:var(--bg3);border-radius:8px;padding:8px 14px">
+                            <div style="font-size:18px;font-weight:800;color:#34d399">${fmtTime(totalMusic)}</div>
+                            <div style="font-size:10px;color:var(--muted);text-transform:uppercase">ouvindo</div>
+                        </div>
+                        <div style="text-align:center;background:var(--bg3);border-radius:8px;padding:8px 14px">
+                            <div style="font-size:18px;font-weight:800;color:var(--gold)">${fmtTime(totalTime)}</div>
+                            <div style="font-size:10px;color:var(--muted);text-transform:uppercase">total</div>
+                        </div>
+                    </div>
+                </div>
+                <div style="text-align:center;flex-shrink:0">
+                    <div style="width:72px;height:72px;border-radius:50%;background:conic-gradient(${scoreColor} ${score*3.6}deg, var(--bg3) 0deg);display:flex;align-items:center;justify-content:center;margin:0 auto 4px">
+                        <div style="width:56px;height:56px;border-radius:50%;background:var(--bg2);display:flex;align-items:center;justify-content:center">
+                            <div style="font-size:18px;font-weight:900;color:${scoreColor}">${score}</div>
+                        </div>
+                    </div>
+                    <div style="font-size:11px;font-weight:700;color:${scoreColor}">${scoreLabel}</div>
+                    <div style="font-size:10px;color:var(--muted)">preparação</div>
+                </div>
+            </div>
+            ${recent.length ? `
+            <div style="margin-top:14px;border-top:1px solid var(--border);padding-top:12px">
+                <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:8px">Atividade recente</div>
+                <div style="display:flex;flex-direction:column;gap:4px">
+                    ${recent.map(a=>`<div style="display:flex;align-items:center;gap:8px;font-size:12px">
+                        <span style="color:var(--muted);white-space:nowrap">${fmtDate(a.at)}</span>
+                        <span>${typeLabel[a.type]||a.type}</span>
+                        <span style="color:var(--purple-light);font-weight:600">${a.songTitle||''}</span>
+                        ${a.duration>0?`<span style="margin-left:auto;color:var(--muted)">${fmtTime(a.duration)}</span>`:''}
+                    </div>`).join('')}
+                </div>
+            </div>` : `<div style="margin-top:12px;font-size:12px;color:var(--muted);font-style:italic">Sem atividade registrada ainda.</div>`}
+        </div>`;
+    });
+
+    return `<div style="max-width:800px;margin:0 auto">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:8px">
+            <h2 style="font-size:22px;font-weight:800">📊 Atividade dos Membros</h2>
+            <button class="btn btn-ghost btn-sm" onclick="if(confirm('Limpar todo o histórico de atividade?')){S.activityLog=[];persist();render();}"
+                style="color:#f87171;border-color:#f87171">🗑 Limpar histórico</button>
+        </div>
+        ${cards.join('')}
+    </div>`;
+}
+
+// ════════════════════════════════════════════════════
+//  CADASTROS — Diretório completo dos membros
+// ════════════════════════════════════════════════════
+function cadastrosPage() {
+    const mbs = S.members;
+    const instrLabel = {violao:'Violão',teclado:'Teclado',bateria:'Bateria',baixo:'Baixo',guitarra:'Guitarra',sopro:'Sopro',vocal1:'Vocal 1',vocal2:'Vocal 2',vocal3:'Vocal 3',animador:'Animador'};
+
+    if (!mbs.length) return `<div style="text-align:center;padding:60px;color:var(--muted)">
+        <div style="font-size:36px;margin-bottom:12px">👁</div>
+        Nenhum membro cadastrado ainda.
+    </div>`;
+
+    const rows = mbs.map(m => `
+        <tr style="border-bottom:1px solid var(--border)">
+            <td style="padding:12px 10px;font-weight:700">${m.name}</td>
+            <td style="padding:12px 10px;color:var(--muted)">${instrLabel[m.instrument]||m.instrument}</td>
+            <td style="padding:12px 10px">
+                ${m.whatsapp
+                    ? `<a href="https://wa.me/55${m.whatsapp.replace(/\D/g,'')}" target="_blank"
+                        style="color:#25d366;text-decoration:none;font-weight:600">📱 ${m.whatsapp}</a>`
+                    : `<span style="color:#f87171;font-size:12px">não informado</span>`}
+            </td>
+            <td style="padding:12px 10px">
+                ${m.email
+                    ? `<a href="mailto:${m.email}" style="color:#a5b4fc;text-decoration:none">${m.email}</a>`
+                    : `<span style="color:#f87171;font-size:12px">não informado</span>`}
+            </td>
+            <td style="padding:12px 10px;font-family:monospace;font-size:13px;color:var(--purple-light)">${m.user}</td>
+            <td style="padding:12px 10px">
+                <div style="display:flex;align-items:center;gap:6px">
+                    <span id="pw-${m.id}" style="font-family:monospace;font-size:13px;color:var(--muted)">••••••</span>
+                    <button class="btn btn-ghost btn-sm btn-icon" style="font-size:12px"
+                        onclick="togglePw('${m.id}','${m.pass}')">👁</button>
+                </div>
+            </td>
+            <td style="padding:12px 10px">
+                <span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:8px;
+                    ${m.firstAccessDone
+                        ? 'background:rgba(34,197,94,.15);color:#22c55e;border:1px solid rgba(34,197,94,.3)'
+                        : 'background:rgba(241,90,36,.12);color:#f97316;border:1px solid rgba(241,90,36,.3)'}">
+                    ${m.firstAccessDone ? '✅ Ativo' : '⏳ Pendente'}
+                </span>
+            </td>
+            <td style="padding:12px 10px">
+                <div style="display:flex;gap:4px">
+                    <button class="btn btn-ghost btn-sm btn-icon" title="Editar" onclick="openMemberForm('${m.id}')">✏️</button>
+                    <button class="btn btn-ghost btn-sm btn-icon" title="Excluir" onclick="deleteMember('${m.id}')">🗑</button>
+                </div>
+            </td>
+        </tr>`).join('');
+
+    return `<div style="max-width:900px;margin:0 auto">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:8px">
+            <h2 style="font-size:22px;font-weight:800">👁 Cadastros do Ministério</h2>
+            <div style="display:flex;gap:8px">
+                <span style="font-size:13px;color:var(--muted);align-self:center">${mbs.length} membro${mbs.length!==1?'s':''}</span>
+                <button class="btn btn-primary btn-sm" onclick="nav('membros');openMemberForm(null)">+ Novo Membro</button>
+            </div>
+        </div>
+        <div style="overflow-x:auto;border-radius:var(--radius);border:1px solid var(--border)">
+            <table style="width:100%;border-collapse:collapse;background:var(--bg2)">
+                <thead>
+                    <tr style="background:var(--bg3);border-bottom:2px solid var(--border)">
+                        <th style="padding:10px;text-align:left;font-size:11px;text-transform:uppercase;color:var(--muted);font-weight:700">Nome</th>
+                        <th style="padding:10px;text-align:left;font-size:11px;text-transform:uppercase;color:var(--muted);font-weight:700">Instrumento</th>
+                        <th style="padding:10px;text-align:left;font-size:11px;text-transform:uppercase;color:var(--muted);font-weight:700">WhatsApp</th>
+                        <th style="padding:10px;text-align:left;font-size:11px;text-transform:uppercase;color:var(--muted);font-weight:700">Email</th>
+                        <th style="padding:10px;text-align:left;font-size:11px;text-transform:uppercase;color:var(--muted);font-weight:700">Usuário</th>
+                        <th style="padding:10px;text-align:left;font-size:11px;text-transform:uppercase;color:var(--muted);font-weight:700">Senha</th>
+                        <th style="padding:10px;text-align:left;font-size:11px;text-transform:uppercase;color:var(--muted);font-weight:700">Status</th>
+                        <th style="padding:10px;text-align:left;font-size:11px;text-transform:uppercase;color:var(--muted);font-weight:700">Ações</th>
+                    </tr>
+                </thead>
+                <tbody>${rows}</tbody>
+            </table>
+        </div>
+        <div style="margin-top:12px;font-size:12px;color:var(--muted);text-align:center">
+            🔒 Esta página é visível apenas para o ADM · Clique em 👁 para revelar senhas
+        </div>
+    </div>`;
+}
+
+function togglePw(id, pass) {
+    const el = document.getElementById('pw-'+id);
+    if (!el) return;
+    el.textContent = el.textContent === '••••••' ? pass : '••••••';
 }
 
 // ════════════════════════════════════════════════════
