@@ -797,6 +797,50 @@
         }
         .rel-alegrai { border-left-color:#F15A24 !important; background:linear-gradient(90deg,rgba(255,212,0,.06),transparent) !important; }
 
+        /* ── Financeiro ── */
+        .fin-summary { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-bottom:20px; }
+        @media (max-width:500px) { .fin-summary { grid-template-columns:1fr 1fr; } .fin-summary .fin-saldo { grid-column:1/-1; } }
+        .fin-card {
+            background:var(--bg2); border:1px solid var(--border); border-radius:var(--radius);
+            padding:16px 18px; display:flex; flex-direction:column; gap:4px;
+        }
+        .fin-card.entrada { border-top:3px solid #22c55e; }
+        .fin-card.saida   { border-top:3px solid #ef4444; }
+        .fin-card.saldo   { border-top:3px solid var(--purple); }
+        .fin-card-label { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.6px; color:var(--muted); }
+        .fin-card-val   { font-size:26px; font-weight:800; letter-spacing:-.5px; }
+        .fin-card.entrada .fin-card-val { color:#4ade80; }
+        .fin-card.saida   .fin-card-val { color:#f87171; }
+        .fin-card.saldo   .fin-card-val { color:var(--purple-light); }
+        .fin-card-sub { font-size:12px; color:var(--muted); }
+
+        .fin-filtros { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:16px; align-items:center; }
+        .fin-filtros select { padding:7px 12px; border-radius:var(--radius-sm); border:1px solid var(--border); background:var(--bg3); color:var(--text); font-size:13px; font-family:inherit; }
+
+        .fin-list { display:flex; flex-direction:column; gap:8px; }
+        .fin-item {
+            background:var(--bg2); border:1px solid var(--border);
+            border-radius:var(--radius); padding:14px 16px;
+            display:flex; align-items:center; gap:14px;
+            contain: layout style;
+        }
+        .fin-badge {
+            width:36px; height:36px; border-radius:50%;
+            display:flex; align-items:center; justify-content:center;
+            font-size:16px; flex-shrink:0;
+        }
+        .fin-badge.entrada { background:rgba(34,197,94,.15); }
+        .fin-badge.saida   { background:rgba(239,68,68,.15); }
+        .fin-item-main { flex:1; min-width:0; }
+        .fin-item-desc { font-size:14px; font-weight:700; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+        .fin-item-meta { font-size:12px; color:var(--muted); margin-top:2px; }
+        .fin-item-val  { font-size:16px; font-weight:800; white-space:nowrap; }
+        .fin-item-val.entrada { color:#4ade80; }
+        .fin-item-val.saida   { color:#f87171; }
+        .fin-item-actions { display:flex; gap:6px; }
+        .fin-empty { text-align:center; padding:48px 20px; color:var(--muted); }
+        .fin-empty-icon { font-size:48px; margin-bottom:12px; }
+
         /* ── Print media ── */
         @media print {
             body * { visibility:hidden; }
@@ -916,6 +960,9 @@ const S = {
     _relMonth: new Date().getMonth(), // selected month for report (0=Jan)
     availability: {},    // { evId: { memberId: 'can'|'cannot' } }
     substitutions: [],   // [{ id, fromId, fromName, toId, toName, evId, evTitle, evDate, role, roleLabel, status:'pending'|'accepted'|'rejected', at, notifiedFrom, notifiedTo }]
+    financeiro: [],      // [{ id, tipo:'entrada'|'saida', categoria, descricao, valor, data, obs, criadoPor, criadoEm }]
+    _finFiltro: 'todos', // 'todos'|'entrada'|'saida'
+    _finMes: '',         // '' = todos os meses, ou 'YYYY-MM'
 };
 const isAdm    = () => S.role === 'adm';
 const isGeral  = () => S.role === 'geral';
@@ -1005,6 +1052,7 @@ function _doPersist() {
         localStorage.setItem('hl_requests',     JSON.stringify(S.accessRequests));
         localStorage.setItem('hl_availability', JSON.stringify(S.availability));
         localStorage.setItem('hl_substitutions',JSON.stringify(S.substitutions));
+        localStorage.setItem('hl_financeiro',   JSON.stringify(S.financeiro));
     } catch(e) {
         // localStorage quota exceeded — trim and retry
         S.activityLog = S.activityLog.slice(-100);
@@ -1029,6 +1077,8 @@ function hydrate() {
         if (av) S.availability = JSON.parse(av);
         const sb = localStorage.getItem('hl_substitutions');
         if (sb) S.substitutions = JSON.parse(sb);
+        const fi = localStorage.getItem('hl_financeiro');
+        if (fi) S.financeiro = JSON.parse(fi);
     } catch(e) { console.error(e); }
     // Migrate: instrument (string) → instruments (array)
     S.members.forEach(m => {
@@ -1458,6 +1508,7 @@ function html() {
     if (S.page === 'atividade')    page = atividadePage();
     if (S.page === 'cadastros')    page = cadastrosPage();
     if (S.page === 'relatorio')    page = relatorioPage();
+    if (S.page === 'financeiro')   page = financeiroPage();
     if (S.page === 'minha-escala') page = minhaEscalaPage();
     return header() + `<div class="main">${page}</div>` + (S.modal ? modalHtml() : '') + bottomNav();
 }
@@ -1470,12 +1521,14 @@ function bottomNav() {
         { p:'membros',      i:'👥', l:'Membros', badge: S.accessRequests.filter(r=>r.status==='pending').length },
         { p:'atividade',    i:'📊', l:'Atividade' },
         { p:'relatorio',    i:'📄', l:'Relatório'  },
+        { p:'financeiro',   i:'💰', l:'Financeiro' },
     ];
     const geral = [
-        { p:'library',  i:'🎸', l:'Músicas'  },
-        { p:'setlists', i:'📋', l:'Set Lists' },
-        { p:'playlist', i:'▶️', l:'Playlist'  },
-        { p:'agenda',   i:'📅', l:'Agenda'    },
+        { p:'library',    i:'🎸', l:'Músicas'   },
+        { p:'setlists',   i:'📋', l:'Set Lists' },
+        { p:'playlist',   i:'▶️', l:'Playlist'  },
+        { p:'agenda',     i:'📅', l:'Agenda'    },
+        { p:'financeiro', i:'💰', l:'Financeiro'},
     ];
     const membro = [
         { p:'minha-escala', i:'🎯', l:'Escala'    },
@@ -1483,6 +1536,7 @@ function bottomNav() {
         { p:'setlists',     i:'📋', l:'Set Lists' },
         { p:'playlist',     i:'▶️', l:'Playlist'  },
         { p:'agenda',       i:'📅', l:'Agenda'    },
+        { p:'financeiro',   i:'💰', l:'Financeiro'},
     ];
     const items = isMembro() ? membro : isAdm() ? adm : geral;
     return `<nav class="bottom-nav" role="navigation" aria-label="Navegação principal">
@@ -1519,6 +1573,7 @@ function header() {
                 <button class="nav-btn ${S.page==='atividade'?'active':''}" onclick="nav('atividade')">📊 Atividade</button>
                 <button class="nav-btn ${S.page==='cadastros'?'active':''}" onclick="nav('cadastros')">👁 Cadastros</button>
                 <button class="nav-btn ${S.page==='relatorio'?'active':''}" onclick="nav('relatorio')">📄 Relatório</button>
+                <button class="nav-btn ${S.page==='financeiro'?'active':''}" onclick="nav('financeiro')">💰 Financeiro</button>
                 ` : ''}
             `}
         </nav>
@@ -1630,6 +1685,7 @@ function modalHtml() {
     if (type==='sub-picker')       return subPickerModal(data);
     if (type==='sub-request')      return subRequestModal(data);
     if (type==='sub-result')       return subResultModal(data);
+    if (type==='fin-add')          return finAddModal(data);
     return '';
 }
 
@@ -3417,6 +3473,255 @@ function togglePw(id, pass) {
     const el = document.getElementById('pw-'+id);
     if (!el) return;
     el.textContent = el.textContent === '••••••' ? pass : '••••••';
+}
+
+// ════════════════════════════════════════════════════
+// ════════════════════════════════════════════════════
+//  FINANCEIRO — PRESTAÇÃO DE CONTAS
+// ════════════════════════════════════════════════════
+const FIN_CAT_ENTRADA = ['Doação','Dízimo','Contribuição','Evento','Patrocínio','Outro'];
+const FIN_CAT_SAIDA   = ['Equipamento','Material Musical','Evento','Manutenção','Serviços','Impressão','Outro'];
+const FIN_EMOJI       = { entrada:'⬆️', saida:'⬇️' };
+
+function fmtBRL(v) {
+    return 'R$ ' + Number(v).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+}
+function fmtDataFin(ds) {
+    if (!ds) return '';
+    const [y,m,d] = ds.split('-');
+    return `${d}/${m}/${y}`;
+}
+
+function financeiroPage() {
+    const todos = S.financeiro.slice().sort((a,b)=>b.data.localeCompare(a.data));
+
+    // ── Filtros ──
+    const filtroTipo = S._finFiltro || 'todos';
+    const filtroMes  = S._finMes || '';
+
+    const mesesDisponiveis = [...new Set(todos.map(t=>t.data.slice(0,7)))].sort().reverse();
+
+    let lista = todos;
+    if (filtroTipo !== 'todos') lista = lista.filter(t=>t.tipo===filtroTipo);
+    if (filtroMes)              lista = lista.filter(t=>t.data.startsWith(filtroMes));
+
+    // ── Totais (sobre a lista filtrada) ──
+    const totalEntrada = lista.filter(t=>t.tipo==='entrada').reduce((a,t)=>a+Number(t.valor),0);
+    const totalSaida   = lista.filter(t=>t.tipo==='saida'  ).reduce((a,t)=>a+Number(t.valor),0);
+    const saldo        = totalEntrada - totalSaida;
+
+    const countEntrada = lista.filter(t=>t.tipo==='entrada').length;
+    const countSaida   = lista.filter(t=>t.tipo==='saida'  ).length;
+
+    const MESES_PT = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+    function mesFmt(ym) {
+        if (!ym) return '';
+        const [y,m] = ym.split('-');
+        return `${MESES_PT[parseInt(m)-1]}/${y}`;
+    }
+
+    return `
+    <div class="section-header">
+        <div>
+            <h2 class="section-title">💰 Financeiro</h2>
+            <p style="color:var(--muted);font-size:13px;margin-top:2px">Prestação de contas do ministério</p>
+        </div>
+        ${isAdm() ? `<div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn btn-primary btn-sm" onclick="openFinAdd()">+ Lançamento</button>
+            <button class="btn btn-sm" onclick="downloadFinCSV()" style="background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);color:#fff">⬇ Relatório</button>
+        </div>` : ''}
+    </div>
+
+    <!-- Cards de resumo -->
+    <div class="fin-summary">
+        <div class="fin-card entrada">
+            <div class="fin-card-label">↑ Entradas</div>
+            <div class="fin-card-val">${fmtBRL(totalEntrada)}</div>
+            <div class="fin-card-sub">${countEntrada} lançamento${countEntrada!==1?'s':''}</div>
+        </div>
+        <div class="fin-card saida">
+            <div class="fin-card-label">↓ Saídas</div>
+            <div class="fin-card-val">${fmtBRL(totalSaida)}</div>
+            <div class="fin-card-sub">${countSaida} lançamento${countSaida!==1?'s':''}</div>
+        </div>
+        <div class="fin-card saldo fin-saldo">
+            <div class="fin-card-label">= Saldo</div>
+            <div class="fin-card-val" style="color:${saldo>=0?'#4ade80':'#f87171'}">${fmtBRL(saldo)}</div>
+            <div class="fin-card-sub">${filtroMes ? mesFmt(filtroMes) : 'Período completo'}</div>
+        </div>
+    </div>
+
+    <!-- Filtros -->
+    <div class="fin-filtros">
+        <div style="display:flex;gap:6px">
+            ${['todos','entrada','saida'].map(f=>`<button class="btn btn-sm ${filtroTipo===f?'btn-primary':''}" style="${filtroTipo!==f?'background:var(--bg3);border:1px solid var(--border);color:var(--muted)':''}" onclick="S._finFiltro='${f}';render()">${f==='todos'?'Todos':f==='entrada'?'⬆ Entradas':'⬇ Saídas'}</button>`).join('')}
+        </div>
+        <select onchange="S._finMes=this.value;render()">
+            <option value="" ${!filtroMes?'selected':''}>Todos os meses</option>
+            ${mesesDisponiveis.map(ym=>`<option value="${ym}" ${filtroMes===ym?'selected':''}>${mesFmt(ym)}</option>`).join('')}
+        </select>
+    </div>
+
+    <!-- Lista de lançamentos -->
+    <div class="fin-list">
+        ${lista.length === 0 ? `
+        <div class="fin-empty">
+            <div class="fin-empty-icon">💳</div>
+            <div style="font-size:16px;font-weight:700;margin-bottom:6px">Nenhum lançamento</div>
+            <div style="font-size:13px">${isAdm()?'Clique em "+ Lançamento" para registrar a primeira entrada ou saída.':'Ainda não há lançamentos registrados.'}</div>
+        </div>` :
+        lista.map(t=>`
+        <div class="fin-item">
+            <div class="fin-badge ${t.tipo}">${t.tipo==='entrada'?'⬆':'⬇'}</div>
+            <div class="fin-item-main">
+                <div class="fin-item-desc">${escHtml(t.descricao)}</div>
+                <div class="fin-item-meta">
+                    <span style="background:${t.tipo==='entrada'?'rgba(34,197,94,.15)':'rgba(239,68,68,.15)'};color:${t.tipo==='entrada'?'#4ade80':'#f87171'};padding:1px 8px;border-radius:20px;font-size:11px;font-weight:700">${escHtml(t.categoria)}</span>
+                    &nbsp;·&nbsp;${fmtDataFin(t.data)}
+                    ${t.obs?`&nbsp;·&nbsp;<span style="font-style:italic">${escHtml(t.obs)}</span>`:''}
+                </div>
+            </div>
+            <div class="fin-item-val ${t.tipo}">${t.tipo==='entrada'?'+':'-'} ${fmtBRL(t.valor)}</div>
+            ${isAdm()?`<div class="fin-item-actions">
+                <button class="btn btn-ghost btn-sm" onclick="openFinEdit('${t.id}')">✏️</button>
+                <button class="btn btn-danger btn-sm" onclick="delFin('${t.id}')">🗑</button>
+            </div>`:''}
+        </div>`).join('')}
+    </div>
+    `;
+}
+
+function escHtml(s) {
+    return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function finAddModal(data) {
+    const edit = data && data.id;
+    const t = edit ? S.financeiro.find(x=>x.id===data.id) : null;
+    const tipo = t?.tipo || data?.tipo || 'entrada';
+    const cats = tipo==='entrada' ? FIN_CAT_ENTRADA : FIN_CAT_SAIDA;
+    return `<div class="backdrop" onclick="closeModal(event)">
+    <div class="modal" style="max-width:460px">
+        <div class="modal-hd">
+            <div class="modal-title">${edit?'Editar Lançamento':'Novo Lançamento'}</div>
+            <button class="close-btn" onclick="closeModal()">✕</button>
+        </div>
+        <div class="modal-body">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
+                <button id="fin-btn-entrada" class="btn ${tipo==='entrada'?'btn-primary':''}" onclick="finSwitchTipo('entrada')"
+                    style="${tipo!=='entrada'?'background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.3);color:#4ade80':''}">
+                    ⬆ Entrada
+                </button>
+                <button id="fin-btn-saida" class="btn ${tipo==='saida'?'btn-danger':''}" onclick="finSwitchTipo('saida')"
+                    style="${tipo!=='saida'?'background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);color:#f87171':''}">
+                    ⬇ Saída
+                </button>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Descrição *</label>
+                <input class="field" id="fin-desc" type="text" maxlength="120" placeholder="Ex: Doação do membro João" value="${escHtml(t?.descricao||'')}">
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+                <div class="form-group">
+                    <label class="form-label">Valor (R$) *</label>
+                    <input class="field" id="fin-valor" type="number" min="0" step="0.01" placeholder="0,00" value="${t?.valor||''}">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Data *</label>
+                    <input class="field" id="fin-data" type="date" value="${t?.data||new Date().toISOString().slice(0,10)}">
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Categoria</label>
+                <select class="field" id="fin-cat">
+                    ${cats.map(c=>`<option value="${c}" ${(t?.categoria||cats[0])===c?'selected':''}>${c}</option>`).join('')}
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Observação</label>
+                <textarea class="field" id="fin-obs" rows="2" placeholder="Opcional">${escHtml(t?.obs||'')}</textarea>
+            </div>
+        </div>
+        <div class="modal-ft">
+            <button class="btn btn-ghost" onclick="closeModal()">Cancelar</button>
+            <button class="btn btn-primary" onclick="saveFin('${edit?t.id:''}')">💾 Salvar</button>
+        </div>
+    </div></div>`;
+}
+
+function finSwitchTipo(tipo) {
+    S.modal.data = { ...S.modal.data, tipo };
+    render();
+    // preserve form values after re-render
+}
+
+function openFinAdd()       { S.modal = { type:'fin-add', data:{ tipo:'entrada' } }; render(); }
+function openFinEdit(id)    { S.modal = { type:'fin-add', data:{ id } }; render(); }
+
+function saveFin(editId) {
+    const desc  = (document.getElementById('fin-desc')?.value||'').trim();
+    const valor = parseFloat(document.getElementById('fin-valor')?.value||'0');
+    const data  = document.getElementById('fin-data')?.value||'';
+    const cat   = document.getElementById('fin-cat')?.value||'';
+    const obs   = (document.getElementById('fin-obs')?.value||'').trim();
+    const tipo  = S.modal?.data?.tipo || 'entrada';
+
+    if (!desc)        { toast('⚠️ Informe a descrição.'); return; }
+    if (!valor||valor<=0) { toast('⚠️ Informe um valor válido.'); return; }
+    if (!data)        { toast('⚠️ Informe a data.'); return; }
+
+    if (editId) {
+        const idx = S.financeiro.findIndex(x=>x.id===editId);
+        if (idx>=0) S.financeiro[idx] = { ...S.financeiro[idx], tipo, categoria:cat, descricao:desc, valor, data, obs };
+        toast('✅ Lançamento atualizado.');
+    } else {
+        S.financeiro.push({ id:'fin'+uid(), tipo, categoria:cat, descricao:desc, valor, data, obs,
+            criadoPor: S.currentMember?.name || 'ADM', criadoEm: Date.now() });
+        toast('✅ Lançamento registrado.');
+    }
+    persist();
+    S.modal = null;
+    render();
+}
+
+function delFin(id) {
+    if (!confirm('Excluir este lançamento?')) return;
+    S.financeiro = S.financeiro.filter(x=>x.id!==id);
+    persist();
+    toast('🗑 Lançamento excluído.');
+    render();
+}
+
+function downloadFinCSV() {
+    const todos = S.financeiro.slice().sort((a,b)=>a.data.localeCompare(b.data));
+    const MESES_PT = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+
+    const totalEntrada = todos.filter(t=>t.tipo==='entrada').reduce((a,t)=>a+Number(t.valor),0);
+    const totalSaida   = todos.filter(t=>t.tipo==='saida').reduce((a,t)=>a+Number(t.valor),0);
+    const saldo        = totalEntrada - totalSaida;
+
+    const header = 'Data;Tipo;Categoria;Descrição;Valor (R$);Observação;Registrado por\n';
+    const rows = todos.map(t => [
+        fmtDataFin(t.data),
+        t.tipo==='entrada'?'Entrada':'Saída',
+        t.categoria,
+        t.descricao,
+        Number(t.valor).toFixed(2).replace('.',','),
+        t.obs||'',
+        t.criadoPor||'ADM'
+    ].map(v=>`"${String(v).replace(/"/g,'""')}"`).join(';')).join('\n');
+
+    const rodape = `\n\n"Total Entradas";"${totalEntrada.toFixed(2).replace('.',',')}"\n"Total Saídas";"${totalSaida.toFixed(2).replace('.',',')}"\n"Saldo";"${saldo.toFixed(2).replace('.',',')}"\n`;
+
+    const bom = '﻿'; // BOM para Excel reconhecer UTF-8
+    const blob = new Blob([bom + header + rows + rodape], { type:'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const hoje = new Date().toISOString().slice(0,10);
+    a.href = url; a.download = `hallel-financeiro-${hoje}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast('📥 Relatório baixado!');
 }
 
 // ════════════════════════════════════════════════════
