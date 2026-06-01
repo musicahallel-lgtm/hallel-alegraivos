@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/leoecarla/hallel-music/.claude/health-check.sh",
+            "timeout": 15
+          }
+        ]
+      }
+    ]
+  }
+}
