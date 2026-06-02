@@ -1254,14 +1254,51 @@ async function loadPdfIndex() {
 //  PERSISTENCE  (songs + setlists in localStorage)
 // ═══════════════════════════════════════════════
 let _persistTimer = null;
-let _localDirty   = false;   // true enquanto há edição local ainda não enviada ao Firestore
+let _localDirty   = false;
 let _lastPersistAt = 0;
 
 function persist(immediate) {
-    if (immediate) { _doPersist(); return; }
-    _localDirty = true;      // marca que temos dados locais mais novos
+    // 1. Salva no localStorage IMEDIATAMENTE (sem esperar)
+    try {
+        localStorage.setItem('hl_songs',         JSON.stringify(S.songs));
+        localStorage.setItem('hl_setlists',      JSON.stringify(S.setlists));
+        localStorage.setItem('hl_escalas',       JSON.stringify(S.escalas));
+        localStorage.setItem('hl_members',       JSON.stringify(S.members));
+        localStorage.setItem('hl_activity',      JSON.stringify(S.activityLog.slice(-500)));
+        localStorage.setItem('hl_requests',      JSON.stringify(S.accessRequests.filter(r=>!r._cloud)));
+        localStorage.setItem('hl_availability',  JSON.stringify(S.availability));
+        localStorage.setItem('hl_substitutions', JSON.stringify(S.substitutions));
+        localStorage.setItem('hl_financeiro',    JSON.stringify(S.financeiro));
+        localStorage.setItem('hl_inventario',    JSON.stringify(S.inventario));
+        localStorage.setItem('hl_avisos',        JSON.stringify(S.avisos));
+        localStorage.setItem('hl_evCustom',      JSON.stringify(S.eventosCustom));
+    } catch(e) { console.warn('localStorage:', e); }
+    if (immediate) { _syncFirestore(); return; }
+    // 2. Envia para o Firestore com debounce (não bloqueia a UI)
+    _localDirty = true;
     clearTimeout(_persistTimer);
-    _persistTimer = setTimeout(_doPersist, 400);
+    _persistTimer = setTimeout(_syncFirestore, 100);
+}
+
+function _syncFirestore() {
+    if (!_fbDB) { _localDirty = false; return; }
+    _syncPending = true; _setSyncStatus(false);
+    _lastPersistAt = Date.now();
+    _fbDB.collection('ministerio').doc('dados').set({
+        songs:         S.songs,
+        setlists:      S.setlists,
+        escalas:       S.escalas,
+        members:       S.members,
+        activityLog:   S.activityLog.slice(-200),
+        availability:  S.availability,
+        substitutions: S.substitutions,
+        financeiro:    S.financeiro,
+        inventario:    S.inventario,
+        avisos:        S.avisos,
+        eventosCustom: S.eventosCustom,
+        _updatedAt:    _lastPersistAt,
+    }).then(() => { _syncPending=false; _localDirty=false; _setSyncStatus(true); })
+      .catch(e  => { console.warn('Firestore save:', e); _localDirty=false; _setSyncStatus(true); });
 }
 // ── Chaves ↔ campos do Firestore ─────────────────────────────────
 const FS_KEYS = {
@@ -1292,47 +1329,8 @@ function _normalize() {
     });
 }
 
-// ── persist: localStorage + Firestore ────────────────────────────
-function _doPersist() {
-    // 1. Sempre salva local (cache offline)
-    try {
-        localStorage.setItem('hl_songs',         JSON.stringify(S.songs));
-        localStorage.setItem('hl_setlists',      JSON.stringify(S.setlists));
-        localStorage.setItem('hl_escalas',       JSON.stringify(S.escalas));
-        localStorage.setItem('hl_members',       JSON.stringify(S.members));
-        localStorage.setItem('hl_activity',      JSON.stringify(S.activityLog.slice(-500)));
-        localStorage.setItem('hl_requests',      JSON.stringify(S.accessRequests.filter(r=>!r._cloud)));
-        localStorage.setItem('hl_availability',  JSON.stringify(S.availability));
-        localStorage.setItem('hl_substitutions', JSON.stringify(S.substitutions));
-        localStorage.setItem('hl_financeiro',    JSON.stringify(S.financeiro));
-        localStorage.setItem('hl_inventario',    JSON.stringify(S.inventario));
-        localStorage.setItem('hl_avisos',        JSON.stringify(S.avisos));
-        localStorage.setItem('hl_evCustom',      JSON.stringify(S.eventosCustom));
-    } catch(e) {
-        S.activityLog = S.activityLog.slice(-100);
-        try { localStorage.setItem('hl_activity', JSON.stringify(S.activityLog)); } catch(_) {}
-    }
-    // 2. Sincroniza com Firestore (se disponível)
-    if (!_fbDB) return;
-    _syncPending = true; _setSyncStatus(false);
-    _lastPersistAt = Date.now();
-    const doc = _fbDB.collection('ministerio').doc('dados');
-    doc.set({
-        songs:         S.songs,
-        setlists:      S.setlists,
-        escalas:       S.escalas,
-        members:       S.members,
-        activityLog:   S.activityLog.slice(-200),
-        availability:  S.availability,
-        substitutions: S.substitutions,
-        financeiro:    S.financeiro,
-        inventario:    S.inventario,
-        avisos:        S.avisos,
-        eventosCustom: S.eventosCustom,
-        _updatedAt:    Date.now(),
-    }).then(() => { _syncPending = false; _localDirty = false; _setSyncStatus(true); })
-      .catch(e => { console.warn('Firestore save:', e); _localDirty = false; _setSyncStatus(true); });
-}
+// _doPersist mantido como alias para compatibilidade com código existente
+function _doPersist() { persist(true); }
 
 // ── hydrate: carrega localStorage (offline-first) ─────────────────
 function hydrate() {
