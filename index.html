@@ -1970,6 +1970,7 @@ function modalHtml() {
     if (type==='mission-alert') return missionAlertModal(data);
     if (type==='birthday-alert') return birthdayAlertModal(data);
     if (type==='escala-picker') return escalaPickerModal(data);
+    if (type==='day-picker') return dayPickerModal(data);
     if (type==='member-form')  return memberFormModal(data);
     if (type==='first-access') return firstAccessModal(data);
     if (type==='wa-escala')        return waEscalaModal(data);
@@ -4759,9 +4760,7 @@ function agendaPage() {
             const isMissa = hasRec && recByDate[dateStr].some(e=>e.missa);
             const isMy = hasEv && evByDate[dateStr].some(e => myEscalas.has(e.id));
             const cls = [isToday?'today':'', isAlegrai?'has-alegrai':hasEv?'has-ev':'', hasRec?'has-rec':'', isMissa?'rec-missa':'', isPast?'past':'', isMy?'my-escala':''].filter(Boolean).join(' ');
-            const clickEv  = hasEv  ? `openEvModal('${evByDate[dateStr][0].id}')` : '';
-            const clickRec = hasRec ? `openRecModal('${recByDate[dateStr][0].recId}','${dateStr}')` : '';
-            const click = (hasEv||hasRec) ? `onclick="${clickEv||clickRec}"` : '';
+            const click = (hasEv||hasRec) ? `onclick="openDayModal('${dateStr}')"` : '';
             calHtml += `<div class="cal-day ${cls}" title="${tip}" ${click}>${day}</div>`;
         }
         calHtml += '</div></div>';
@@ -4853,6 +4852,60 @@ function openRecModal(recId, dateStr) {
     const ev = { id: recId+'-'+dateStr, recId, title: rec.title, start: dateStr, end: dateStr,
                  horario: rec.horario, recurring: true, dateLabel: label };
     S.modal = {type:'evento', data:ev}; S.evTab='escala'; render();
+}
+
+function eventsOnDate(dateStr) {
+    const evs  = EVENTOS_2026.filter(ev => dateStr >= ev.start && dateStr <= ev.end);
+    const recs = REC_2026.filter(e => e.start === dateStr);
+    return { evs, recs };
+}
+
+function openDayModal(dateStr) {
+    const { evs, recs } = eventsOnDate(dateStr);
+    const total = evs.length + recs.length;
+    if (total === 0) return;
+    if (total === 1) {                       // só um evento → abre direto
+        if (evs.length) openEvModal(evs[0].id);
+        else openRecModal(recs[0].recId, dateStr);
+        return;
+    }
+    S.modal = { type:'day-picker', data:{ dateStr } };   // vários → mostra opções
+    render();
+}
+
+function dayPickerModal(data) {
+    const dateStr = data.dateStr;
+    const { evs, recs } = eventsOnDate(dateStr);
+    const [y,mo,d] = dateStr.split('-');
+    const titulo = `${parseInt(d)} de ${MESES_PT[parseInt(mo)-1]}`;
+    const rows = [...evs.map(ev=>({ev,rec:false})), ...recs.map(ev=>({ev,rec:true}))];
+
+    function row(item) {
+        const ev = item.ev;
+        const esc = S.escalas[ev.id];
+        const temEsc = EV_INSTR.some(({k})=>esc?.[k]);
+        const onclick = item.rec ? `openRecModal('${ev.recId}','${dateStr}')` : `openEvModal('${ev.id}')`;
+        const loc = (esc?.local || ev.local || '').trim();
+        return `<button class="ep-row" onclick="${onclick}">
+            <div class="ep-row-main">
+                <div class="ep-row-title">${ev.alegrai?'⭐ ':''}${ev.title}</div>
+                <div class="ep-row-meta">${ev.horario?'⏰ '+ev.horario:'📅 '+titulo}${loc?' · 📍 '+loc.replace(/</g,'&lt;'):''}</div>
+            </div>
+            <span class="ep-tag ${temEsc?'ok':''}">${temEsc?'✅ Com escala':'+ Escalar'}</span>
+        </button>`;
+    }
+
+    return `<div class="backdrop" onclick="closeModal(event)">
+    <div class="modal" style="max-width:520px">
+        <div class="modal-hd">
+            <div class="modal-title">📅 ${titulo}</div>
+            <button class="close-btn" onclick="closeModal()">✕</button>
+        </div>
+        <div class="modal-body">
+            <p style="color:var(--muted);font-size:13px;margin-bottom:14px">${rows.length} eventos neste dia — selecione para montar a escala.</p>
+            ${rows.map(row).join('')}
+        </div>
+    </div></div>`;
 }
 
 function openEscalaPicker() { S.modal = {type:'escala-picker', data:{q:''}}; render(); }
