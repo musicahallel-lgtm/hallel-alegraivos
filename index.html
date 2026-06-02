@@ -1254,8 +1254,12 @@ async function loadPdfIndex() {
 //  PERSISTENCE  (songs + setlists in localStorage)
 // ═══════════════════════════════════════════════
 let _persistTimer = null;
+let _localDirty   = false;   // true enquanto há edição local ainda não enviada ao Firestore
+let _lastPersistAt = 0;
+
 function persist(immediate) {
     if (immediate) { _doPersist(); return; }
+    _localDirty = true;      // marca que temos dados locais mais novos
     clearTimeout(_persistTimer);
     _persistTimer = setTimeout(_doPersist, 400);
 }
@@ -1311,6 +1315,7 @@ function _doPersist() {
     // 2. Sincroniza com Firestore (se disponível)
     if (!_fbDB) return;
     _syncPending = true; _setSyncStatus(false);
+    _lastPersistAt = Date.now();
     const doc = _fbDB.collection('ministerio').doc('dados');
     doc.set({
         songs:         S.songs,
@@ -1325,8 +1330,8 @@ function _doPersist() {
         avisos:        S.avisos,
         eventosCustom: S.eventosCustom,
         _updatedAt:    Date.now(),
-    }).then(() => { _syncPending = false; _setSyncStatus(true); })
-      .catch(e => { console.warn('Firestore save:', e); _setSyncStatus(true); });
+    }).then(() => { _syncPending = false; _localDirty = false; _setSyncStatus(true); })
+      .catch(e => { console.warn('Firestore save:', e); _localDirty = false; _setSyncStatus(true); });
 }
 
 // ── hydrate: carrega localStorage (offline-first) ─────────────────
@@ -1392,6 +1397,10 @@ function _escutaFirestore() {
         if (!snap.exists) return;
         const d = snap.data();
         if (!d) return;
+        // Ignora se temos edição local ainda não enviada (evita sobrescrever dados recém-adicionados)
+        if (_localDirty) return;
+        // Ignora snapshots mais antigos que nosso último persist (evita race condition)
+        if (_lastPersistAt && d._updatedAt && d._updatedAt < _lastPersistAt) return;
         if (d.songs)         S.songs          = d.songs;
         if (d.setlists)      S.setlists       = d.setlists;
         if (d.escalas)       S.escalas        = d.escalas;
