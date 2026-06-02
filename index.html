@@ -2387,6 +2387,7 @@ function modalHtml() {
     if (type==='nova-atividade') return novaAtividadeModal(data);
     if (type==='member-form')  return memberFormModal(data);
     if (type==='first-access') return firstAccessModal(data);
+    if (type==='bem-vindo')    return bemVindoModal(data);
     if (type==='wa-escala')        return waEscalaModal(data);
     if (type==='sub-picker')       return subPickerModal(data);
     if (type==='sub-request')      return subRequestModal(data);
@@ -3746,10 +3747,61 @@ function saveFirstAccess(memberId) {
     member.firstAccessDone = true;
     S.currentMember = member;
     persist();
+    // Abre modal de boas-vindas; ao fechar, mostra missões se houver
+    S.modal = { type:'bem-vindo', data:{ member } };
+    render();
+}
+
+function bemVindoModal({ member }) {
+    const primeiroNome = member.name.split(' ')[0];
+    const instrLabel = (EV_INSTR.find(x=>x.k===member.instruments?.[0])||{}).label || '';
+    return `<div class="mission-backdrop" onclick="">
+    <div class="mission-card" style="max-width:460px;text-align:center;background:linear-gradient(160deg,#0a1a0f 0%,#0d1f2d 100%);border:2px solid rgba(0,150,63,.4)">
+
+        <div style="margin-bottom:18px">
+            <div class="home-brand" style="margin:0 auto 16px">
+                <img src="logo.png" alt="Hallel">
+            </div>
+            <div style="font-size:28px;font-weight:900;color:#FFD400;letter-spacing:.5px;margin-bottom:4px">
+                Bem-vindo(a), ${primeiroNome}! 🙌
+            </div>
+            <div style="font-size:13px;color:rgba(255,255,255,.6)">
+                Ministério de Música Hallel — Alegraivos
+            </div>
+        </div>
+
+        <div style="background:rgba(0,150,63,.12);border:1px solid rgba(0,150,63,.3);border-left:4px solid #00963F;border-radius:12px;padding:16px 18px;margin-bottom:20px;text-align:left">
+            <div style="font-size:13px;color:rgba(255,255,255,.85);line-height:1.7">
+                Você agora faz parte do nosso time de louvor. Que sua missão aqui seja sempre com alegria, dedicação e amor a Deus. 🎵
+            </div>
+            ${instrLabel ? `<div style="margin-top:8px;font-size:12px;color:var(--purple-light)">🎼 Você toca: <b>${instrLabel}</b></div>` : ''}
+        </div>
+
+        <div style="background:rgba(255,212,0,.08);border:1px solid rgba(255,212,0,.25);border-radius:10px;padding:14px 16px;margin-bottom:22px">
+            <div style="font-size:12px;color:rgba(255,255,255,.5);text-transform:uppercase;letter-spacing:.8px;margin-bottom:6px">Versículo</div>
+            <div style="font-size:14px;color:#ffe066;font-style:italic;line-height:1.6">
+                "Cantai ao Senhor um cântico novo, pois Ele fez maravilhas."
+            </div>
+            <div style="font-size:11px;color:rgba(255,255,255,.4);margin-top:6px">— Salmo 98:1</div>
+        </div>
+
+        <div style="font-size:12px;color:rgba(255,255,255,.45);margin-bottom:18px;line-height:1.6">
+            Use este app para acompanhar suas <b style="color:rgba(255,255,255,.7)">escalas</b>, estudar as <b style="color:rgba(255,255,255,.7)">músicas</b>,
+            ver os <b style="color:rgba(255,255,255,.7)">set lists</b> e a <b style="color:rgba(255,255,255,.7)">agenda</b> do ministério. Bom uso! 🙏
+        </div>
+
+        <button class="mission-btn" onclick="fecharBemVindo('${member.id}')"
+            style="background:linear-gradient(90deg,#00963F,#2db85a)">
+            ✨ Começar a usar o app
+        </button>
+    </div></div>`;
+}
+
+function fecharBemVindo(memberId) {
+    const member = S.members.find(m=>m.id===memberId);
     S.modal = null;
     render();
-    toast(`✅ Tudo certo! Bem-vindo ao ministério, ${member.name}! 🙏`);
-    setTimeout(() => showMissionAlert(member), 600);
+    if (member) setTimeout(() => showMissionAlert(member), 400);
 }
 
 // ── Trocar senha (para membros já logados) ────────────────────────
