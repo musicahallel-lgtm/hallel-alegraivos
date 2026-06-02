@@ -2077,6 +2077,7 @@ function header() {
             ${isMembro() ? `<button class="btn btn-sm" style="background:rgba(255,212,0,.22);border:1px solid rgba(255,212,0,.45);color:#ffe066;font-size:11px" onclick="showMissionAlert(S.currentMember)">🎯 Ver Missões</button>` : ''}
             ${FIREBASE_CFG ? `<span id="sync-status" title="Sincronizado" style="font-size:16px;opacity:.8;cursor:default">☁️</span>` : ''}
             <span class="role-badge ${S.role}">${roleLabel}</span>
+            ${S.currentMember ? `<button class="btn btn-sm" onclick="openTrocarSenha()" style="background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.25);color:rgba(255,255,255,.85)" title="Trocar senha">${ic('warn',15)}</button>` : ''}
             <button class="btn btn-sm" onclick="doLogout()" style="background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.25);color:rgba(255,255,255,.85)">Sair</button>
         </div>
     </div>`;
@@ -2184,6 +2185,7 @@ function modalHtml() {
     if (type==='sub-request')      return subRequestModal(data);
     if (type==='sub-result')       return subResultModal(data);
     if (type==='fin-add')          return finAddModal(data);
+    if (type==='trocar-senha')     return trocarSenhaModal();
     if (type==='inv-add')          return invAddModal(data);
     return '';
 }
@@ -3399,19 +3401,35 @@ function firstAccessModal(member) {
                     value="${member.whatsapp||''}"
                     style="background:rgba(255,255,255,.07);border-color:rgba(255,255,255,.15);color:#fff;font-size:15px"
                     onkeydown="if(event.key==='Enter')document.getElementById('fa-email').focus()">
-                <div style="font-size:11px;color:var(--muted);margin-top:4px">Número com DDD — usado para comunicação do ministério</div>
             </div>
             <div>
-                <label style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;display:block;margin-bottom:6px">📧 Email principal</label>
+                <label style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;display:block;margin-bottom:6px">📧 Email</label>
                 <input class="field" id="fa-email" type="email" placeholder="seu@email.com"
                     value="${member.email||''}"
                     style="background:rgba(255,255,255,.07);border-color:rgba(255,255,255,.15);color:#fff;font-size:15px"
-                    onkeydown="if(event.key==='Enter')saveFirstAccess('${member.id}')">
+                    onkeydown="if(event.key==='Enter')document.getElementById('fa-pass').focus()">
                 <div style="font-size:11px;color:var(--muted);margin-top:4px">Usado para recuperação de senha</div>
+            </div>
+            <div>
+                <label style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;display:block;margin-bottom:6px">🔑 Escolha sua senha</label>
+                <div style="position:relative">
+                    <input class="field" id="fa-pass" type="password" placeholder="Mínimo 4 caracteres"
+                        style="background:rgba(255,255,255,.07);border-color:rgba(255,255,255,.15);color:#fff;font-size:15px;padding-right:48px"
+                        onkeydown="if(event.key==='Enter')document.getElementById('fa-pass2').focus()">
+                    <button type="button" onclick="(function(){const f=document.getElementById('fa-pass');f.type=f.type==='password'?'text':'password';})()"
+                        style="position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:rgba(255,255,255,.5);font-size:18px;padding:4px;touch-action:manipulation">👁</button>
+                </div>
+                <div style="font-size:11px;color:var(--muted);margin-top:4px">Você decide — só você vai saber</div>
+            </div>
+            <div>
+                <label style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;display:block;margin-bottom:6px">🔑 Confirme a senha</label>
+                <input class="field" id="fa-pass2" type="password" placeholder="Digite a senha novamente"
+                    style="background:rgba(255,255,255,.07);border-color:rgba(255,255,255,.15);color:#fff;font-size:15px"
+                    onkeydown="if(event.key==='Enter')saveFirstAccess('${member.id}')">
             </div>
         </div>
         <button class="mission-btn" onclick="saveFirstAccess('${member.id}')">
-            ✅ Salvar e continuar
+            ✅ Salvar e entrar
         </button>
     </div></div>`;
 }
@@ -3419,19 +3437,73 @@ function firstAccessModal(member) {
 function saveFirstAccess(memberId) {
     const whats = document.getElementById('fa-whats')?.value?.trim();
     const email = document.getElementById('fa-email')?.value?.trim().toLowerCase();
-    if (!whats) { toast('⚠️ Informe seu número de WhatsApp.'); return; }
+    const pass  = document.getElementById('fa-pass')?.value?.trim();
+    const pass2 = document.getElementById('fa-pass2')?.value?.trim();
+    if (!whats)  { toast('⚠️ Informe seu WhatsApp.'); return; }
     if (!email || !email.includes('@')) { toast('⚠️ Informe um email válido.'); return; }
+    if (!pass || pass.length < 4) { toast('⚠️ Escolha uma senha com pelo menos 4 caracteres.'); return; }
+    if (pass !== pass2) { toast('⚠️ As senhas não conferem.'); return; }
     const member = S.members.find(m=>m.id===memberId);
     if (!member) return;
     member.whatsapp = whats;
-    member.email = email;
+    member.email    = email;
+    member.pass     = pass;   // senha escolhida pelo próprio usuário
     member.firstAccessDone = true;
     S.currentMember = member;
     persist();
     S.modal = null;
     render();
-    toast(`✅ Cadastro completo! Bem-vindo ao ministério, ${member.name}! 🙏`);
+    toast(`✅ Tudo certo! Bem-vindo ao ministério, ${member.name}! 🙏`);
     setTimeout(() => showMissionAlert(member), 600);
+}
+
+// ── Trocar senha (para membros já logados) ────────────────────────
+function openTrocarSenha() {
+    S.modal = { type:'trocar-senha', data:{} };
+    render();
+}
+function trocarSenhaModal() {
+    return `<div class="backdrop" onclick="closeModal(event)">
+    <div class="modal" style="max-width:380px">
+        <div class="modal-hd">
+            <div class="modal-title">${ic('warn',18)} Trocar Senha</div>
+            <button class="close-btn" onclick="closeModal()">${ic('close',20)}</button>
+        </div>
+        <div class="modal-body" style="display:flex;flex-direction:column;gap:14px">
+            <div>
+                <label style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;display:block;margin-bottom:5px">Senha atual</label>
+                <input class="field" id="ts-atual" type="password" placeholder="••••••••">
+            </div>
+            <div>
+                <label style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;display:block;margin-bottom:5px">Nova senha</label>
+                <input class="field" id="ts-nova" type="password" placeholder="Mínimo 4 caracteres">
+            </div>
+            <div>
+                <label style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;display:block;margin-bottom:5px">Confirmar nova senha</label>
+                <input class="field" id="ts-nova2" type="password" placeholder="Repita a nova senha">
+            </div>
+        </div>
+        <div class="modal-ft">
+            <button class="btn btn-ghost" onclick="closeModal()">Cancelar</button>
+            <button class="btn btn-primary" onclick="salvarTrocarSenha()">${ic('check',16)} Salvar</button>
+        </div>
+    </div></div>`;
+}
+function salvarTrocarSenha() {
+    const atual = document.getElementById('ts-atual')?.value?.trim();
+    const nova  = document.getElementById('ts-nova')?.value?.trim();
+    const nova2 = document.getElementById('ts-nova2')?.value?.trim();
+    const member = S.currentMember;
+    if (!member) return;
+    if (atual !== member.pass)  { toast('⚠️ Senha atual incorreta.'); return; }
+    if (!nova || nova.length < 4) { toast('⚠️ Nova senha precisa ter pelo menos 4 caracteres.'); return; }
+    if (nova !== nova2) { toast('⚠️ As senhas não conferem.'); return; }
+    // Atualiza senha no array de membros
+    const m = S.members.find(x=>x.id===member.id);
+    if (m) { m.pass = nova; S.currentMember = m; }
+    persist();
+    S.modal = null; render();
+    toast('✅ Senha alterada com sucesso! 🔑');
 }
 
 // ── Mission Alert Modal ──
