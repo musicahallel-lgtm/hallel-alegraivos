@@ -1461,6 +1461,12 @@ function accessRequestScreen() {
             <input class="field" id="req-nasc" type="date" style="background:#f5f5f5;border-color:#ddd;color:#111">
         </div>
         <div class="login-field">
+            <label>👕 Tamanho da camisa</label>
+            <select class="field" id="req-camisa" style="background:#f5f5f5;border-color:#ddd;color:#111">
+                ${['','PP','P','M','G','GG','XG','XGG'].map(t=>`<option value="${t}">${t||'Selecione…'}</option>`).join('')}
+            </select>
+        </div>
+        <div class="login-field">
             <label>Mensagem (opcional)</label>
             <input class="field" id="req-msg" type="text" placeholder="Ex: Toco violão há 3 anos..." style="background:#f5f5f5;border-color:#ddd;color:#111">
         </div>
@@ -1480,13 +1486,14 @@ function submitAccessRequest() {
     const whats = document.getElementById('req-whats')?.value?.trim();
     const email = document.getElementById('req-email')?.value?.trim().toLowerCase();
     const nasc  = document.getElementById('req-nasc')?.value || '';
+    const camisa= document.getElementById('req-camisa')?.value || '';
     const msg   = document.getElementById('req-msg')?.value?.trim();
     if (!name)  { showReqErr('Informe seu nome completo.'); return; }
     if (!whats) { showReqErr('Informe seu WhatsApp.'); return; }
     // Check duplicate
     const dup = S.accessRequests.find(r => r.name.toLowerCase()===name.toLowerCase() && r.status==='pending');
     if (dup) { showReqErr('Já existe uma solicitação pendente com este nome.'); return; }
-    S.accessRequests.push({ id:'rq'+uid(), name, instrument:instr, whatsapp:whats, email, nascimento:nasc, msg, at:Date.now(), status:'pending' });
+    S.accessRequests.push({ id:'rq'+uid(), name, instrument:instr, whatsapp:whats, email, nascimento:nasc, camisa, msg, at:Date.now(), status:'pending' });
     persist();
     document.getElementById('req-ok').classList.add('show');
     document.getElementById('req-btn').style.display = 'none';
@@ -2839,6 +2846,7 @@ function membrosPage() {
                         @${m.user}
                         ${m.whatsapp?`<span style="margin-left:6px;color:var(--muted)">· 📱 ${m.whatsapp}</span>`:''}
                         ${m.email?`<span style="margin-left:6px;color:var(--muted)">· 📧 ${m.email}</span>`:`<span style="margin-left:6px;color:#f87171;font-size:11px">⚠️ sem email</span>`}
+                        ${m.camisa?`<span style="margin-left:6px;color:var(--muted)">· 👕 ${m.camisa}</span>`:''}
                         ${!m.firstAccessDone?`<span style="margin-left:6px;background:rgba(241,90,36,.15);border:1px solid rgba(241,90,36,.3);color:#f97316;border-radius:8px;padding:1px 7px;font-size:11px">⏳ aguardando 1º acesso</span>`:''}
                     </div>
                     <div class="member-meta" style="margin-top:2px">
@@ -2891,7 +2899,7 @@ function approveRequest(rqId) {
     const rq = S.accessRequests.find(r=>r.id===rqId); if(!rq) return;
     // Pre-fill member form with request data
     const newMember = { id:null, name:rq.name, instrument:rq.instrument,
-        whatsapp:rq.whatsapp, email:rq.email, nascimento:rq.nascimento||'', user:'', pass:'' };
+        whatsapp:rq.whatsapp, email:rq.email, nascimento:rq.nascimento||'', camisa:rq.camisa||'', user:'', pass:'' };
     rq.status = 'approved';
     persist();
     S.modal = { type:'member-form', data: newMember };
@@ -2975,9 +2983,17 @@ function memberFormModal(data) {
                         <input class="field" id="mf-email" type="email" placeholder="Ex: raquel@email.com" value="${data.email||''}">
                     </div>
                 </div>
-                <div>
-                    <label style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;display:block;margin-bottom:4px">🎂 Data de nascimento</label>
-                    <input class="field" id="mf-nasc" type="date" value="${data.nascimento||''}">
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+                    <div>
+                        <label style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;display:block;margin-bottom:4px">🎂 Nascimento</label>
+                        <input class="field" id="mf-nasc" type="date" value="${data.nascimento||''}">
+                    </div>
+                    <div>
+                        <label style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;display:block;margin-bottom:4px">👕 Camisa</label>
+                        <select class="field" id="mf-camisa">
+                            ${['','PP','P','M','G','GG','XG','XGG'].map(t=>`<option value="${t}" ${(data.camisa||'')===t?'selected':''}>${t||'—'}</option>`).join('')}
+                        </select>
+                    </div>
                 </div>
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
                     <div>
@@ -3009,6 +3025,7 @@ function saveMember(id) {
     const whats  = document.getElementById('mf-whats')?.value?.trim();
     const email  = document.getElementById('mf-email')?.value?.trim().toLowerCase();
     const nasc   = document.getElementById('mf-nasc')?.value || '';
+    const camisa = document.getElementById('mf-camisa')?.value || '';
     const user   = document.getElementById('mf-user')?.value?.trim().toLowerCase();
     const pass   = document.getElementById('mf-pass')?.value?.trim();
     const typeEl = document.querySelector('input[name="mf-type"]:checked');
@@ -3019,9 +3036,9 @@ function saveMember(id) {
     if (conflict) { toast('⚠️ Esse nome de usuário já existe.'); return; }
     if (id) {
         const m = S.members.find(x=>x.id===id);
-        if (m) { m.name=name; m.instruments=instrs; m.instrument=instrs[0]; m.whatsapp=whats; m.email=email; m.nascimento=nasc; m.user=user; m.pass=pass; m.memberType=memberType; }
+        if (m) { m.name=name; m.instruments=instrs; m.instrument=instrs[0]; m.whatsapp=whats; m.email=email; m.nascimento=nasc; m.camisa=camisa; m.user=user; m.pass=pass; m.memberType=memberType; }
     } else {
-        S.members.push({ id:'mb'+uid(), name, instruments:instrs, instrument:instrs[0], whatsapp:whats, email, nascimento:nasc, user, pass, memberType });
+        S.members.push({ id:'mb'+uid(), name, instruments:instrs, instrument:instrs[0], whatsapp:whats, email, nascimento:nasc, camisa, user, pass, memberType });
     }
     persist(); closeModal(); render();
     toast(id ? `✅ ${name} atualizado!` : `✅ ${name} cadastrado no ministério!`);
