@@ -1114,24 +1114,31 @@ function _loadScript(src) {
     });
 }
 async function initFirebase() {
-    if (!FIREBASE_CFG || !FIREBASE_CFG.apiKey) return; // desativado
+    if (!FIREBASE_CFG || !FIREBASE_CFG.apiKey) return;
     try {
         await _loadScript('https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js');
         await _loadScript('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js');
         firebase.initializeApp(FIREBASE_CFG);
         _fbDB = firebase.firestore();
-        // Carrega dados da nuvem (substitui cache local se houver dados mais novos)
+
+        // ── Carrega dados apenas na abertura (NUNCA sobrescreve durante a sessão) ──
         await carregaFirestore();
-        // Escuta mudanças em tempo real feitas por outros aparelhos
-        _escutaFirestore();
-        // Escuta solicitações de acesso separadamente (coleção própria)
+
+        // ── Solicitações de acesso: listener separado (append-only, não sobrescreve outros dados) ──
         _fbDB.collection('solicitacoes').onSnapshot(snap => {
             const cloud = snap.docs.map(d => ({ ...d.data(), id: d.id, _cloud: true }));
+            // Mantém solicitações locais + atualiza cloud
             const locais = S.accessRequests.filter(r => !r._cloud);
             S.accessRequests = [...locais, ...cloud];
-            // Não re-renderiza se há um modal aberto (evita apagar campos que o usuário está preenchendo)
+            // Só re-renderiza se não há modal aberto (evita apagar campos sendo preenchidos)
             if (S.role && !S.modal && (S.page === 'membros' || S.page === 'inicio')) render();
         }, err => console.warn('Firestore solicitacoes:', err));
+
+        // NOTA: _escutaFirestore() foi removido intencionalmente.
+        // O sync em tempo real de dados gerais causava race conditions (dados sumindo).
+        // Estratégia atual: carrega do Firestore na abertura, escreve a cada persist().
+        // Outros ADMs recebem as mudanças na próxima abertura do app.
+
     } catch (e) { console.warn('Firebase indisponível:', e); }
 }
 // Envia uma solicitação para a nuvem (chamado no submit)
