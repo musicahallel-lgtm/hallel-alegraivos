@@ -2,7 +2,7 @@
 // Mantém o app instalável e funcionando offline. Os dados continuam
 // 100% locais no aparelho (localStorage / IndexedDB) — nada é enviado.
 
-const CACHE = 'hallel-v3';
+const CACHE = 'hallel-v4';
 const CORE = [
   './',
   './index.html',
