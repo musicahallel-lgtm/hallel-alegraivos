@@ -1279,6 +1279,49 @@ let _persistTimer  = null;
 let _localDirty    = false;
 let _lastPersistAt = parseInt(localStorage.getItem('hl_lastPersist')||'0');
 
+// ══════════════════════════════════════════════════════════════════
+//  PROTEÇÃO DE DADOS — 3 camadas para nunca perder o que foi salvo
+// ══════════════════════════════════════════════════════════════════
+
+// Camada 1: snapshot de segurança rotativo (último estado conhecido bom)
+function _salvaSnapshot() {
+    try {
+        const snap = { songs:S.songs, members:S.members, setlists:S.setlists,
+            financeiro:S.financeiro, inventario:S.inventario, at:Date.now() };
+        localStorage.setItem('hl_snapshot', JSON.stringify(snap));
+    } catch(e) {}
+}
+
+// Camada 2: verifica se a nuvem está tentando apagar dados que temos localmente
+function _dadosSegurosPraAplicar(d) {
+    const CAMPOS = ['songs','members','setlists','financeiro','inventario'];
+    for (const campo of CAMPOS) {
+        const local = S[campo];
+        const remoto = d[campo];
+        if (!Array.isArray(local) || !Array.isArray(remoto)) continue;
+        // Nunca aceita dado remoto que tenha MENOS itens que o local
+        // (exceto se o local está vazio — primeira carga)
+        if (local.length > 0 && remoto.length < local.length) {
+            console.warn(`[PROTEÇÃO] ${campo}: remoto(${remoto.length}) < local(${local.length}) — ignorado`);
+            return false;
+        }
+    }
+    return true;
+}
+
+// Camada 3: restaura snapshot se o estado atual parecer vazio após operação
+function _verificaIntegridade(contexto) {
+    const snap = (() => { try { return JSON.parse(localStorage.getItem('hl_snapshot')||'null'); } catch{ return null; }})();
+    if (!snap) return;
+    const problemasArr = ['songs','members','setlists'];
+    for (const campo of problemasArr) {
+        if (snap[campo]?.length > 0 && S[campo].length === 0) {
+            console.warn(`[PROTEÇÃO] ${campo} esvaziou após ${contexto} — restaurando snapshot`);
+            S[campo] = snap[campo];
+        }
+    }
+}
+
 function _salvaLocal() {
     try {
         const now = Date.now();
@@ -1305,6 +1348,7 @@ function _salvaLocal() {
 
 function persist(immediate) {
     _salvaLocal();           // sempre instantâneo
+    _salvaSnapshot();        // [PROTEÇÃO] salva estado bom antes de qualquer sync
     _localDirty = true;      // protege contra listener até o Firestore confirmar
     clearTimeout(_persistTimer);
     if (immediate) { _syncFirestore(); return; }
@@ -1397,6 +1441,11 @@ function hydrate() {
 
 // ── carregaFirestore: puxa dados da nuvem e re-renderiza ──────────
 function _aplicaSnapshot(d) {
+    // [PROTEÇÃO] Camada 2: nunca aceita dado remoto que apague itens locais
+    if (!_dadosSegurosPraAplicar(d)) {
+        console.warn('[PROTEÇÃO] Snapshot remoto rejeitado — mantendo dados locais');
+        return;
+    }
     if (d.songs) {
         // Restaura cifras do localStorage (não enviadas ao Firestore por serem longas)
         const localSongs = (() => { try { return JSON.parse(localStorage.getItem('hl_songs')||'[]'); } catch{ return []; }})();
@@ -6580,6 +6629,8 @@ function maybeInitMixer(song) {
         }
     });
     persist();
+    // [PROTEÇÃO] Camada 3: verifica se nada foi perdido durante a inicialização
+    _verificaIntegridade('inicialização');
     await openDB();
     await loadPdfIndex();
     // Load YouTube IFrame API (async, no blocking)
