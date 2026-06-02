@@ -1746,6 +1746,12 @@ function svgIcon(key, size=32) {
 function ic(key, size=18) {
     return `<svg viewBox="0 0 24 24" width="${size}" height="${size}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-.18em;flex-shrink:0" aria-hidden="true">${ICONS[key]||''}</svg>`;
 }
+// Ícone de instrumento (reusa os glifos do mixer) — para uso DENTRO do app
+const INSTR_GLYPH = { violao:'acoustic', teclado:'piano', bateria:'drum', baixo:'guitar', guitarra:'guitar', sopro:'wind', vocal1:'mic', vocal2:'mic', vocal3:'mic', animador:'mic' };
+function instrIcon(k, size=15) {
+    const g = STEM_ICONS[INSTR_GLYPH[k]] || STEM_ICONS.speaker;
+    return `<svg viewBox="0 0 24 24" width="${size}" height="${size}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-.18em;flex-shrink:0" aria-hidden="true">${g}</svg>`;
+}
 
 // ── Versão DUOTONE (preenchida em dois tons) — usada nos tiles coloridos ──
 const F1 = 'rgba(255,255,255,.18)';  // preenchimento suave
@@ -2883,11 +2889,11 @@ function membrosPage() {
         </div>` : mbs.map(m => {
             const escalas = getMemberEscalas(m.name).filter(e=>e.daysUntil>=0);
             return `<div class="member-card">
-                <div class="member-avatar">${instrEmoji[(m.instruments||[m.instrument])[0]]||'🎵'}</div>
+                <div class="member-avatar">${instrIcon((m.instruments||[m.instrument])[0], 24)}</div>
                 <div class="member-info">
                     <div class="member-name">${m.name}</div>
                     <div class="member-meta">
-                        ${(m.instruments||[m.instrument]).map(i=>`<span style="display:inline-flex;align-items:center;gap:3px;background:rgba(0,150,63,.12);border:1px solid rgba(0,150,63,.2);border-radius:6px;padding:1px 7px;font-size:11px;font-weight:600;margin-right:3px">${instrEmoji[i]||'🎵'} ${instrLabel[i]||i}</span>`).join('')}
+                        ${(m.instruments||[m.instrument]).map(i=>`<span style="display:inline-flex;align-items:center;gap:4px;background:rgba(0,150,63,.12);border:1px solid rgba(0,150,63,.2);border-radius:6px;padding:1px 7px;font-size:11px;font-weight:600;margin-right:3px">${instrIcon(i,12)} ${instrLabel[i]||i}</span>`).join('')}
                     </div>
                     <div class="member-meta" style="margin-top:3px">
                         ${m.accessRole==='adm'?`<span style="display:inline-flex;align-items:center;gap:3px;border-radius:6px;padding:1px 7px;font-size:11px;font-weight:800;margin-right:4px;background:rgba(241,90,36,.18);border:1px solid rgba(241,90,36,.45);color:#fb7a3c">🛡️ ADM</span>`:''}
@@ -3129,7 +3135,7 @@ function minhaEscalaPage() {
             <div style="margin-top:12px;padding:10px 12px;background:rgba(255,255,255,.04);border-radius:8px;border:1px solid var(--border)">
                 <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:7px">👥 Time escalado</div>
                 <div style="display:flex;flex-wrap:wrap;gap:6px">
-                    ${teamMembers.map(({k,emoji,label})=>`<span style="display:inline-flex;align-items:center;gap:4px;background:rgba(255,255,255,.05);border:1px solid var(--border);border-radius:8px;padding:3px 9px;font-size:12px;color:var(--muted)"><span>${instrEmoji2[k]||emoji}</span><span>${esc[k]}</span></span>`).join('')}
+                    ${teamMembers.map(({k,emoji,label})=>`<span style="display:inline-flex;align-items:center;gap:5px;background:rgba(255,255,255,.05);border:1px solid var(--border);border-radius:8px;padding:3px 9px;font-size:12px;color:var(--muted)">${instrIcon(k,13)}<span>${esc[k]}</span></span>`).join('')}
                 </div>
             </div>` : '';
 
@@ -3391,10 +3397,10 @@ function subPickerModal({ evId, fromId, rolesStr, roleLabel, evTitle, evDate }) 
                         const instrEmoji2 = {violao:'🎸',teclado:'🎹',bateria:'🥁',baixo:'🎸',guitarra:'🎸',sopro:'🎷',vocal1:'🎤',vocal2:'🎤',vocal3:'🎤',animador:'🎙'};
                         return `<button class="btn btn-ghost" style="text-align:left;display:flex;align-items:center;gap:10px;padding:10px 12px"
                             onclick="indicarSubstituto('${evId}','${fromId}','${m.id}','${rolesStr}','${roleLabel}','${evTitle}','${evDate}')">
-                            <span style="font-size:18px">${instrEmoji2[(m.instruments||[m.instrument])[0]]||'🎵'}</span>
+                            <span style="display:inline-flex">${instrIcon((m.instruments||[m.instrument])[0],20)}</span>
                             <div>
                                 <div style="font-size:14px;font-weight:700">${m.name}</div>
-                                <div style="font-size:11px;color:var(--muted)">${(m.instruments||[m.instrument]).map(k=>instrEmoji2[k]||'🎵').join(' ')}</div>
+                                <div style="font-size:11px;color:var(--muted);display:flex;gap:5px">${(m.instruments||[m.instrument]).map(k=>instrIcon(k,13)).join('')}</div>
                             </div>
                         </button>`;
                     }).join('')}
@@ -3659,8 +3665,8 @@ function atividadePage() {
         const isColab = (m.memberType||'membro') === 'colaborador';
         return `<div style="background:var(--bg2);border:1px solid ${isColab?'rgba(245,158,11,.2)':'var(--border)'};border-left:4px solid ${isColab?'#f59e0b':'var(--purple)'};border-radius:var(--radius);padding:20px;margin-bottom:14px">
             <div style="display:flex;align-items:flex-start;gap:16px;flex-wrap:wrap">
-                <div style="width:52px;height:52px;border-radius:50%;background:${isColab?'rgba(245,158,11,.2)':'var(--purple)'};display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0">
-                    ${instrEmoji[(m.instruments||[m.instrument])[0]]||'🎵'}
+                <div style="width:52px;height:52px;border-radius:50%;background:${isColab?'rgba(245,158,11,.2)':'var(--purple)'};display:flex;align-items:center;justify-content:center;color:#fff;flex-shrink:0">
+                    ${instrIcon((m.instruments||[m.instrument])[0],26)}
                 </div>
                 <div style="flex:1;min-width:200px">
                     <div style="display:flex;align-items:center;gap:8px;margin-bottom:2px">
@@ -4485,11 +4491,11 @@ function relatorioPage() {
         const filled = EV_INSTR.filter(({k})=>esc[k]);
         if (!filled.length) return compact ? '' : `<span style="color:var(--muted);font-size:12px;font-style:italic">Sem escala definida</span>`;
         if (compact) {
-            return filled.map(({k})=>`<span style="font-size:11px;margin-right:6px">${instrEmoji[k]} ${esc[k]}</span>`).join('');
+            return filled.map(({k})=>`<span style="font-size:11px;margin-right:6px;display:inline-flex;align-items:center;gap:3px">${instrIcon(k,12)} ${esc[k]}</span>`).join('');
         }
         return `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:4px 12px;margin-top:6px">
             ${filled.map(({k})=>`<div style="display:flex;gap:6px;align-items:center;font-size:12px">
-                <span style="color:var(--muted);white-space:nowrap">${instrEmoji[k]} ${instrLabel[k]}</span>
+                <span style="color:var(--muted);white-space:nowrap;display:inline-flex;align-items:center;gap:4px">${instrIcon(k,12)} ${instrLabel[k]}</span>
                 <span style="font-weight:700;color:var(--text)">${esc[k]}</span>
             </div>`).join('')}
         </div>`;
@@ -4818,7 +4824,7 @@ function agendaPage() {
             // Show team for member when escalated
             let teamHtml = '';
             if (isMine && esc) {
-                const team = EV_INSTR.filter(({k})=>esc[k]).map(({k,emoji,label})=>`<span style="font-size:11px;color:var(--muted)">${emoji} <b style="color:var(--text)">${esc[k]}</b></span>`);
+                const team = EV_INSTR.filter(({k})=>esc[k]).map(({k,emoji,label})=>`<span style="font-size:11px;color:var(--muted);display:inline-flex;align-items:center;gap:4px">${instrIcon(k,12)} <b style="color:var(--text)">${esc[k]}</b></span>`);
                 if (team.length) teamHtml = `<div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:6px;padding:6px 8px;background:rgba(0,150,63,.06);border-radius:6px;border:1px solid rgba(0,150,63,.15)">${team.join('')}</div>`;
             }
             listHtml += `<div class="ev-item ${ev.alegrai?'ev-alegrai-card':''} ${isMine&&!isPast?'ev-mine':''} ${isUp&&!ev.alegrai&&!isMine?'upcoming':''} ${isPast?'past':''}" onclick="openEvModal('${ev.id}')" style="cursor:pointer">
@@ -5023,7 +5029,7 @@ function eventoModal(ev) {
                 const thisDl = instrMatch.length ? `dl-${k}-${ev.id}` : dlId;
                 return `${instrMatch.length?`<datalist id="${thisDl}">${instrMatch.map(m=>`<option value="${m.name}">`).join('')}</datalist>`:''}
                 <div class="escal-row">
-                    <div class="escal-inst">${emoji} ${label}</div>
+                    <div class="escal-inst">${instrIcon(k,15)} ${label}</div>
                     <input class="escal-input" type="text" placeholder="—" list="${thisDl}"
                         value="${(esc[k]||'').replace(/"/g,'&quot;')}"
                         onchange="saveEvEscalado('${ev.id}','${k}',this.value)"
@@ -5060,7 +5066,7 @@ function eventoModal(ev) {
                     const val = esc[k]||'';
                     const isMine = myName && val.toLowerCase().includes(myName);
                     return `<div class="escal-row" style="pointer-events:none">
-                        <div class="escal-inst">${emoji} ${label}</div>
+                        <div class="escal-inst">${instrIcon(k,15)} ${label}</div>
                         <div class="escal-input" style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:${isMine?'800':'500'};color:${isMine?'var(--purple-light)':'var(--text)'};background:${isMine?'rgba(0,150,63,.1)':'transparent'};border-color:${isMine?'rgba(0,150,63,.3)':'var(--border)'}">
                             ${isMine?'⭐ ':''}${val}
                         </div>
