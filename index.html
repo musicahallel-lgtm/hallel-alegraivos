@@ -1079,7 +1079,8 @@ const COORD_WHATS = '5592993243020';
 // Cole aqui o firebaseConfig do seu projeto para ATIVAR. Enquanto for null, o app
 // funciona 100% local (sem nuvem, sem peso extra) e usa só o WhatsApp.
 const FIREBASE_CFG = null;
-// Ex.: const FIREBASE_CFG = { apiKey:"...", authDomain:"...", databaseURL:"https://...firebaseio.com", projectId:"..." };
+// Ex.: const FIREBASE_CFG = { apiKey:"...", authDomain:"...", projectId:"hallel-app-557a7", appId:"..." };
+// (Usa Cloud Firestore — coleção "solicitacoes")
 
 let _fbDB = null;
 function _loadScript(src) {
@@ -1090,31 +1091,30 @@ function _loadScript(src) {
     });
 }
 async function initFirebase() {
-    if (!FIREBASE_CFG || !FIREBASE_CFG.apiKey || !FIREBASE_CFG.databaseURL) return; // desativado
+    if (!FIREBASE_CFG || !FIREBASE_CFG.apiKey) return; // desativado
     try {
         await _loadScript('https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js');
-        await _loadScript('https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js');
+        await _loadScript('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js');
         firebase.initializeApp(FIREBASE_CFG);
-        _fbDB = firebase.database();
+        _fbDB = firebase.firestore();
         // Escuta a "caixinha" de solicitações na nuvem e funde na lista local
-        _fbDB.ref('solicitacoes').on('value', snap => {
-            const val = snap.val() || {};
-            const cloud = Object.entries(val).map(([id, r]) => ({ ...r, id, _cloud: true }));
+        _fbDB.collection('solicitacoes').onSnapshot(snap => {
+            const cloud = snap.docs.map(d => ({ ...d.data(), id: d.id, _cloud: true }));
             const locais = S.accessRequests.filter(r => !r._cloud);
             S.accessRequests = [...locais, ...cloud];
             if (S.role && (S.page === 'membros' || S.page === 'inicio')) render();
-        });
+        }, err => console.warn('Firestore listen:', err));
     } catch (e) { console.warn('Firebase indisponível:', e); }
 }
 // Envia uma solicitação para a nuvem (chamado no submit)
 function fbEnviarSolicitacao(req) {
     if (!_fbDB) return false;
-    try { _fbDB.ref('solicitacoes').push(req); return true; }
+    try { _fbDB.collection('solicitacoes').add(req); return true; }
     catch (e) { console.warn('Falha ao enviar solicitação à nuvem:', e); return false; }
 }
 // Remove da nuvem quando aprovada/recusada
 function fbRemoverSolicitacao(id) {
-    if (_fbDB && id) { try { _fbDB.ref('solicitacoes/' + id).remove(); } catch (e) {} }
+    if (_fbDB && id) { try { _fbDB.collection('solicitacoes').doc(id).delete(); } catch (e) {} }
 }
 // ─────────────────────────────────────────────────────────
 
