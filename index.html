@@ -1476,30 +1476,41 @@ function _aplicaSnapshot(d) {
     _salvaLocal();
 }
 
-async function carregaFirestore() {
+async function carregaFirestore(forcar) {
     if (!_fbDB) return;
     try {
         const snap = await _fbDB.collection('ministerio').doc('dados').get();
         if (!snap.exists) {
-            // Nuvem vazia → envia dados locais (primeiro sync)
+            // Nuvem vazia → primeiro sync: envia dados locais
             persist(true); return;
         }
         const d = snap.data();
         const firestoreTs = d._updatedAt || 0;
         const localTs     = parseInt(localStorage.getItem('hl_lastPersist') || '0');
 
-        if (localTs > firestoreTs) {
-            // Local é mais novo (ex: mudanças offline, sessão anterior não sincronizou)
-            // Empurra os dados locais para o Firestore em vez de sobrescrever
-            console.log('Local mais novo que Firestore — enviando dados locais');
-            persist(true);
-        } else {
-            // Firestore é mais novo (outro dispositivo fez alterações) → carrega
+        // Sempre carrega do Firestore se:
+        // - for forçado (ex: botão recarregar)
+        // - Firestore é mais novo
+        // - Firestore tem membros e local não tem (device nunca sincronizou)
+        const firestoreTemMembros = (d.members||[]).length > 0;
+        const localVazio = S.members.length === 0 && S.songs.length <= 5; // só seeds
+        if (forcar || firestoreTs >= localTs || localVazio || firestoreTemMembros) {
             _aplicaSnapshot(d);
             render();
+        } else {
+            // Local genuinamente mais novo (offline e salvou algo) → envia para nuvem
+            persist(true);
         }
         _setSyncStatus(true);
     } catch(e) { console.warn('Firestore load:', e); }
+}
+
+// Recarrega dados do Firestore manualmente (botão para o ADM)
+async function recarregarDados() {
+    if (!_fbDB) { toast('⚠️ Sem conexão com a nuvem.'); return; }
+    _setSyncStatus(false);
+    await carregaFirestore(true);
+    toast('✅ Dados atualizados da nuvem!');
 }
 
 // ── escuta mudanças em tempo real feitas por outros ───────────────
@@ -2281,7 +2292,7 @@ function header() {
             ${S.page==='library'  && isAdm() ? `<button class="btn btn-sm" style="background:rgba(255,255,255,.92);color:#004d20;font-weight:800;box-shadow:0 2px 10px rgba(0,0,0,.25)" onclick="openAdd()">+ Música</button>` : ''}
             ${S.page==='setlists' && isAdm() ? `<button class="btn btn-sm" style="background:rgba(255,255,255,.92);color:#004d20;font-weight:800;box-shadow:0 2px 10px rgba(0,0,0,.25)" onclick="newSL()">+ Set List</button>` : ''}
             ${isMembro() ? `<button class="btn btn-sm" style="background:rgba(255,212,0,.22);border:1px solid rgba(255,212,0,.45);color:#ffe066;font-size:11px" onclick="showMissionAlert(S.currentMember)">🎯 Ver Missões</button>` : ''}
-            ${FIREBASE_CFG ? `<span id="sync-status" title="Sincronizado" style="font-size:16px;opacity:.8;cursor:default">☁️</span>` : ''}
+            ${FIREBASE_CFG ? `<span id="sync-status" onclick="recarregarDados()" title="Clique para atualizar da nuvem" style="font-size:16px;opacity:.8;cursor:pointer">☁️</span>` : ''}
             <span class="role-badge ${S.role}">${roleLabel}</span>
             ${S.currentMember ? `<button class="btn btn-sm" onclick="openTrocarSenha()" style="background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.25);color:rgba(255,255,255,.85)" title="Trocar senha">${ic('warn',15)}</button>` : ''}
             <button class="btn btn-sm" onclick="doLogout()" style="background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.25);color:rgba(255,255,255,.85)">Sair</button>
@@ -6713,6 +6724,19 @@ function maybeInitMixer(song) {
     // Sincronização das solicitações de acesso (se o Firebase estiver configurado)
     initFirebase();
 })();
+
+// ── Recarrega do Firestore quando o app volta ao foco (celular desbloqueado, aba ativada) ──
+let _lastVisibleAt = Date.now();
+document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && _fbDB && S.role) {
+        const mins = (Date.now() - _lastVisibleAt) / 60000;
+        if (mins >= 2) { // só recarrega se ficou 2+ minutos em segundo plano
+            carregaFirestore(true);
+        }
+    } else {
+        _lastVisibleAt = Date.now();
+    }
+});
 
 // ── PWA: registra o service worker (app instalável + offline) ──
 if ('serviceWorker' in navigator) {
