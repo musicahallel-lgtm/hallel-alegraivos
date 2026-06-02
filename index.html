@@ -1078,8 +1078,14 @@ const COORD_WHATS = '5592993243020';
 // ── Firebase (só para SINCRONIZAR as solicitações de acesso entre celulares) ──
 // Cole aqui o firebaseConfig do seu projeto para ATIVAR. Enquanto for null, o app
 // funciona 100% local (sem nuvem, sem peso extra) e usa só o WhatsApp.
-const FIREBASE_CFG = null;
-// Ex.: const FIREBASE_CFG = { apiKey:"...", authDomain:"...", projectId:"hallel-app-557a7", appId:"..." };
+const FIREBASE_CFG = {
+    apiKey: "AIzaSyDB5ZvcKzmuA9L1UJnCYo6KfYCR72Q-dV8",
+    authDomain: "hallel-app-557a7.firebaseapp.com",
+    projectId: "hallel-app-557a7",
+    storageBucket: "hallel-app-557a7.firebasestorage.app",
+    messagingSenderId: "950947639600",
+    appId: "1:950947639600:web:fd8d7af93ca603346c98f5",
+};
 // (Usa Cloud Firestore — coleção "solicitacoes")
 
 let _fbDB = null;
