@@ -1157,6 +1157,13 @@ function fbEnviarSolicitacao(req) {
 // Remove da nuvem quando aprovada/recusada
 function fbRemoverSolicitacao(id) {
     if (_fbDB && id) { try { _fbDB.collection('solicitacoes').doc(id).delete(); } catch (e) {} }
+    // Limpa do backup local também
+    try {
+        const bkp = JSON.parse(localStorage.getItem('hl_requests_cloud_bkp')||'[]');
+        const novo = bkp.filter(r=>r.id!==id);
+        if (novo.length) localStorage.setItem('hl_requests_cloud_bkp', JSON.stringify(novo));
+        else localStorage.removeItem('hl_requests_cloud_bkp');
+    } catch(e) {}
 }
 // ─────────────────────────────────────────────────────────
 
@@ -1283,6 +1290,10 @@ function _salvaLocal() {
         localStorage.setItem('hl_members',       JSON.stringify(S.members));
         localStorage.setItem('hl_activity',      JSON.stringify(S.activityLog.slice(-500)));
         localStorage.setItem('hl_requests',      JSON.stringify(S.accessRequests.filter(r=>!r._cloud)));
+        // Backup de cloud requests para restaurar antes do listener do Firestore disparar
+        const cloudBackup = S.accessRequests.filter(r=>r._cloud && r.status==='pending');
+        if (cloudBackup.length) localStorage.setItem('hl_requests_cloud_bkp', JSON.stringify(cloudBackup));
+        else localStorage.removeItem('hl_requests_cloud_bkp');
         localStorage.setItem('hl_availability',  JSON.stringify(S.availability));
         localStorage.setItem('hl_substitutions', JSON.stringify(S.substitutions));
         localStorage.setItem('hl_financeiro',    JSON.stringify(S.financeiro));
@@ -1360,7 +1371,14 @@ function hydrate() {
         const es = localStorage.getItem('hl_escalas');       if (es) S.escalas         = JSON.parse(es);
         const mb = localStorage.getItem('hl_members');       if (mb) S.members         = JSON.parse(mb);
         const ac = localStorage.getItem('hl_activity');      if (ac) S.activityLog     = JSON.parse(ac).slice(-500);
-        const rq = localStorage.getItem('hl_requests');      if (rq) S.accessRequests  = JSON.parse(rq);
+        const rq  = localStorage.getItem('hl_requests');      if (rq) S.accessRequests = JSON.parse(rq);
+        // Restaura backup de pedidos cloud (evita sumiço durante recarga antes do listener disparar)
+        const rqBkp = localStorage.getItem('hl_requests_cloud_bkp');
+        if (rqBkp) {
+            const bkp = JSON.parse(rqBkp);
+            // Só adiciona os que ainda não estão no array (evita duplicatas)
+            bkp.forEach(r => { if (!S.accessRequests.find(x=>x.id===r.id)) S.accessRequests.push(r); });
+        }
         const av = localStorage.getItem('hl_availability');  if (av) S.availability    = JSON.parse(av);
         const sb = localStorage.getItem('hl_substitutions'); if (sb) S.substitutions   = JSON.parse(sb);
         const fi = localStorage.getItem('hl_financeiro');    if (fi) S.financeiro      = JSON.parse(fi);
