@@ -1782,27 +1782,51 @@ function doRecovery() {
         return;
     }
 
-    // Validação OK — mostra a senha mascarada e abre WhatsApp pra confirmar
-    const senhaMask = member.pass.slice(0,2) + '•'.repeat(Math.max(0, member.pass.length-2));
-    const txt = encodeURIComponent(
+    // Validação OK — tenta enviar por email primeiro, WhatsApp como backup
+    const btn2 = document.getElementById('rec-btn');
+    if (btn2) { btn2.disabled=true; btn2.textContent='Enviando…'; }
+
+    const waMsg = encodeURIComponent(
         '🔑 *Recuperação de senha — Hallel*\n\n'
         + 'Olá, *' + member.name + '*! Sua senha atual é:\n'
         + '*' + member.pass + '*\n\n'
         + 'Acesse: https://musicahallel-lgtm.github.io/hallel-alegraivos/\n'
         + '_Recomendamos trocar a senha após entrar._'
     );
+    const waUrl = 'https://wa.me/' + ('55'+member.whatsapp.replace(/\D/g,'')) + '?text=' + waMsg;
 
-    const okDiv = document.getElementById('rec-ok');
-    const okMsg = document.getElementById('rec-ok-msg');
-    if (okDiv) { okDiv.style.display='block'; }
-    if (okMsg) okMsg.innerHTML = '✅ Identidade confirmada!<br><br>'
-        + 'Sua senha: <b style="font-size:18px;letter-spacing:2px">' + senhaMask + '</b><br><br>'
-        + '<small style="color:#666">A senha completa foi enviada via WhatsApp para que você possa copiar.</small>';
-    const btn = document.getElementById('rec-btn');
-    if (btn) btn.style.display='none';
+    function _mostrarSucesso(via) {
+        const senhaMask = member.pass.slice(0,2) + '•'.repeat(Math.max(0, member.pass.length-2));
+        const okDiv = document.getElementById('rec-ok');
+        const okMsg = document.getElementById('rec-ok-msg');
+        if (okDiv) okDiv.style.display='block';
+        if (okMsg) okMsg.innerHTML = '✅ Identidade confirmada!<br><br>'
+            + 'Sua senha: <b style="font-size:18px;letter-spacing:2px">' + senhaMask + '</b><br><br>'
+            + '<small style="color:#666">A senha completa foi enviada ' + via + '.</small>';
+        if (btn2) btn2.style.display='none';
+    }
 
-    // Envia a senha completa via WhatsApp (abre o app do celular)
-    window.open('https://wa.me/' + (member.whatsapp?.replace(/\D/g,'')?('55'+member.whatsapp.replace(/\D/g,'')):(COORD_WHATS)) + '?text=' + txt, '_blank');
+    // Tenta email via EmailJS
+    if (window.emailjs) {
+        emailjs.init(EMAILJS_CFG.publicKey);
+        emailjs.send(EMAILJS_CFG.serviceId, EMAILJS_CFG.templateId, {
+            to_email:    member.email,
+            member_name: member.name,
+            username:    member.user,
+            password:    member.pass,
+            app_url:     'https://musicahallel-lgtm.github.io/hallel-alegraivos/',
+        }).then(() => {
+            _mostrarSucesso('para o seu email <b>' + member.email.replace(/(.{2}).+(@.+)/, '$1***$2') + '</b>');
+        }).catch(err => {
+            console.warn('EmailJS falhou, usando WhatsApp:', err);
+            window.open(waUrl, '_blank');
+            _mostrarSucesso('via WhatsApp');
+        });
+    } else {
+        // EmailJS não carregou, usa WhatsApp direto
+        window.open(waUrl, '_blank');
+        _mostrarSucesso('via WhatsApp');
+    }
 }
 
 function showRecErr(msg) {
