@@ -1315,12 +1315,18 @@ function _syncFirestore() {
     if (!_fbDB) { _localDirty = false; return; }
     _syncPending = true; _setSyncStatus(false);
     _lastPersistAt = Date.now();
+    // Prepara songs sem cifras longas para o Firestore (cifras ficam só no localStorage)
+    // Isso reduz o doc de ~87KB para ~15KB para 80 músicas
+    const songsLight = S.songs.map(s => {
+        const { chords, ...rest } = s;
+        return chords && chords.length > 500 ? rest : s;  // cifras curtas ficam, longas não
+    });
     _fbDB.collection('ministerio').doc('dados').set({
-        songs:         S.songs,
+        songs:         songsLight,
         setlists:      S.setlists,
         escalas:       S.escalas,
         members:       S.members,
-        activityLog:   S.activityLog.slice(-200),
+        activityLog:   S.activityLog.slice(-50),   // era -200, agora -50
         availability:  S.availability,
         substitutions: S.substitutions,
         financeiro:    S.financeiro,
@@ -1391,7 +1397,17 @@ function hydrate() {
 
 // ── carregaFirestore: puxa dados da nuvem e re-renderiza ──────────
 function _aplicaSnapshot(d) {
-    if (d.songs)         S.songs          = d.songs;
+    if (d.songs) {
+        // Restaura cifras do localStorage (não enviadas ao Firestore por serem longas)
+        const localSongs = (() => { try { return JSON.parse(localStorage.getItem('hl_songs')||'[]'); } catch{ return []; }})();
+        S.songs = d.songs.map(s => {
+            if (!s.chords) {
+                const local = localSongs.find(ls => ls.id === s.id);
+                if (local?.chords) return { ...s, chords: local.chords };
+            }
+            return s;
+        });
+    }
     if (d.setlists)      S.setlists       = d.setlists;
     if (d.escalas)       S.escalas        = d.escalas;
     if (d.members)       S.members        = d.members;
