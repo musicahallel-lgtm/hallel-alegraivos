@@ -956,6 +956,10 @@
             .app-tile:hover .app-icon { transform:translateY(-3px); box-shadow:0 8px 22px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.18); }
         }
 
+        /* Ícones inline em títulos e botões */
+        .section-title svg { margin-right:4px; }
+        .modal-title svg { margin-right:5px; }
+
         /* ── Seletor de escala ── */
         .ep-section { font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:.5px; color:var(--muted); margin:14px 0 8px; }
         .ep-section:first-of-type { margin-top:0; }
@@ -1717,9 +1721,30 @@ const ICONS = {
     financeiro:    '<path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4Z"/>',
     inventario:    '<path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/>',
     'minha-escala':'<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/>',
+    // ── Ícones de interface (ações) ──
+    close:    '<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>',
+    edit:     '<path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/>',
+    trash:    '<path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/>',
+    print:    '<polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/>',
+    download: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>',
+    search:   '<circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>',
+    plus:     '<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>',
+    clock:    '<circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 14"/>',
+    pin:      '<path d="M21 10c0 6-9 12-9 12s-9-6-9-12a9 9 0 0 1 18 0Z"/><circle cx="12" cy="10" r="3"/>',
+    mail:     '<rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 6-10 7L2 6"/>',
+    phone:    '<path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.8 19.8 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.8 19.8 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92Z"/>',
+    star:     '<polygon points="12 2 15 9 22 9.3 16.5 13.8 18.5 21 12 17 5.5 21 7.5 13.8 2 9.3 9 9 12 2"/>',
+    check:    '<polyline points="20 6 9 17 4 12"/>',
+    x:        '<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>',
+    warn:     '<path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>',
+    whatsapp: '<path d="M3 21l1.65-4.5a8 8 0 1 1 3.4 3.05z"/><path d="M9 9.5c0 3 2.5 5.5 5.5 5.5l1-1.5-2-1-1 1c-1 0-2.5-1.5-2.5-2.5l1-1-1-2z" fill="currentColor" stroke="none"/>',
 };
 function svgIcon(key, size=32) {
     return `<svg viewBox="0 0 24 24" width="${size}" height="${size}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[key]||''}</svg>`;
+}
+// Ícone inline para textos/botões (herda a cor; alinha com o texto)
+function ic(key, size=18) {
+    return `<svg viewBox="0 0 24 24" width="${size}" height="${size}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-.18em;flex-shrink:0" aria-hidden="true">${ICONS[key]||''}</svg>`;
 }
 
 // ── Versão DUOTONE (preenchida em dois tons) — usada nos tiles coloridos ──
@@ -1892,7 +1917,7 @@ function libPage() {
     </div>
     <div class="toolbar">
         <div class="search-wrap">
-            <span class="si">🔍</span>
+            <span class="si">${ic('search',16)}</span>
             <input class="search-input" type="text" placeholder="Buscar música ou artista…"
                    value="${esc(S.q)}" oninput="doSearch(this.value)">
         </div>
@@ -2005,7 +2030,7 @@ function detailModal(song) {
                 ${song.bpm?`<div class="meta-it"><span class="meta-lb">BPM</span><span class="meta-vl">${song.bpm}</span></div>`:''}
                 ${song.vozPrincipal?`<div class="meta-it"><span class="meta-lb">🎤 Voz</span><span class="meta-vl">${song.vozPrincipal}</span></div>`:''}
             </div>
-            <button class="close-btn" onclick="closeModal()">✕</button>
+            <button class="close-btn" onclick="closeModal()">${ic('close',20)}</button>
         </div>
         <div class="modal-body">
             <div class="detail-grid">
@@ -2091,7 +2116,7 @@ function detailModal(song) {
                         </div>
                         <div class="pdf-actions">
                             ${pdfUrl?`<a href="${pdfUrl}" download="${song.title}.pdf" class="btn btn-ghost btn-sm">⬇ Baixar PDF</a>`:''}
-                            <button class="btn btn-ghost btn-sm" style="margin-left:auto" onclick="openEdit('${song.id}')">✏️ Substituir</button>
+                            <button class="btn btn-ghost btn-sm" style="margin-left:auto" onclick="openEdit('${song.id}')">${ic('edit',15)} Substituir</button>
                         </div>` : ''}
                     </div>` :
                     `<div class="dsec" style="min-height:160px">
@@ -2108,8 +2133,8 @@ function detailModal(song) {
 
         </div>
         <div class="modal-ft">
-            ${isAdm()?`<button class="btn btn-ghost btn-sm" onclick="openEdit('${song.id}')">✏️ Editar</button>`:''}
-            ${isAdm()?`<button class="btn btn-danger btn-sm" onclick="delSong('${song.id}')">🗑 Excluir</button>`:''}
+            ${isAdm()?`<button class="btn btn-ghost btn-sm" onclick="openEdit('${song.id}')">${ic('edit',15)} Editar</button>`:''}
+            ${isAdm()?`<button class="btn btn-danger btn-sm" onclick="delSong('${song.id}')">${ic('trash',15)} Excluir</button>`:''}
             <button class="btn btn-ghost" onclick="closeModal()">Fechar</button>
         </div>
     </div></div>`;
@@ -2159,8 +2184,8 @@ function addModal(v) {
     return `<div class="backdrop" onclick="closeModal(event)">
     <div class="modal" style="max-width:700px">
         <div class="modal-hd">
-            <div class="modal-title">${isEdit?'✏️ Editar Música':'+ Adicionar Música'}</div>
-            <button class="close-btn" onclick="closeModal()">✕</button>
+            <div class="modal-title">${isEdit?`${ic('edit',18)} Editar Música`:`${ic('plus',18)} Adicionar Música`}</div>
+            <button class="close-btn" onclick="closeModal()">${ic('close',20)}</button>
         </div>
         <div class="modal-body">
             <div class="form-grid">
@@ -2239,11 +2264,11 @@ function slModal(sl) {
             </div>
             <div style="display:flex;gap:6px;flex-wrap:wrap">
                 <button class="btn btn-primary btn-sm" onclick="plFromSL('${sl.id}')">▶ Tocar</button>
-                <button class="btn btn-gold btn-sm"    onclick="openPrint('${sl.id}')">🖨 Imprimir</button>
-                ${isAdm()?`<button class="btn btn-ghost btn-sm" onclick="editSLMeta('${sl.id}')">✏️ Editar</button>`:''}
-                ${isAdm()?`<button class="btn btn-danger btn-sm" onclick="delSL('${sl.id}')">🗑</button>`:''}
+                <button class="btn btn-gold btn-sm"    onclick="openPrint('${sl.id}')">${ic('print',16)} Imprimir</button>
+                ${isAdm()?`<button class="btn btn-ghost btn-sm" onclick="editSLMeta('${sl.id}')">${ic('edit',15)} Editar</button>`:''}
+                ${isAdm()?`<button class="btn btn-danger btn-sm" onclick="delSL('${sl.id}')">${ic('trash',15)}</button>`:''}
             </div>
-            <button class="close-btn" onclick="closeModal()">✕</button>
+            <button class="close-btn" onclick="closeModal()">${ic('close',20)}</button>
         </div>
         <div class="modal-body">
             <div class="sl-editor" style="${!isAdm()?'grid-template-columns:1fr':''}">
@@ -2262,8 +2287,8 @@ function slModal(sl) {
                                     📌 ${block.name}
                                     <span style="opacity:.7;font-weight:400">(${bsongs.length})</span>
                                 </span>
-                                ${isAdm()?`<button class="sl-block-hd-btn" onclick="event.stopPropagation();slRenameBlock('${sl.id}','${block.id}')">✏️</button>`:''}
-                                ${isAdm()?`<button class="sl-block-hd-btn" onclick="event.stopPropagation();slDelBlock('${sl.id}','${block.id}')">🗑</button>`:''}
+                                ${isAdm()?`<button class="sl-block-hd-btn" onclick="event.stopPropagation();slRenameBlock('${sl.id}','${block.id}')">${ic('edit',15)}</button>`:''}
+                                ${isAdm()?`<button class="sl-block-hd-btn" onclick="event.stopPropagation();slDelBlock('${sl.id}','${block.id}')">${ic('trash',15)}</button>`:''}
                             </div>
                             <div class="sl-block-body" data-block-id="${block.id}">
                                 ${bsongs.length===0 ? (isAdm()?`<div class="sl-block-empty">Arraste uma música até aqui, ou clique em + ao lado</div>`:`<div class="sl-block-empty" style="color:var(--muted);font-style:italic">Nenhuma música neste bloco.</div>`) : ''}
@@ -2361,8 +2386,8 @@ function printModal(sl) {
     return `<div class="backdrop" onclick="closeModal(event)">
     <div class="modal" style="max-width:700px">
         <div class="modal-hd">
-            <div class="modal-title">🖨 Imprimir Set List</div>
-            <button class="close-btn" onclick="closeModal()">✕</button>
+            <div class="modal-title">Imprimir Set List</div>
+            <button class="close-btn" onclick="closeModal()">${ic('close',20)}</button>
         </div>
         <div class="modal-body">
             <div class="print-view">
@@ -2421,7 +2446,7 @@ function printModal(sl) {
         </div>
         <div class="modal-ft">
             <button class="btn btn-ghost" onclick="closeModal()">Fechar</button>
-            <button class="btn btn-primary" onclick="window.print()">🖨 Imprimir</button>
+            <button class="btn btn-primary" onclick="window.print()">${ic('print',16)} Imprimir</button>
         </div>
     </div></div>`;
 }
@@ -2608,7 +2633,7 @@ function newSLModal(d) {
     <div class="modal" style="max-width:540px">
         <div class="modal-hd">
             <div class="modal-title">+ Novo Set List</div>
-            <button class="close-btn" onclick="closeModal()">✕</button>
+            <button class="close-btn" onclick="closeModal()">${ic('close',20)}</button>
         </div>
         <div class="modal-body" style="display:flex;flex-direction:column;gap:16px">
             <div class="fg full">
@@ -2880,8 +2905,8 @@ function membrosPage() {
                     </div>
                 </div>
                 <div style="display:flex;gap:6px">
-                    <button class="btn btn-ghost btn-sm btn-icon" title="Editar" onclick="openMemberForm('${m.id}')">✏️</button>
-                    <button class="btn btn-ghost btn-sm btn-icon" title="Excluir" onclick="deleteMember('${m.id}')">🗑</button>
+                    <button class="btn btn-ghost btn-sm btn-icon" title="Editar" onclick="openMemberForm('${m.id}')">${ic('edit',15)}</button>
+                    <button class="btn btn-ghost btn-sm btn-icon" title="Excluir" onclick="deleteMember('${m.id}')">${ic('trash',15)}</button>
                 </div>
             </div>`;
         }).join('')}
@@ -2954,8 +2979,8 @@ function memberFormModal(data) {
     return `<div class="backdrop" onclick="closeModal(event)">
     <div class="modal" style="max-width:460px">
         <div class="modal-hd">
-            <div class="modal-title">${isEdit?'✏️ Editar Membro':'👤 Novo Membro'}</div>
-            <button class="close-btn" onclick="closeModal()">✕</button>
+            <div class="modal-title">${isEdit?`${ic('edit',18)} Editar Membro`:`${ic('membros',18)} Novo Membro`}</div>
+            <button class="close-btn" onclick="closeModal()">${ic('close',20)}</button>
         </div>
         <div class="modal-body">
             <div style="display:flex;flex-direction:column;gap:12px">
@@ -3351,7 +3376,7 @@ function subPickerModal({ evId, fromId, rolesStr, roleLabel, evTitle, evDate }) 
     <div class="modal" style="max-width:440px">
         <div class="modal-hd">
             <div class="modal-title">👤 Indicar Substituto</div>
-            <button class="close-btn" onclick="closeModal()">✕</button>
+            <button class="close-btn" onclick="closeModal()">${ic('close',20)}</button>
         </div>
         <div class="modal-body">
             <div style="background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);border-radius:8px;padding:10px 12px;margin-bottom:16px;font-size:13px">
@@ -3723,7 +3748,7 @@ function atividadePage() {
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:8px">
             <h2 style="font-size:22px;font-weight:800">📊 Atividade do Ministério</h2>
             <button class="btn btn-ghost btn-sm" onclick="if(confirm('Limpar todo o histórico de atividade?')){S.activityLog=[];persist();render();}"
-                style="color:#f87171;border-color:#f87171">🗑 Limpar histórico</button>
+                style="color:#f87171;border-color:#f87171">${ic('trash',15)} Limpar histórico</button>
         </div>
         ${overviewSection}
         ${membrosSection}
@@ -3781,8 +3806,8 @@ function cadastrosPage() {
             </td>
             <td style="padding:12px 10px">
                 <div style="display:flex;gap:4px">
-                    <button class="btn btn-ghost btn-sm btn-icon" title="Editar" onclick="openMemberForm('${m.id}')">✏️</button>
-                    <button class="btn btn-ghost btn-sm btn-icon" title="Excluir" onclick="deleteMember('${m.id}')">🗑</button>
+                    <button class="btn btn-ghost btn-sm btn-icon" title="Editar" onclick="openMemberForm('${m.id}')">${ic('edit',15)}</button>
+                    <button class="btn btn-ghost btn-sm btn-icon" title="Excluir" onclick="deleteMember('${m.id}')">${ic('trash',15)}</button>
                 </div>
             </td>
         </tr>`).join('');
@@ -3859,12 +3884,12 @@ function inventarioPage() {
     return `
     <div class="section-header">
         <div>
-            <h2 class="section-title">📦 Inventário</h2>
+            <h2 class="section-title">${ic('inventario',22)} Inventário</h2>
             <p style="color:var(--muted);font-size:13px;margin-top:2px">Patrimônio do ministério</p>
         </div>
         ${isAdm() ? `<div style="display:flex;gap:8px;flex-wrap:wrap">
-            <button class="btn btn-primary btn-sm" onclick="openInvAdd()">+ Item</button>
-            <button class="btn btn-sm" onclick="printInventario()" style="background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);color:#fff">🖨 Imprimir</button>
+            <button class="btn btn-primary btn-sm" onclick="openInvAdd()">${ic('plus',16)} Item</button>
+            <button class="btn btn-sm" onclick="printInventario()" style="background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);color:#fff">${ic('print',16)} Imprimir</button>
         </div>` : ''}
     </div>
 
@@ -3916,8 +3941,8 @@ function inventarioPage() {
                 ${item.descricao?`<div class="inv-card-desc">${escHtml(item.descricao)}</div>`:''}
                 ${item.obs?`<div class="inv-card-desc" style="font-style:italic;color:var(--muted)">📝 ${escHtml(item.obs)}</div>`:''}
                 ${isAdm()?`<div class="inv-card-ft">
-                    <button class="btn btn-ghost btn-sm" onclick="openInvEdit('${item.id}')">✏️ Editar</button>
-                    <button class="btn btn-danger btn-sm" onclick="delInv('${item.id}')">🗑</button>
+                    <button class="btn btn-ghost btn-sm" onclick="openInvEdit('${item.id}')">${ic('edit',15)} Editar</button>
+                    <button class="btn btn-danger btn-sm" onclick="delInv('${item.id}')">${ic('trash',15)}</button>
                 </div>`:''}
             </div>`;
         }).join('')}
@@ -3931,7 +3956,7 @@ function invAddModal(data) {
     <div class="modal" style="max-width:480px">
         <div class="modal-hd">
             <div class="modal-title">${edit?'Editar Item':'Novo Item'}</div>
-            <button class="close-btn" onclick="closeModal()">✕</button>
+            <button class="close-btn" onclick="closeModal()">${ic('close',20)}</button>
         </div>
         <div class="modal-body">
             <div class="form-group">
@@ -4066,13 +4091,13 @@ function financeiroPage() {
     return `
     <div class="section-header">
         <div>
-            <h2 class="section-title">💰 Financeiro</h2>
+            <h2 class="section-title">${ic('financeiro',22)} Financeiro</h2>
             <p style="color:var(--muted);font-size:13px;margin-top:2px">Prestação de contas do ministério</p>
         </div>
         ${isAdm() ? `<div style="display:flex;gap:8px;flex-wrap:wrap">
-            <button class="btn btn-primary btn-sm" onclick="openFinAdd()">+ Lançamento</button>
-            <button class="btn btn-sm" onclick="printFinanceiro()" style="background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);color:#fff">🖨 Imprimir</button>
-            <button class="btn btn-sm" onclick="downloadFinCSV()" style="background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);color:#fff">⬇ CSV</button>
+            <button class="btn btn-primary btn-sm" onclick="openFinAdd()">${ic('plus',16)} Lançamento</button>
+            <button class="btn btn-sm" onclick="printFinanceiro()" style="background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);color:#fff">${ic('print',16)} Imprimir</button>
+            <button class="btn btn-sm" onclick="downloadFinCSV()" style="background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);color:#fff">${ic('download',16)} CSV</button>
         </div>` : ''}
     </div>
 
@@ -4127,8 +4152,8 @@ function financeiroPage() {
             </div>
             <div class="fin-item-val ${t.tipo}">${t.tipo==='entrada'?'+':'-'} ${fmtBRL(t.valor)}</div>
             ${isAdm()?`<div class="fin-item-actions">
-                <button class="btn btn-ghost btn-sm" onclick="openFinEdit('${t.id}')">✏️</button>
-                <button class="btn btn-danger btn-sm" onclick="delFin('${t.id}')">🗑</button>
+                <button class="btn btn-ghost btn-sm" onclick="openFinEdit('${t.id}')">${ic('edit',15)}</button>
+                <button class="btn btn-danger btn-sm" onclick="delFin('${t.id}')">${ic('trash',15)}</button>
             </div>`:''}
         </div>`).join('')}
     </div>
@@ -4148,7 +4173,7 @@ function finAddModal(data) {
     <div class="modal" style="max-width:460px">
         <div class="modal-hd">
             <div class="modal-title">${edit?'Editar Lançamento':'Novo Lançamento'}</div>
-            <button class="close-btn" onclick="closeModal()">✕</button>
+            <button class="close-btn" onclick="closeModal()">${ic('close',20)}</button>
         </div>
         <div class="modal-body">
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
@@ -4827,9 +4852,9 @@ function agendaPage() {
 
     return `<div class="agenda-wrap">
         <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:18px">
-            <h2 style="font-size:22px;font-weight:800">📅 Agenda Hallel 2026</h2>
+            <h2 style="font-size:22px;font-weight:800;display:inline-flex;align-items:center;gap:7px">${ic('agenda',20)} Agenda Hallel 2026</h2>
             ${isAdm()
-                ? `<button class="btn btn-primary btn-sm" onclick="openEscalaPicker()">🎼 Fazer Escala</button>`
+                ? `<button class="btn btn-primary btn-sm" onclick="openEscalaPicker()">${ic('setlists',16)} Fazer Escala</button>`
                 : `<span style="font-size:13px;color:var(--muted)">${EVENTOS_2026.length} eventos + semanais</span>`}
         </div>
         ${recSumHtml}
@@ -4899,7 +4924,7 @@ function dayPickerModal(data) {
     <div class="modal" style="max-width:520px">
         <div class="modal-hd">
             <div class="modal-title">📅 ${titulo}</div>
-            <button class="close-btn" onclick="closeModal()">✕</button>
+            <button class="close-btn" onclick="closeModal()">${ic('close',20)}</button>
         </div>
         <div class="modal-body">
             <p style="color:var(--muted);font-size:13px;margin-bottom:14px">${rows.length} eventos neste dia — selecione para montar a escala.</p>
@@ -4949,8 +4974,8 @@ function escalaPickerModal(data) {
     return `<div class="backdrop" onclick="closeModal(event)">
     <div class="modal" style="max-width:560px">
         <div class="modal-hd">
-            <div class="modal-title">🎼 Fazer Escala</div>
-            <button class="close-btn" onclick="closeModal()">✕</button>
+            <div class="modal-title">Fazer Escala</div>
+            <button class="close-btn" onclick="closeModal()">${ic('close',20)}</button>
         </div>
         <div class="modal-body">
             <p style="color:var(--muted);font-size:13px;margin-bottom:12px">Selecione o evento para montar a escala.</p>
@@ -5098,7 +5123,7 @@ function eventoModal(ev) {
                     ${ev.recurring?` · <span style="color:var(--gold)">Evento semanal</span>`:''}
                 </div>
             </div>
-            <button class="close-btn" onclick="closeModal()">✕</button>
+            <button class="close-btn" onclick="closeModal()">${ic('close',20)}</button>
         </div>
         <div class="modal-body">
             ${localHtml}
@@ -5183,7 +5208,7 @@ _— Ministério de Música Hallel_`;
     <div class="modal" style="max-width:520px">
         <div class="modal-hd">
             <div class="modal-title">📲 Notificar via WhatsApp</div>
-            <button class="close-btn" onclick="closeModal()">✕</button>
+            <button class="close-btn" onclick="closeModal()">${ic('close',20)}</button>
         </div>
         <div class="modal-body" style="display:flex;flex-direction:column;gap:18px">
 
@@ -5447,7 +5472,7 @@ function playlistPage() {
 
     return `
     <div class="pl-topbar">
-        <h2 class="section-title">▶ Playlist</h2>
+        <h2 class="section-title">${ic('playlist',18)} Playlist</h2>
         <div class="pl-tabs">
             <button class="ptab ${plat==='youtube'?'active':''}" onclick="plSetPlatform('youtube')">▶ YouTube</button>
             <button class="ptab ${plat==='spotify'?'active':''}" onclick="plSetPlatform('spotify')">● Spotify</button>
