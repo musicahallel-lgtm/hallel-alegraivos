@@ -980,6 +980,23 @@
         }
         .ep-tag.ok { background:rgba(0,150,63,.15); border-color:rgba(0,150,63,.35); color:var(--purple-light); }
 
+        /* ── Avisos Urgentes ── */
+        .aviso-banner {
+            margin-bottom:14px; border-radius:var(--radius); padding:14px 16px;
+            display:flex; align-items:flex-start; gap:12px; position:relative;
+            animation:avisoIn .3s ease;
+        }
+        @keyframes avisoIn { from{opacity:0;transform:translateY(-8px)} to{opacity:1;transform:none} }
+        .aviso-urgente { background:linear-gradient(135deg,rgba(239,68,68,.18),rgba(239,68,68,.08)); border:1px solid rgba(239,68,68,.4); border-left:4px solid #ef4444; }
+        .aviso-ensaio  { background:linear-gradient(135deg,rgba(251,191,36,.18),rgba(251,191,36,.08)); border:1px solid rgba(251,191,36,.4); border-left:4px solid #f59e0b; }
+        .aviso-info    { background:linear-gradient(135deg,rgba(99,102,241,.18),rgba(99,102,241,.08)); border:1px solid rgba(99,102,241,.4); border-left:4px solid #6366f1; }
+        .aviso-icon { font-size:24px; flex-shrink:0; margin-top:1px; }
+        .aviso-body { flex:1; min-width:0; }
+        .aviso-titulo { font-size:15px; font-weight:800; margin-bottom:3px; }
+        .aviso-texto  { font-size:13px; color:var(--muted); line-height:1.5; }
+        .aviso-meta   { font-size:11px; color:var(--muted); margin-top:5px; }
+        .aviso-actions { display:flex; gap:6px; margin-top:8px; flex-wrap:wrap; }
+
         /* ── Print media ── */
         @media print {
             body * { visibility:hidden; }
@@ -1155,6 +1172,7 @@ const S = {
     _relMonth: new Date().getMonth(), // selected month for report (0=Jan)
     availability: {},    // { evId: { memberId: 'can'|'cannot' } }
     substitutions: [],   // [{ id, fromId, fromName, toId, toName, evId, evTitle, evDate, role, roleLabel, status:'pending'|'accepted'|'rejected', at, notifiedFrom, notifiedTo }]
+    avisos: [],          // [{ id, titulo, texto, tipo:'urgente'|'info'|'ensaio', criadoPor, criadoEm }]
     financeiro: [],      // [{ id, tipo:'entrada'|'saida', categoria, descricao, valor, data, obs, criadoPor, criadoEm }]
     _finFiltro: 'todos', // 'todos'|'entrada'|'saida'
     _finMes: '',         // '' = todos os meses, ou 'YYYY-MM'
@@ -1283,6 +1301,7 @@ function _doPersist() {
         localStorage.setItem('hl_substitutions', JSON.stringify(S.substitutions));
         localStorage.setItem('hl_financeiro',    JSON.stringify(S.financeiro));
         localStorage.setItem('hl_inventario',    JSON.stringify(S.inventario));
+        localStorage.setItem('hl_avisos',        JSON.stringify(S.avisos));
     } catch(e) {
         S.activityLog = S.activityLog.slice(-100);
         try { localStorage.setItem('hl_activity', JSON.stringify(S.activityLog)); } catch(_) {}
@@ -1301,6 +1320,7 @@ function _doPersist() {
         substitutions: S.substitutions,
         financeiro:    S.financeiro,
         inventario:    S.inventario,
+        avisos:        S.avisos,
         _updatedAt:    Date.now(),
     }).then(() => { _syncPending = false; _setSyncStatus(true); })
       .catch(e => { console.warn('Firestore save:', e); _setSyncStatus(true); });
@@ -1319,6 +1339,7 @@ function hydrate() {
         const sb = localStorage.getItem('hl_substitutions'); if (sb) S.substitutions   = JSON.parse(sb);
         const fi = localStorage.getItem('hl_financeiro');    if (fi) S.financeiro      = JSON.parse(fi);
         const iv = localStorage.getItem('hl_inventario');    if (iv) S.inventario      = JSON.parse(iv);
+        const av = localStorage.getItem('hl_avisos');        if (av) S.avisos          = JSON.parse(av);
     } catch(e) { console.error(e); }
     _normalize();
 }
@@ -1342,6 +1363,7 @@ async function carregaFirestore() {
         if (d.substitutions) S.substitutions  = d.substitutions;
         if (d.financeiro)    S.financeiro     = d.financeiro;
         if (d.inventario)    S.inventario     = d.inventario;
+        if (d.avisos)        S.avisos         = d.avisos;
         _normalize();
         // Salva no localStorage como cache
         localStorage.setItem('hl_songs',         JSON.stringify(S.songs));
@@ -1374,6 +1396,7 @@ function _escutaFirestore() {
         if (d.substitutions) S.substitutions  = d.substitutions;
         if (d.financeiro)    S.financeiro     = d.financeiro;
         if (d.inventario)    S.inventario     = d.inventario;
+        if (d.avisos)        S.avisos         = d.avisos;
         _normalize();
         // Restaura membro logado (pode ter sido atualizado)
         if (S.currentMember) {
@@ -1888,7 +1911,8 @@ function html() {
     if (S.page === 'financeiro')   page = financeiroPage();
     if (S.page === 'inventario')   page = inventarioPage();
     if (S.page === 'minha-escala') page = minhaEscalaPage();
-    return header() + `<div class="main">${page}</div>` + (S.modal ? modalHtml() : '');
+    const avisosBanner = S.page !== 'inicio' ? avisosHtml() : '';
+    return header() + `<div class="main">${avisosBanner}${page}</div>` + (S.modal ? modalHtml() : '');
 }
 
 // ── Conjunto de ícones SVG personalizados (traço único, identidade própria) ──
@@ -1965,7 +1989,7 @@ function inicioPage() {
     const pending = S.accessRequests.filter(r=>r.status==='pending').length;
     const T = {
         'minha-escala':{ i:'🎯', l:'Minha Escala', bg:'linear-gradient(145deg,#FFD400,#F15A24)' },
-        library:       { i:'🎸', l:'Músicas',      bg:'linear-gradient(145deg,#2db85a,#006b2d)' },
+        library:       { i:'🎸', l:'Biblioteca',   bg:'linear-gradient(145deg,#2db85a,#006b2d)' },
         setlists:      { i:'📋', l:'Set Lists',    bg:'linear-gradient(145deg,#fb923c,#c2410c)' },
         playlist:      { i:'▶️', l:'Playlist',     bg:'linear-gradient(145deg,#f87171,#b91c1c)' },
         agenda:        { i:'📅', l:'Agenda',       bg:'linear-gradient(145deg,#60a5fa,#1d4ed8)' },
@@ -1997,19 +2021,27 @@ function inicioPage() {
         </button>`;
     }).join('');
 
+    const avisosInicio = avisosHtml();
     return `
     <div class="home-brand"><img src="logo.png" alt="Hallel"></div>
     <div class="home-hero">
         <h2>${saud}${nome?`, ${nome}`:''}! 👋</h2>
         <p>Ministério de Música Hallel — escolha uma área</p>
     </div>
+    ${avisosInicio}
+    ${isAdm() ? `<div style="text-align:center;margin-bottom:16px">
+        <button class="btn btn-sm" onclick="openNovoAviso()"
+            style="background:rgba(239,68,68,.15);border:1px solid rgba(239,68,68,.4);color:#f87171;font-weight:700">
+            ${ic('warn',15)} Publicar aviso urgente
+        </button>
+    </div>` : ''}
     <div class="app-grid">${tiles}</div>`;
 }
 
 function bottomNav() {
     const adm = [
         { p:'inicio',       i:'🏠', l:'Início'    },
-        { p:'library',      i:'🎸', l:'Músicas'  },
+        { p:'library',      i:'🎸', l:'Biblioteca' },
         { p:'setlists',     i:'📋', l:'Set Lists' },
         { p:'agenda',       i:'📅', l:'Agenda'    },
         { p:'membros',      i:'👥', l:'Membros', badge: S.accessRequests.filter(r=>r.status==='pending').length },
@@ -2020,7 +2052,7 @@ function bottomNav() {
     ];
     const geral = [
         { p:'inicio',     i:'🏠', l:'Início'    },
-        { p:'library',    i:'🎸', l:'Músicas'   },
+        { p:'library',    i:'🎸', l:'Biblioteca' },
         { p:'setlists',   i:'📋', l:'Set Lists' },
         { p:'playlist',   i:'▶️', l:'Playlist'  },
         { p:'agenda',     i:'📅', l:'Agenda'    },
@@ -2106,7 +2138,7 @@ function libPage() {
     });
     return `
     <div class="section-header">
-        <h2 class="section-title">Biblioteca</h2>
+        <h2 class="section-title">Biblioteca de Músicas</h2>
         <span class="section-count">${S.songs.length} música${S.songs.length!==1?'s':''}</span>
         ${isAdm() ? `<button class="btn btn-primary btn-sm mobile-fab" onclick="openAdd()">+ Música</button>` : ''}
     </div>
@@ -2199,6 +2231,7 @@ function modalHtml() {
     if (type==='sub-result')       return subResultModal(data);
     if (type==='fin-add')          return finAddModal(data);
     if (type==='trocar-senha')     return trocarSenhaModal();
+    if (type==='novo-aviso')       return novoAvisoModal(data);
     if (type==='inv-add')          return invAddModal(data);
     return '';
 }
@@ -4713,6 +4746,115 @@ function printInventario() {
     </body></html>`);
     win.document.close();
     win.focus();
+}
+
+// ════════════════════════════════════════════════════
+//  AVISOS URGENTES
+// ════════════════════════════════════════════════════
+const AVISO_TIPOS = {
+    urgente: { label:'🚨 Urgente',  cor:'#ef4444', cls:'aviso-urgente' },
+    ensaio:  { label:'🎵 Ensaio',   cor:'#f59e0b', cls:'aviso-ensaio'  },
+    info:    { label:'📢 Informativo', cor:'#6366f1', cls:'aviso-info'  },
+};
+
+function avisosHtml() {
+    if (!S.avisos || !S.avisos.length) return '';
+    const dismissed = JSON.parse(localStorage.getItem('hl_avisos_dismissed')||'[]');
+    const visiveis = S.avisos.filter(a => !dismissed.includes(a.id));
+    if (!visiveis.length) return '';
+    return visiveis.map(a => {
+        const t = AVISO_TIPOS[a.tipo] || AVISO_TIPOS.info;
+        const data = new Date(a.criadoEm).toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
+        return `<div class="aviso-banner ${t.cls}">
+            <div class="aviso-body">
+                <div class="aviso-titulo" style="color:${t.cor}">${t.label} — ${escHtml(a.titulo)}</div>
+                <div class="aviso-texto">${escHtml(a.texto).replace(/\n/g,'<br>')}</div>
+                <div class="aviso-meta">${a.criadoPor} · ${data}</div>
+                <div class="aviso-actions">
+                    <button class="btn btn-sm" onclick="dismissAviso('${a.id}')"
+                        style="background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);color:var(--muted);font-size:12px">
+                        ${ic('check',13)} Entendido
+                    </button>
+                    ${isAdm() ? `<button class="btn btn-sm btn-danger" onclick="delAviso('${a.id}')" style="font-size:12px">
+                        ${ic('trash',13)} Remover para todos
+                    </button>` : ''}
+                </div>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+function dismissAviso(id) {
+    const d = JSON.parse(localStorage.getItem('hl_avisos_dismissed')||'[]');
+    if (!d.includes(id)) d.push(id);
+    localStorage.setItem('hl_avisos_dismissed', JSON.stringify(d));
+    render();
+}
+
+function delAviso(id) {
+    if (!confirm('Remover este aviso para todos?')) return;
+    S.avisos = S.avisos.filter(a => a.id !== id);
+    persist();
+    toast('Aviso removido.');
+    render();
+}
+
+function openNovoAviso() {
+    S.modal = { type:'novo-aviso', data:{ tipo:'urgente' } };
+    render();
+}
+
+function novoAvisoModal(data) {
+    const tipo = data?.tipo || 'urgente';
+    return `<div class="backdrop" onclick="closeModal(event)">
+    <div class="modal" style="max-width:480px">
+        <div class="modal-hd">
+            <div class="modal-title">${ic('warn',18)} Novo Aviso</div>
+            <button class="close-btn" onclick="closeModal()">${ic('close',20)}</button>
+        </div>
+        <div class="modal-body" style="display:flex;flex-direction:column;gap:14px">
+            <div>
+                <label class="form-label">Tipo</label>
+                <div style="display:flex;gap:8px;flex-wrap:wrap">
+                    ${Object.entries(AVISO_TIPOS).map(([k,v])=>`
+                    <button onclick="S.modal.data.tipo='${k}';render()" class="btn btn-sm"
+                        style="flex:1;${tipo===k?`background:${v.cor};color:#fff;border-color:${v.cor}`:'background:var(--bg3);border:1px solid var(--border);color:var(--muted)'}">
+                        ${v.label}
+                    </button>`).join('')}
+                </div>
+            </div>
+            <div>
+                <label class="form-label">Título *</label>
+                <input class="field" id="av-titulo" type="text" maxlength="80"
+                    placeholder="Ex: Ensaio extra sábado 15h" value="${escHtml(data?.titulo||'')}">
+            </div>
+            <div>
+                <label class="form-label">Mensagem *</label>
+                <textarea class="field" id="av-texto" rows="4"
+                    placeholder="Descreva o aviso aqui...">${escHtml(data?.texto||'')}</textarea>
+            </div>
+        </div>
+        <div class="modal-ft">
+            <button class="btn btn-ghost" onclick="closeModal()">Cancelar</button>
+            <button class="btn btn-primary" onclick="salvarAviso()">
+                ${ic('check',16)} Publicar para todos
+            </button>
+        </div>
+    </div></div>`;
+}
+
+function salvarAviso() {
+    const titulo = document.getElementById('av-titulo')?.value?.trim();
+    const texto  = document.getElementById('av-texto')?.value?.trim();
+    const tipo   = S.modal?.data?.tipo || 'urgente';
+    if (!titulo) { toast('⚠️ Informe o título do aviso.'); return; }
+    if (!texto)  { toast('⚠️ Informe a mensagem.'); return; }
+    const criadoPor = isAdm() && S.currentMember ? S.currentMember.name : 'ADM';
+    S.avisos.unshift({ id:'av'+uid(), titulo, texto, tipo, criadoPor, criadoEm: Date.now() });
+    persist();
+    S.modal = null;
+    render();
+    toast('📢 Aviso publicado para todos!');
 }
 
 // ════════════════════════════════════════════════════
