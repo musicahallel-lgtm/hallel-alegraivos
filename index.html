@@ -1103,13 +1103,17 @@ async function initFirebase() {
         await _loadScript('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js');
         firebase.initializeApp(FIREBASE_CFG);
         _fbDB = firebase.firestore();
-        // Escuta a "caixinha" de solicitações na nuvem e funde na lista local
+        // Carrega dados da nuvem (substitui cache local se houver dados mais novos)
+        await carregaFirestore();
+        // Escuta mudanças em tempo real feitas por outros aparelhos
+        _escutaFirestore();
+        // Escuta solicitações de acesso separadamente (coleção própria)
         _fbDB.collection('solicitacoes').onSnapshot(snap => {
             const cloud = snap.docs.map(d => ({ ...d.data(), id: d.id, _cloud: true }));
             const locais = S.accessRequests.filter(r => !r._cloud);
             S.accessRequests = [...locais, ...cloud];
             if (S.role && (S.page === 'membros' || S.page === 'inicio')) render();
-        }, err => console.warn('Firestore listen:', err));
+        }, err => console.warn('Firestore solicitacoes:', err));
     } catch (e) { console.warn('Firebase indisponível:', e); }
 }
 // Envia uma solicitação para a nuvem (chamado no submit)
@@ -1236,59 +1240,149 @@ function persist(immediate) {
     clearTimeout(_persistTimer);
     _persistTimer = setTimeout(_doPersist, 400);
 }
-function _doPersist() {
-    try {
-        localStorage.setItem('hl_songs',    JSON.stringify(S.songs));
-        localStorage.setItem('hl_setlists', JSON.stringify(S.setlists));
-        localStorage.setItem('hl_escalas',  JSON.stringify(S.escalas));
-        localStorage.setItem('hl_members',  JSON.stringify(S.members));
-        localStorage.setItem('hl_activity',  JSON.stringify(S.activityLog.slice(-500)));
-        localStorage.setItem('hl_requests',     JSON.stringify(S.accessRequests));
-        localStorage.setItem('hl_availability', JSON.stringify(S.availability));
-        localStorage.setItem('hl_substitutions',JSON.stringify(S.substitutions));
-        localStorage.setItem('hl_financeiro',   JSON.stringify(S.financeiro));
-        localStorage.setItem('hl_inventario',   JSON.stringify(S.inventario));
-    } catch(e) {
-        // localStorage quota exceeded — trim and retry
-        S.activityLog = S.activityLog.slice(-100);
-        try { localStorage.setItem('hl_activity', JSON.stringify(S.activityLog)); } catch(_) {}
-    }
+// ── Chaves ↔ campos do Firestore ─────────────────────────────────
+const FS_KEYS = {
+    songs: 'hl_songs', setlists: 'hl_setlists', escalas: 'hl_escalas',
+    members: 'hl_members', activityLog: 'hl_activity', accessRequests: 'hl_requests',
+    availability: 'hl_availability', substitutions: 'hl_substitutions',
+    financeiro: 'hl_financeiro', inventario: 'hl_inventario',
+};
+
+// ── Indicador de sincronização ────────────────────────────────────
+let _syncPending = false;
+function _setSyncStatus(ok) {
+    const el = document.getElementById('sync-status');
+    if (el) { el.textContent = ok ? '☁️' : '⏳'; el.title = ok ? 'Sincronizado' : 'Salvando…'; }
 }
-function hydrate() {
-    try {
-        const s  = localStorage.getItem('hl_songs');
-        const sl = localStorage.getItem('hl_setlists');
-        const es = localStorage.getItem('hl_escalas');
-        const mb = localStorage.getItem('hl_members');
-        if (s)  S.songs    = JSON.parse(s);
-        if (sl) S.setlists = JSON.parse(sl);
-        if (es) S.escalas  = JSON.parse(es);
-        if (mb) S.members  = JSON.parse(mb);
-        const ac = localStorage.getItem('hl_activity');
-        if (ac) { S.activityLog = JSON.parse(ac).slice(-500); } // keep only last 500
-        const rq = localStorage.getItem('hl_requests');
-        if (rq) S.accessRequests = JSON.parse(rq);
-        const av = localStorage.getItem('hl_availability');
-        if (av) S.availability = JSON.parse(av);
-        const sb = localStorage.getItem('hl_substitutions');
-        if (sb) S.substitutions = JSON.parse(sb);
-        const fi = localStorage.getItem('hl_financeiro');
-        if (fi) S.financeiro = JSON.parse(fi);
-        const iv = localStorage.getItem('hl_inventario');
-        if (iv) S.inventario = JSON.parse(iv);
-    } catch(e) { console.error(e); }
-    // Migrate: instrument (string) → instruments (array)
+
+// ── Normaliza dados (migrations) ─────────────────────────────────
+function _normalize() {
     S.members.forEach(m => {
         if (!m.instruments) m.instruments = m.instrument ? [m.instrument] : [];
-        if (!m.memberType) m.memberType = 'membro'; // Migrate: default type = membro
+        if (!m.memberType)  m.memberType  = 'membro';
     });
-    // Migrate old set lists (songIds → blocks)
     S.setlists.forEach(sl => {
         if (!sl.blocks) {
             sl.blocks = [{ id: 'b'+uid(), name: 'Geral', songIds: sl.songIds || [] }];
             delete sl.songIds;
         }
     });
+}
+
+// ── persist: localStorage + Firestore ────────────────────────────
+function _doPersist() {
+    // 1. Sempre salva local (cache offline)
+    try {
+        localStorage.setItem('hl_songs',         JSON.stringify(S.songs));
+        localStorage.setItem('hl_setlists',      JSON.stringify(S.setlists));
+        localStorage.setItem('hl_escalas',       JSON.stringify(S.escalas));
+        localStorage.setItem('hl_members',       JSON.stringify(S.members));
+        localStorage.setItem('hl_activity',      JSON.stringify(S.activityLog.slice(-500)));
+        localStorage.setItem('hl_requests',      JSON.stringify(S.accessRequests.filter(r=>!r._cloud)));
+        localStorage.setItem('hl_availability',  JSON.stringify(S.availability));
+        localStorage.setItem('hl_substitutions', JSON.stringify(S.substitutions));
+        localStorage.setItem('hl_financeiro',    JSON.stringify(S.financeiro));
+        localStorage.setItem('hl_inventario',    JSON.stringify(S.inventario));
+    } catch(e) {
+        S.activityLog = S.activityLog.slice(-100);
+        try { localStorage.setItem('hl_activity', JSON.stringify(S.activityLog)); } catch(_) {}
+    }
+    // 2. Sincroniza com Firestore (se disponível)
+    if (!_fbDB) return;
+    _syncPending = true; _setSyncStatus(false);
+    const doc = _fbDB.collection('ministerio').doc('dados');
+    doc.set({
+        songs:         S.songs,
+        setlists:      S.setlists,
+        escalas:       S.escalas,
+        members:       S.members,
+        activityLog:   S.activityLog.slice(-200),
+        availability:  S.availability,
+        substitutions: S.substitutions,
+        financeiro:    S.financeiro,
+        inventario:    S.inventario,
+        _updatedAt:    Date.now(),
+    }).then(() => { _syncPending = false; _setSyncStatus(true); })
+      .catch(e => { console.warn('Firestore save:', e); _setSyncStatus(true); });
+}
+
+// ── hydrate: carrega localStorage (offline-first) ─────────────────
+function hydrate() {
+    try {
+        const s  = localStorage.getItem('hl_songs');         if (s)  S.songs          = JSON.parse(s);
+        const sl = localStorage.getItem('hl_setlists');      if (sl) S.setlists        = JSON.parse(sl);
+        const es = localStorage.getItem('hl_escalas');       if (es) S.escalas         = JSON.parse(es);
+        const mb = localStorage.getItem('hl_members');       if (mb) S.members         = JSON.parse(mb);
+        const ac = localStorage.getItem('hl_activity');      if (ac) S.activityLog     = JSON.parse(ac).slice(-500);
+        const rq = localStorage.getItem('hl_requests');      if (rq) S.accessRequests  = JSON.parse(rq);
+        const av = localStorage.getItem('hl_availability');  if (av) S.availability    = JSON.parse(av);
+        const sb = localStorage.getItem('hl_substitutions'); if (sb) S.substitutions   = JSON.parse(sb);
+        const fi = localStorage.getItem('hl_financeiro');    if (fi) S.financeiro      = JSON.parse(fi);
+        const iv = localStorage.getItem('hl_inventario');    if (iv) S.inventario      = JSON.parse(iv);
+    } catch(e) { console.error(e); }
+    _normalize();
+}
+
+// ── carregaFirestore: puxa dados da nuvem e re-renderiza ──────────
+async function carregaFirestore() {
+    if (!_fbDB) return;
+    try {
+        const snap = await _fbDB.collection('ministerio').doc('dados').get();
+        if (!snap.exists) {
+            // Nuvem vazia → envia dados locais (primeiro sync)
+            _doPersist(); return;
+        }
+        const d = snap.data();
+        if (d.songs)         S.songs          = d.songs;
+        if (d.setlists)      S.setlists       = d.setlists;
+        if (d.escalas)       S.escalas        = d.escalas;
+        if (d.members)       S.members        = d.members;
+        if (d.activityLog)   S.activityLog    = d.activityLog;
+        if (d.availability)  S.availability   = d.availability;
+        if (d.substitutions) S.substitutions  = d.substitutions;
+        if (d.financeiro)    S.financeiro     = d.financeiro;
+        if (d.inventario)    S.inventario     = d.inventario;
+        _normalize();
+        // Salva no localStorage como cache
+        localStorage.setItem('hl_songs',         JSON.stringify(S.songs));
+        localStorage.setItem('hl_setlists',      JSON.stringify(S.setlists));
+        localStorage.setItem('hl_escalas',       JSON.stringify(S.escalas));
+        localStorage.setItem('hl_members',       JSON.stringify(S.members));
+        localStorage.setItem('hl_activity',      JSON.stringify(S.activityLog));
+        localStorage.setItem('hl_availability',  JSON.stringify(S.availability));
+        localStorage.setItem('hl_substitutions', JSON.stringify(S.substitutions));
+        localStorage.setItem('hl_financeiro',    JSON.stringify(S.financeiro));
+        localStorage.setItem('hl_inventario',    JSON.stringify(S.inventario));
+        render();
+        _setSyncStatus(true);
+    } catch(e) { console.warn('Firestore load:', e); }
+}
+
+// ── escuta mudanças em tempo real feitas por outros ───────────────
+function _escutaFirestore() {
+    if (!_fbDB) return;
+    _fbDB.collection('ministerio').doc('dados').onSnapshot(snap => {
+        if (!snap.exists || snap.metadata.hasPendingWrites) return; // ignora escrita própria
+        const d = snap.data();
+        if (!d || !d._updatedAt) return;
+        if (d.songs)         S.songs          = d.songs;
+        if (d.setlists)      S.setlists       = d.setlists;
+        if (d.escalas)       S.escalas        = d.escalas;
+        if (d.members)       S.members        = d.members;
+        if (d.activityLog)   S.activityLog    = d.activityLog;
+        if (d.availability)  S.availability   = d.availability;
+        if (d.substitutions) S.substitutions  = d.substitutions;
+        if (d.financeiro)    S.financeiro     = d.financeiro;
+        if (d.inventario)    S.inventario     = d.inventario;
+        _normalize();
+        // Restaura membro logado (pode ter sido atualizado)
+        if (S.currentMember) {
+            const m = S.members.find(x=>x.id===S.currentMember.id);
+            if (m) S.currentMember = m;
+        }
+        render();
+        _setSyncStatus(true);
+    }, err => console.warn('Firestore listen:', err));
 }
 
 // ═══════════════════════════════════════════════
@@ -1981,6 +2075,7 @@ function header() {
             ${S.page==='library'  && isAdm() ? `<button class="btn btn-sm" style="background:rgba(255,255,255,.92);color:#004d20;font-weight:800;box-shadow:0 2px 10px rgba(0,0,0,.25)" onclick="openAdd()">+ Música</button>` : ''}
             ${S.page==='setlists' && isAdm() ? `<button class="btn btn-sm" style="background:rgba(255,255,255,.92);color:#004d20;font-weight:800;box-shadow:0 2px 10px rgba(0,0,0,.25)" onclick="newSL()">+ Set List</button>` : ''}
             ${isMembro() ? `<button class="btn btn-sm" style="background:rgba(255,212,0,.22);border:1px solid rgba(255,212,0,.45);color:#ffe066;font-size:11px" onclick="showMissionAlert(S.currentMember)">🎯 Ver Missões</button>` : ''}
+            ${FIREBASE_CFG ? `<span id="sync-status" title="Sincronizado" style="font-size:16px;opacity:.8;cursor:default">☁️</span>` : ''}
             <span class="role-badge ${S.role}">${roleLabel}</span>
             <button class="btn btn-sm" onclick="doLogout()" style="background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.25);color:rgba(255,255,255,.85)">Sair</button>
         </div>
