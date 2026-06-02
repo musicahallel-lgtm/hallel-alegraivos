@@ -1568,9 +1568,10 @@ function doLogin() {
     // Check member credentials
     const member = S.members.find(m => m.user.toLowerCase() === user && m.pass === pass);
     if (member) {
-        S.role = 'membro';
+        const accessRole = member.accessRole || 'membro';
+        S.role = accessRole;
         S.currentMember = member;
-        localStorage.setItem('hl_role', 'membro');
+        localStorage.setItem('hl_role', accessRole);
         localStorage.setItem('hl_current_member', member.id);
         // Track login
         S.activityLog.push({ id: uid(), memberId: member.id, memberName: member.name,
@@ -2840,6 +2841,7 @@ function membrosPage() {
                         ${(m.instruments||[m.instrument]).map(i=>`<span style="display:inline-flex;align-items:center;gap:3px;background:rgba(0,150,63,.12);border:1px solid rgba(0,150,63,.2);border-radius:6px;padding:1px 7px;font-size:11px;font-weight:600;margin-right:3px">${instrEmoji[i]||'🎵'} ${instrLabel[i]||i}</span>`).join('')}
                     </div>
                     <div class="member-meta" style="margin-top:3px">
+                        ${m.accessRole==='adm'?`<span style="display:inline-flex;align-items:center;gap:3px;border-radius:6px;padding:1px 7px;font-size:11px;font-weight:800;margin-right:4px;background:rgba(241,90,36,.18);border:1px solid rgba(241,90,36,.45);color:#fb7a3c">🛡️ ADM</span>`:''}
                         <span style="display:inline-flex;align-items:center;gap:3px;border-radius:6px;padding:1px 7px;font-size:11px;font-weight:700;margin-right:4px;${(m.memberType||'membro')==='colaborador'?'background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.3);color:#f59e0b':'background:rgba(0,150,63,.12);border:1px solid rgba(0,150,63,.25);color:var(--purple-light)'}">
                             ${(m.memberType||'membro')==='colaborador'?'🤝 Colaborador':'🎼 Membro'}
                         </span>
@@ -2995,6 +2997,13 @@ function memberFormModal(data) {
                         </select>
                     </div>
                 </div>
+                <div>
+                    <label style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;display:block;margin-bottom:4px">🔑 Perfil de acesso</label>
+                    <select class="field" id="mf-role">
+                        <option value="membro" ${(data.accessRole||'membro')==='membro'?'selected':''}>👤 Usuário comum — vê escalas, músicas, agenda</option>
+                        <option value="adm" ${data.accessRole==='adm'?'selected':''}>🛡️ Administrador — acesso total (edita tudo)</option>
+                    </select>
+                </div>
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
                     <div>
                         <label style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;display:block;margin-bottom:4px">Usuário (login)</label>
@@ -3026,6 +3035,7 @@ function saveMember(id) {
     const email  = document.getElementById('mf-email')?.value?.trim().toLowerCase();
     const nasc   = document.getElementById('mf-nasc')?.value || '';
     const camisa = document.getElementById('mf-camisa')?.value || '';
+    const accessRole = document.getElementById('mf-role')?.value || 'membro';
     const user   = document.getElementById('mf-user')?.value?.trim().toLowerCase();
     const pass   = document.getElementById('mf-pass')?.value?.trim();
     const typeEl = document.querySelector('input[name="mf-type"]:checked');
@@ -3036,9 +3046,9 @@ function saveMember(id) {
     if (conflict) { toast('⚠️ Esse nome de usuário já existe.'); return; }
     if (id) {
         const m = S.members.find(x=>x.id===id);
-        if (m) { m.name=name; m.instruments=instrs; m.instrument=instrs[0]; m.whatsapp=whats; m.email=email; m.nascimento=nasc; m.camisa=camisa; m.user=user; m.pass=pass; m.memberType=memberType; }
+        if (m) { m.name=name; m.instruments=instrs; m.instrument=instrs[0]; m.whatsapp=whats; m.email=email; m.nascimento=nasc; m.camisa=camisa; m.accessRole=accessRole; m.user=user; m.pass=pass; m.memberType=memberType; }
     } else {
-        S.members.push({ id:'mb'+uid(), name, instruments:instrs, instrument:instrs[0], whatsapp:whats, email, nascimento:nasc, camisa, user, pass, memberType });
+        S.members.push({ id:'mb'+uid(), name, instruments:instrs, instrument:instrs[0], whatsapp:whats, email, nascimento:nasc, camisa, accessRole, user, pass, memberType });
     }
     persist(); closeModal(); render();
     toast(id ? `✅ ${name} atualizado!` : `✅ ${name} cadastrado no ministério!`);
@@ -5659,11 +5669,11 @@ function maybeInitMixer(song) {
 // ═══════════════════════════════════════════════
 (async () => {
     hydrate();
-    // Restore logged-in member session
-    if (S.role === 'membro') {
-        const memberId = localStorage.getItem('hl_current_member');
+    // Restore logged-in member session (inclui membros que sao ADM)
+    const memberId = localStorage.getItem('hl_current_member');
+    if (memberId) {
         S.currentMember = S.members.find(m=>m.id===memberId) || null;
-        if (!S.currentMember) { S.role = null; localStorage.removeItem('hl_role'); }
+        if (!S.currentMember && S.role === 'membro') { S.role = null; localStorage.removeItem('hl_role'); }
     }
     // Remove músicas retiradas do repertório
     const removedSet = new Set(REMOVED.map(t => t.toLowerCase()));
