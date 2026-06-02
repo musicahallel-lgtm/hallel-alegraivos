@@ -956,6 +956,26 @@
             .app-tile:hover .app-icon { transform:translateY(-3px); box-shadow:0 8px 22px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.18); }
         }
 
+        /* ── Seletor de escala ── */
+        .ep-section { font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:.5px; color:var(--muted); margin:14px 0 8px; }
+        .ep-section:first-of-type { margin-top:0; }
+        .ep-row {
+            display:flex; align-items:center; gap:10px; width:100%;
+            padding:12px 14px; margin-bottom:8px; border-radius:var(--radius-sm);
+            background:var(--bg3); border:1px solid var(--border); cursor:pointer;
+            text-align:left; font-family:inherit; transition:border-color .15s, background-color .15s;
+        }
+        .ep-row:hover { border-color:var(--purple); background:var(--bg4); }
+        .ep-row-main { flex:1; min-width:0; }
+        .ep-row-title { font-size:14px; font-weight:700; color:var(--text); }
+        .ep-row-meta { font-size:12px; color:var(--muted); margin-top:2px; }
+        .ep-tag {
+            flex-shrink:0; font-size:11px; font-weight:700; white-space:nowrap;
+            padding:4px 10px; border-radius:100px;
+            background:rgba(241,90,36,.15); border:1px solid rgba(241,90,36,.35); color:#fb7a3c;
+        }
+        .ep-tag.ok { background:rgba(0,150,63,.15); border-color:rgba(0,150,63,.35); color:var(--purple-light); }
+
         /* ── Print media ── */
         @media print {
             body * { visibility:hidden; }
@@ -1949,6 +1969,7 @@ function modalHtml() {
     if (type==='evento')       return eventoModal(data);
     if (type==='mission-alert') return missionAlertModal(data);
     if (type==='birthday-alert') return birthdayAlertModal(data);
+    if (type==='escala-picker') return escalaPickerModal(data);
     if (type==='member-form')  return memberFormModal(data);
     if (type==='first-access') return firstAccessModal(data);
     if (type==='wa-escala')        return waEscalaModal(data);
@@ -4806,9 +4827,11 @@ function agendaPage() {
     </div>`;
 
     return `<div class="agenda-wrap">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:18px">
             <h2 style="font-size:22px;font-weight:800">📅 Agenda Hallel 2026</h2>
-            <span style="font-size:13px;color:var(--muted)">${EVENTOS_2026.length} eventos + semanais</span>
+            ${isAdm()
+                ? `<button class="btn btn-primary btn-sm" onclick="openEscalaPicker()">🎼 Fazer Escala</button>`
+                : `<span style="font-size:13px;color:var(--muted)">${EVENTOS_2026.length} eventos + semanais</span>`}
         </div>
         ${recSumHtml}
         ${notifHtml}
@@ -4830,6 +4853,63 @@ function openRecModal(recId, dateStr) {
     const ev = { id: recId+'-'+dateStr, recId, title: rec.title, start: dateStr, end: dateStr,
                  horario: rec.horario, recurring: true, dateLabel: label };
     S.modal = {type:'evento', data:ev}; S.evTab='escala'; render();
+}
+
+function openEscalaPicker() { S.modal = {type:'escala-picker', data:{q:''}}; render(); }
+function escalaPickerSearch(v) { if (S.modal?.type==='escala-picker') { S.modal.data.q = v; render(); } }
+
+function escalaPickerModal(data) {
+    const q = (data?.q || '').toLowerCase().trim();
+    const today = new Date(); today.setHours(0,0,0,0);
+
+    // Eventos avulsos: futuros primeiro, depois passados
+    const evs = EVENTOS_2026
+        .filter(ev => !q || ev.title.toLowerCase().includes(q))
+        .map(ev => ({ ev, d: evDaysUntil(ev) }))
+        .sort((a,b) => {
+            const af = a.d >= 0, bf = b.d >= 0;
+            if (af !== bf) return af ? -1 : 1;       // futuros antes
+            return af ? a.d - b.d : b.d - a.d;        // futuros asc, passados desc
+        });
+
+    // Próximas datas dos cultos semanais
+    const recNext = RECORRENTES.map(r => {
+        const next = REC_2026.filter(e => e.recId===r.id && evDaysUntil(e) >= 0)
+            .sort((a,b)=>a.start.localeCompare(b.start))[0];
+        return next ? { rec:r, ev:next } : null;
+    }).filter(Boolean).filter(x => !q || x.rec.title.toLowerCase().includes(q));
+
+    function evRow(ev, d) {
+        const esc = S.escalas[ev.id];
+        const temEsc = EV_INSTR.some(({k})=>esc?.[k]);
+        const passou = d < 0;
+        const quando = d === 0 ? 'HOJE' : d === 1 ? 'amanhã' : d > 0 ? `em ${d} dias` : `${evDateLabel(ev)}`;
+        return `<button class="ep-row" onclick="openEvModal('${ev.id}')" ${passou?'style="opacity:.6"':''}>
+            <div class="ep-row-main">
+                <div class="ep-row-title">${ev.alegrai?'⭐ ':''}${ev.title}</div>
+                <div class="ep-row-meta">📅 ${evDateLabel(ev)}${ev.horario?' · ⏰ '+ev.horario:''}${d>=0?` · <b style="color:var(--purple-light)">${quando}</b>`:''}</div>
+            </div>
+            <span class="ep-tag ${temEsc?'ok':''}">${temEsc?'✅ Com escala':'+ Escalar'}</span>
+        </button>`;
+    }
+
+    return `<div class="backdrop" onclick="closeModal(event)">
+    <div class="modal" style="max-width:560px">
+        <div class="modal-hd">
+            <div class="modal-title">🎼 Fazer Escala</div>
+            <button class="close-btn" onclick="closeModal()">✕</button>
+        </div>
+        <div class="modal-body">
+            <p style="color:var(--muted);font-size:13px;margin-bottom:12px">Selecione o evento para montar a escala.</p>
+            <input class="field" type="text" placeholder="🔍 Buscar evento…" value="${(data?.q||'').replace(/"/g,'&quot;')}"
+                oninput="escalaPickerSearch(this.value)" style="margin-bottom:16px">
+            ${recNext.length ? `<div class="ep-section">Cultos semanais (próxima data)</div>
+                ${recNext.map(x => evRow(x.ev, evDaysUntil(x.ev))).join('')}` : ''}
+            <div class="ep-section">Eventos</div>
+            ${evs.length ? evs.map(({ev,d}) => evRow(ev,d)).join('')
+                : `<div style="text-align:center;color:var(--muted);padding:24px;font-size:13px">Nenhum evento encontrado.</div>`}
+        </div>
+    </div></div>`;
 }
 
 const EV_INSTR = [
