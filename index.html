@@ -841,6 +841,59 @@
         .fin-empty { text-align:center; padding:48px 20px; color:var(--muted); }
         .fin-empty-icon { font-size:48px; margin-bottom:12px; }
 
+        /* ── Inventário ── */
+        .inv-stats { display:flex; gap:10px; flex-wrap:wrap; margin-bottom:18px; }
+        .inv-stat-pill {
+            background:var(--bg2); border:1px solid var(--border); border-radius:100px;
+            padding:7px 16px; display:flex; align-items:center; gap:8px;
+            font-size:13px; font-weight:600;
+        }
+        .inv-stat-pill span:first-child { font-size:18px; }
+        .inv-stat-pill b { color:var(--text); }
+        .inv-stat-pill small { color:var(--muted); font-weight:400; }
+
+        .inv-toolbar { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:16px; align-items:center; }
+        .inv-toolbar input.field { flex:1; min-width:160px; padding:8px 12px; font-size:13px; }
+        .inv-toolbar select { padding:8px 12px; border-radius:var(--radius-sm); border:1px solid var(--border); background:var(--bg3); color:var(--text); font-size:13px; font-family:inherit; }
+
+        .inv-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:12px; }
+        @media (max-width:600px) { .inv-grid { grid-template-columns:1fr; } }
+
+        .inv-card {
+            background:var(--bg2); border:1px solid var(--border);
+            border-radius:var(--radius); padding:16px;
+            display:flex; flex-direction:column; gap:10px;
+            contain: layout style;
+            transition:border-color .15s, box-shadow .15s;
+        }
+        .inv-card:hover { border-color:var(--purple); box-shadow:0 4px 16px rgba(0,150,63,.12); }
+
+        .inv-card-top { display:flex; align-items:flex-start; gap:10px; }
+        .inv-cat-icon { width:40px; height:40px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:20px; flex-shrink:0; background:var(--bg3); }
+        .inv-card-info { flex:1; min-width:0; }
+        .inv-card-name { font-size:15px; font-weight:800; color:var(--text); line-height:1.3; }
+        .inv-card-cat  { font-size:12px; color:var(--muted); margin-top:2px; }
+
+        .inv-card-mid { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+        .inv-qtd { font-size:22px; font-weight:800; color:var(--purple-light); }
+        .inv-unidade { font-size:12px; color:var(--muted); margin-top:2px; }
+
+        .inv-estado {
+            font-size:11px; font-weight:700; padding:3px 10px;
+            border-radius:100px; white-space:nowrap;
+        }
+        .inv-estado.otimo   { background:rgba(34,197,94,.15);  color:#4ade80; border:1px solid rgba(34,197,94,.3); }
+        .inv-estado.bom     { background:rgba(59,130,246,.15); color:#60a5fa; border:1px solid rgba(59,130,246,.3); }
+        .inv-estado.regular { background:rgba(234,179,8,.15);  color:#fbbf24; border:1px solid rgba(234,179,8,.3); }
+        .inv-estado.manutencao { background:rgba(239,68,68,.15); color:#f87171; border:1px solid rgba(239,68,68,.3); }
+        .inv-estado.inativo { background:rgba(156,163,175,.1); color:#9ca3af; border:1px solid rgba(156,163,175,.2); }
+
+        .inv-card-desc { font-size:12px; color:var(--muted); line-height:1.5; }
+        .inv-card-ft { display:flex; justify-content:flex-end; gap:6px; border-top:1px solid var(--border); padding-top:10px; }
+
+        .inv-empty { text-align:center; padding:60px 20px; color:var(--muted); grid-column:1/-1; }
+        .inv-empty-icon { font-size:56px; margin-bottom:14px; }
+
         /* ── Print media ── */
         @media print {
             body * { visibility:hidden; }
@@ -963,6 +1016,9 @@ const S = {
     financeiro: [],      // [{ id, tipo:'entrada'|'saida', categoria, descricao, valor, data, obs, criadoPor, criadoEm }]
     _finFiltro: 'todos', // 'todos'|'entrada'|'saida'
     _finMes: '',         // '' = todos os meses, ou 'YYYY-MM'
+    inventario: [],      // [{ id, nome, categoria, quantidade, unidade, estado, descricao, obs, criadoEm, atualizadoEm }]
+    _invCat: '',         // filtro de categoria
+    _invQ: '',           // busca livre
 };
 const isAdm    = () => S.role === 'adm';
 const isGeral  = () => S.role === 'geral';
@@ -1053,6 +1109,7 @@ function _doPersist() {
         localStorage.setItem('hl_availability', JSON.stringify(S.availability));
         localStorage.setItem('hl_substitutions',JSON.stringify(S.substitutions));
         localStorage.setItem('hl_financeiro',   JSON.stringify(S.financeiro));
+        localStorage.setItem('hl_inventario',   JSON.stringify(S.inventario));
     } catch(e) {
         // localStorage quota exceeded — trim and retry
         S.activityLog = S.activityLog.slice(-100);
@@ -1079,6 +1136,8 @@ function hydrate() {
         if (sb) S.substitutions = JSON.parse(sb);
         const fi = localStorage.getItem('hl_financeiro');
         if (fi) S.financeiro = JSON.parse(fi);
+        const iv = localStorage.getItem('hl_inventario');
+        if (iv) S.inventario = JSON.parse(iv);
     } catch(e) { console.error(e); }
     // Migrate: instrument (string) → instruments (array)
     S.members.forEach(m => {
@@ -1509,6 +1568,7 @@ function html() {
     if (S.page === 'cadastros')    page = cadastrosPage();
     if (S.page === 'relatorio')    page = relatorioPage();
     if (S.page === 'financeiro')   page = financeiroPage();
+    if (S.page === 'inventario')   page = inventarioPage();
     if (S.page === 'minha-escala') page = minhaEscalaPage();
     return header() + `<div class="main">${page}</div>` + (S.modal ? modalHtml() : '') + bottomNav();
 }
@@ -1522,6 +1582,7 @@ function bottomNav() {
         { p:'atividade',    i:'📊', l:'Atividade' },
         { p:'relatorio',    i:'📄', l:'Relatório'  },
         { p:'financeiro',   i:'💰', l:'Financeiro' },
+        { p:'inventario',   i:'📦', l:'Inventário' },
     ];
     const geral = [
         { p:'library',    i:'🎸', l:'Músicas'   },
@@ -1529,6 +1590,7 @@ function bottomNav() {
         { p:'playlist',   i:'▶️', l:'Playlist'  },
         { p:'agenda',     i:'📅', l:'Agenda'    },
         { p:'financeiro', i:'💰', l:'Financeiro'},
+        { p:'inventario', i:'📦', l:'Inventário'},
     ];
     const membro = [
         { p:'minha-escala', i:'🎯', l:'Escala'    },
@@ -1537,6 +1599,7 @@ function bottomNav() {
         { p:'playlist',     i:'▶️', l:'Playlist'  },
         { p:'agenda',       i:'📅', l:'Agenda'    },
         { p:'financeiro',   i:'💰', l:'Financeiro'},
+        { p:'inventario',   i:'📦', l:'Inventário'},
     ];
     const items = isMembro() ? membro : isAdm() ? adm : geral;
     return `<nav class="bottom-nav" role="navigation" aria-label="Navegação principal">
@@ -1574,6 +1637,7 @@ function header() {
                 <button class="nav-btn ${S.page==='cadastros'?'active':''}" onclick="nav('cadastros')">👁 Cadastros</button>
                 <button class="nav-btn ${S.page==='relatorio'?'active':''}" onclick="nav('relatorio')">📄 Relatório</button>
                 <button class="nav-btn ${S.page==='financeiro'?'active':''}" onclick="nav('financeiro')">💰 Financeiro</button>
+                <button class="nav-btn ${S.page==='inventario'?'active':''}" onclick="nav('inventario')">📦 Inventário</button>
                 ` : ''}
             `}
         </nav>
@@ -1686,6 +1750,7 @@ function modalHtml() {
     if (type==='sub-request')      return subRequestModal(data);
     if (type==='sub-result')       return subResultModal(data);
     if (type==='fin-add')          return finAddModal(data);
+    if (type==='inv-add')          return invAddModal(data);
     return '';
 }
 
@@ -3476,6 +3541,196 @@ function togglePw(id, pass) {
 }
 
 // ════════════════════════════════════════════════════
+// ════════════════════════════════════════════════════
+//  INVENTÁRIO DE PATRIMÔNIO
+// ════════════════════════════════════════════════════
+const INV_CATS = ['Instrumento','Equipamento de Som','Microfone','Cabo / Adaptador','Acessório','Mobiliário','Outro'];
+const INV_CAT_EMOJI = {
+    'Instrumento':'🎸', 'Equipamento de Som':'🔊', 'Microfone':'🎤',
+    'Cabo / Adaptador':'🔌', 'Acessório':'🎵', 'Mobiliário':'🪑', 'Outro':'📦'
+};
+const INV_ESTADOS = ['Ótimo','Bom','Regular','Manutenção','Inativo'];
+const INV_ESTADO_KEY = { 'Ótimo':'otimo','Bom':'bom','Regular':'regular','Manutenção':'manutencao','Inativo':'inativo' };
+const INV_UNIDADES = ['un','par','cx','kit','m','rolo'];
+
+function inventarioPage() {
+    const q     = (S._invQ || '').toLowerCase();
+    const cat   = S._invCat || '';
+    const todos = S.inventario.slice().sort((a,b)=>a.nome.localeCompare(b.nome,'pt-BR'));
+
+    let lista = todos;
+    if (cat) lista = lista.filter(i=>i.categoria===cat);
+    if (q)   lista = lista.filter(i=>
+        i.nome.toLowerCase().includes(q) ||
+        (i.descricao||'').toLowerCase().includes(q) ||
+        (i.categoria||'').toLowerCase().includes(q)
+    );
+
+    // ── Estatísticas ──
+    const totalItens = todos.reduce((s,i)=>s+Number(i.quantidade||0),0);
+    const manutencao = todos.filter(i=>i.estado==='Manutenção').length;
+    const catCount   = [...new Set(todos.map(i=>i.categoria))].length;
+
+    return `
+    <div class="section-header">
+        <div>
+            <h2 class="section-title">📦 Inventário</h2>
+            <p style="color:var(--muted);font-size:13px;margin-top:2px">Patrimônio do ministério</p>
+        </div>
+        ${isAdm() ? `<button class="btn btn-primary btn-sm" onclick="openInvAdd()">+ Item</button>` : ''}
+    </div>
+
+    <!-- Estatísticas rápidas -->
+    <div class="inv-stats">
+        <div class="inv-stat-pill"><span>📦</span><b>${todos.length}</b><small>item${todos.length!==1?'s':''}</small></div>
+        <div class="inv-stat-pill"><span>🔢</span><b>${totalItens}</b><small>unid. no total</small></div>
+        <div class="inv-stat-pill"><span>🗂</span><b>${catCount}</b><small>categoria${catCount!==1?'s':''}</small></div>
+        ${manutencao>0?`<div class="inv-stat-pill" style="border-color:rgba(239,68,68,.3)"><span>🔧</span><b style="color:#f87171">${manutencao}</b><small style="color:#f87171">em manutenção</small></div>`:''}
+    </div>
+
+    <!-- Filtros -->
+    <div class="inv-toolbar">
+        <input class="field" type="text" placeholder="🔍 Buscar item..." value="${escHtml(S._invQ||'')}"
+            oninput="S._invQ=this.value;render()">
+        <select onchange="S._invCat=this.value;render()">
+            <option value="" ${!cat?'selected':''}>Todas as categorias</option>
+            ${INV_CATS.map(c=>`<option value="${c}" ${cat===c?'selected':''}>${INV_CAT_EMOJI[c]||'📦'} ${c}</option>`).join('')}
+        </select>
+    </div>
+
+    <!-- Grade de itens -->
+    <div class="inv-grid">
+        ${lista.length === 0 ? `
+        <div class="inv-empty">
+            <div class="inv-empty-icon">📦</div>
+            <div style="font-size:17px;font-weight:700;margin-bottom:8px">${q||cat?'Nenhum item encontrado':'Inventário vazio'}</div>
+            <div style="font-size:13px">${isAdm()&&!q&&!cat?'Clique em "+ Item" para cadastrar o primeiro patrimônio.':q||cat?'Tente outros filtros.':''}</div>
+        </div>` :
+        lista.map(item => {
+            const estadoKey = INV_ESTADO_KEY[item.estado] || 'bom';
+            const emoji     = INV_CAT_EMOJI[item.categoria] || '📦';
+            return `<div class="inv-card">
+                <div class="inv-card-top">
+                    <div class="inv-cat-icon">${emoji}</div>
+                    <div class="inv-card-info">
+                        <div class="inv-card-name">${escHtml(item.nome)}</div>
+                        <div class="inv-card-cat">${escHtml(item.categoria)}</div>
+                    </div>
+                </div>
+                <div class="inv-card-mid">
+                    <div>
+                        <div class="inv-qtd">${Number(item.quantidade)}</div>
+                        <div class="inv-unidade">${escHtml(item.unidade||'un')}</div>
+                    </div>
+                    <div style="flex:1"></div>
+                    <span class="inv-estado ${estadoKey}">${escHtml(item.estado)}</span>
+                </div>
+                ${item.descricao?`<div class="inv-card-desc">${escHtml(item.descricao)}</div>`:''}
+                ${item.obs?`<div class="inv-card-desc" style="font-style:italic;color:var(--muted)">📝 ${escHtml(item.obs)}</div>`:''}
+                ${isAdm()?`<div class="inv-card-ft">
+                    <button class="btn btn-ghost btn-sm" onclick="openInvEdit('${item.id}')">✏️ Editar</button>
+                    <button class="btn btn-danger btn-sm" onclick="delInv('${item.id}')">🗑</button>
+                </div>`:''}
+            </div>`;
+        }).join('')}
+    </div>`;
+}
+
+function invAddModal(data) {
+    const edit = data && data.id;
+    const it   = edit ? S.inventario.find(x=>x.id===data.id) : null;
+    return `<div class="backdrop" onclick="closeModal(event)">
+    <div class="modal" style="max-width:480px">
+        <div class="modal-hd">
+            <div class="modal-title">${edit?'Editar Item':'Novo Item'}</div>
+            <button class="close-btn" onclick="closeModal()">✕</button>
+        </div>
+        <div class="modal-body">
+            <div class="form-group">
+                <label class="form-label">Nome do item *</label>
+                <input class="field" id="inv-nome" type="text" maxlength="100"
+                    placeholder="Ex: Violão Yamaha C40" value="${escHtml(it?.nome||'')}">
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+                <div class="form-group">
+                    <label class="form-label">Categoria</label>
+                    <select class="field" id="inv-cat">
+                        ${INV_CATS.map(c=>`<option value="${c}" ${(it?.categoria||INV_CATS[0])===c?'selected':''}>${INV_CAT_EMOJI[c]} ${c}</option>`).join('')}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Estado</label>
+                    <select class="field" id="inv-estado">
+                        ${INV_ESTADOS.map(e=>`<option value="${e}" ${(it?.estado||'Bom')===e?'selected':''}>${e}</option>`).join('')}
+                    </select>
+                </div>
+            </div>
+            <div style="display:grid;grid-template-columns:2fr 1fr;gap:12px">
+                <div class="form-group">
+                    <label class="form-label">Quantidade *</label>
+                    <input class="field" id="inv-qtd" type="number" min="0" step="1" placeholder="1" value="${it?.quantidade??1}">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Unidade</label>
+                    <select class="field" id="inv-unidade">
+                        ${INV_UNIDADES.map(u=>`<option value="${u}" ${(it?.unidade||'un')===u?'selected':''}>${u}</option>`).join('')}
+                    </select>
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Descrição</label>
+                <input class="field" id="inv-desc" type="text" maxlength="200"
+                    placeholder="Ex: Modelo, marca, número de série…" value="${escHtml(it?.descricao||'')}">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Observação</label>
+                <textarea class="field" id="inv-obs" rows="2" placeholder="Localização, quem está usando, etc.">${escHtml(it?.obs||'')}</textarea>
+            </div>
+        </div>
+        <div class="modal-ft">
+            <button class="btn btn-ghost" onclick="closeModal()">Cancelar</button>
+            <button class="btn btn-primary" onclick="saveInv('${edit?it.id:''}')">💾 Salvar</button>
+        </div>
+    </div></div>`;
+}
+
+function openInvAdd()     { S.modal = { type:'inv-add', data:{} }; render(); }
+function openInvEdit(id)  { S.modal = { type:'inv-add', data:{ id } }; render(); }
+
+function saveInv(editId) {
+    const nome   = (document.getElementById('inv-nome')?.value||'').trim();
+    const cat    = document.getElementById('inv-cat')?.value||'Outro';
+    const estado = document.getElementById('inv-estado')?.value||'Bom';
+    const qtd    = parseFloat(document.getElementById('inv-qtd')?.value||'1');
+    const unid   = document.getElementById('inv-unidade')?.value||'un';
+    const desc   = (document.getElementById('inv-desc')?.value||'').trim();
+    const obs    = (document.getElementById('inv-obs')?.value||'').trim();
+
+    if (!nome) { toast('⚠️ Informe o nome do item.'); return; }
+    if (isNaN(qtd)||qtd<0) { toast('⚠️ Informe uma quantidade válida.'); return; }
+
+    const agora = Date.now();
+    if (editId) {
+        const idx = S.inventario.findIndex(x=>x.id===editId);
+        if (idx>=0) S.inventario[idx] = { ...S.inventario[idx], nome, categoria:cat, estado, quantidade:qtd, unidade:unid, descricao:desc, obs, atualizadoEm:agora };
+        toast('✅ Item atualizado.');
+    } else {
+        S.inventario.push({ id:'inv'+uid(), nome, categoria:cat, estado, quantidade:qtd, unidade:unid, descricao:desc, obs, criadoEm:agora, atualizadoEm:agora });
+        toast('✅ Item cadastrado.');
+    }
+    persist();
+    S.modal = null;
+    render();
+}
+
+function delInv(id) {
+    if (!confirm('Excluir este item do inventário?')) return;
+    S.inventario = S.inventario.filter(x=>x.id!==id);
+    persist();
+    toast('🗑 Item excluído.');
+    render();
+}
+
 // ════════════════════════════════════════════════════
 //  FINANCEIRO — PRESTAÇÃO DE CONTAS
 // ════════════════════════════════════════════════════
