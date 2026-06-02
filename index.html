@@ -1173,6 +1173,7 @@ const S = {
     availability: {},    // { evId: { memberId: 'can'|'cannot' } }
     substitutions: [],   // [{ id, fromId, fromName, toId, toName, evId, evTitle, evDate, role, roleLabel, status:'pending'|'accepted'|'rejected', at, notifiedFrom, notifiedTo }]
     avisos: [],          // [{ id, titulo, texto, tipo:'urgente'|'info'|'ensaio', criadoPor, criadoEm }]
+    eventosCustom: [],   // [{ id, title, start, end, horario, local, obs, cor, criadoPor }]
     financeiro: [],      // [{ id, tipo:'entrada'|'saida', categoria, descricao, valor, data, obs, criadoPor, criadoEm }]
     _finFiltro: 'todos', // 'todos'|'entrada'|'saida'
     _finMes: '',         // '' = todos os meses, ou 'YYYY-MM'
@@ -1302,6 +1303,7 @@ function _doPersist() {
         localStorage.setItem('hl_financeiro',    JSON.stringify(S.financeiro));
         localStorage.setItem('hl_inventario',    JSON.stringify(S.inventario));
         localStorage.setItem('hl_avisos',        JSON.stringify(S.avisos));
+        localStorage.setItem('hl_evCustom',      JSON.stringify(S.eventosCustom));
     } catch(e) {
         S.activityLog = S.activityLog.slice(-100);
         try { localStorage.setItem('hl_activity', JSON.stringify(S.activityLog)); } catch(_) {}
@@ -1321,6 +1323,7 @@ function _doPersist() {
         financeiro:    S.financeiro,
         inventario:    S.inventario,
         avisos:        S.avisos,
+        eventosCustom: S.eventosCustom,
         _updatedAt:    Date.now(),
     }).then(() => { _syncPending = false; _setSyncStatus(true); })
       .catch(e => { console.warn('Firestore save:', e); _setSyncStatus(true); });
@@ -1340,6 +1343,7 @@ function hydrate() {
         const fi = localStorage.getItem('hl_financeiro');    if (fi) S.financeiro      = JSON.parse(fi);
         const iv = localStorage.getItem('hl_inventario');    if (iv) S.inventario      = JSON.parse(iv);
         const avi = localStorage.getItem('hl_avisos');       if (avi) S.avisos         = JSON.parse(avi);
+        const evc = localStorage.getItem('hl_evCustom');     if (evc) S.eventosCustom  = JSON.parse(evc);
     } catch(e) { console.error(e); }
     _normalize();
 }
@@ -1364,6 +1368,7 @@ async function carregaFirestore() {
         if (d.financeiro)    S.financeiro     = d.financeiro;
         if (d.inventario)    S.inventario     = d.inventario;
         if (d.avisos)        S.avisos         = d.avisos;
+        if (d.eventosCustom) S.eventosCustom  = d.eventosCustom;
         _normalize();
         // Salva no localStorage como cache
         localStorage.setItem('hl_songs',         JSON.stringify(S.songs));
@@ -1397,6 +1402,7 @@ function _escutaFirestore() {
         if (d.financeiro)    S.financeiro     = d.financeiro;
         if (d.inventario)    S.inventario     = d.inventario;
         if (d.avisos)        S.avisos         = d.avisos;
+        if (d.eventosCustom) S.eventosCustom  = d.eventosCustom;
         _normalize();
         // Restaura membro logado (pode ter sido atualizado)
         if (S.currentMember) {
@@ -2222,7 +2228,8 @@ function modalHtml() {
     if (type==='mission-alert') return missionAlertModal(data);
     if (type==='birthday-alert') return birthdayAlertModal(data);
     if (type==='escala-picker') return escalaPickerModal(data);
-    if (type==='day-picker') return dayPickerModal(data);
+    if (type==='day-picker')     return dayPickerModal(data);
+    if (type==='nova-atividade') return novaAtividadeModal(data);
     if (type==='member-form')  return memberFormModal(data);
     if (type==='first-access') return firstAccessModal(data);
     if (type==='wa-escala')        return waEscalaModal(data);
@@ -5199,6 +5206,113 @@ function printRelatorio(mesNome) {
 
 // ════════════════════════════════════════════════════
 
+// ── Cadastro de atividades personalizadas ────────────────────────
+function openNovaAtividade(dateStr) {
+    S.modal = { type:'nova-atividade', data:{ date: dateStr || '', editId: null } };
+    render();
+}
+function openEditAtividade(id) {
+    const ev = S.eventosCustom.find(e=>e.id===id);
+    if (!ev) return;
+    S.modal = { type:'nova-atividade', data:{ editId:id, date:ev.start, fim:ev.end } };
+    render();
+}
+function delAtividade(id) {
+    if (!confirm('Remover esta atividade?')) return;
+    S.eventosCustom = S.eventosCustom.filter(e=>e.id!==id);
+    persist(); toast('🗑 Atividade removida.'); render();
+}
+
+function novaAtividadeModal(data) {
+    const isEdit = !!data?.editId;
+    const ev = isEdit ? S.eventosCustom.find(e=>e.id===data.editId) : null;
+    const hoje = new Date().toISOString().slice(0,10);
+    const CORES = [
+        {val:'#00963F',label:'Verde'},
+        {val:'#3b82f6',label:'Azul'},
+        {val:'#f59e0b',label:'Âmbar'},
+        {val:'#ef4444',label:'Vermelho'},
+        {val:'#8b5cf6',label:'Roxo'},
+        {val:'#ec4899',label:'Rosa'},
+    ];
+    const corAtual = ev?.cor || '#3b82f6';
+    return `<div class="backdrop" onclick="closeModal(event)">
+    <div class="modal" style="max-width:480px">
+        <div class="modal-hd">
+            <div class="modal-title">${ic('agenda',18)} ${isEdit?'Editar Atividade':'Nova Atividade'}</div>
+            <button class="close-btn" onclick="closeModal()">${ic('close',20)}</button>
+        </div>
+        <div class="modal-body" style="display:flex;flex-direction:column;gap:12px">
+            <div>
+                <label class="form-label">Título da atividade *</label>
+                <input class="field" id="na-titulo" type="text" maxlength="80"
+                    placeholder="Ex: Adoração extra, Ensaio, Reunião..."
+                    value="${escHtml(ev?.title||'')}">
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+                <div>
+                    <label class="form-label">Data início *</label>
+                    <input class="field" id="na-inicio" type="date" value="${ev?.start||data?.date||hoje}">
+                </div>
+                <div>
+                    <label class="form-label">Data fim</label>
+                    <input class="field" id="na-fim" type="date" value="${ev?.end||data?.date||hoje}">
+                </div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+                <div>
+                    <label class="form-label">Horário</label>
+                    <input class="field" id="na-horario" type="text" placeholder="Ex: 19h00 – 21h00"
+                        value="${escHtml(ev?.horario||'')}">
+                </div>
+                <div>
+                    <label class="form-label">Cor no calendário</label>
+                    <select class="field" id="na-cor">
+                        ${CORES.map(c=>`<option value="${c.val}" ${corAtual===c.val?'selected':''}>${c.label}</option>`).join('')}
+                    </select>
+                </div>
+            </div>
+            <div>
+                <label class="form-label">Local (endereço)</label>
+                <input class="field" id="na-local" type="text" placeholder="Rua, número — Bairro, Cidade"
+                    value="${escHtml(ev?.local||'')}">
+            </div>
+            <div>
+                <label class="form-label">Observação</label>
+                <textarea class="field" id="na-obs" rows="2" placeholder="Informações adicionais...">${escHtml(ev?.obs||'')}</textarea>
+            </div>
+        </div>
+        <div class="modal-ft">
+            <button class="btn btn-ghost" onclick="closeModal()">Cancelar</button>
+            <button class="btn btn-primary" onclick="salvarAtividade('${data?.editId||''}')">
+                ${ic('check',16)} ${isEdit?'Salvar alterações':'Adicionar ao calendário'}
+            </button>
+        </div>
+    </div></div>`;
+}
+
+function salvarAtividade(editId) {
+    const titulo  = document.getElementById('na-titulo')?.value?.trim();
+    const inicio  = document.getElementById('na-inicio')?.value;
+    const fim     = document.getElementById('na-fim')?.value || inicio;
+    const horario = document.getElementById('na-horario')?.value?.trim();
+    const local   = document.getElementById('na-local')?.value?.trim();
+    const obs     = document.getElementById('na-obs')?.value?.trim();
+    const cor     = document.getElementById('na-cor')?.value || '#3b82f6';
+    const criadoPor = S.currentMember?.name || 'ADM';
+    if (!titulo) { toast('⚠️ Informe o título da atividade.'); return; }
+    if (!inicio) { toast('⚠️ Informe a data de início.'); return; }
+    if (editId) {
+        const ev = S.eventosCustom.find(e=>e.id===editId);
+        if (ev) Object.assign(ev, { title:titulo, start:inicio, end:fim, horario, local, obs, cor });
+        toast('✅ Atividade atualizada!');
+    } else {
+        S.eventosCustom.push({ id:'evc'+uid(), title:titulo, start:inicio, end:fim, horario, local, obs, cor, criadoPor, criadoEm:Date.now() });
+        toast('✅ Atividade adicionada ao calendário!');
+    }
+    persist(); S.modal=null; render();
+}
+
 function agendaPage() {
     const today = new Date(); today.setHours(0,0,0,0);
     const dismissed = JSON.parse(localStorage.getItem('hl_notif_dismissed')||'[]');
@@ -5217,7 +5331,8 @@ function agendaPage() {
     // Build set of dates with events for quick lookup
     const evByDate = {};    // one-time events
     const recByDate = {};   // recurring events
-    EVENTOS_2026.forEach(ev => {
+    const todosEvs = [...EVENTOS_2026, ...S.eventosCustom];
+    todosEvs.forEach(ev => {
         const s = new Date(ev.start+'T00:00:00');
         const e = new Date(ev.end+'T00:00:00');
         for (let d = new Date(s); d <= e; d.setDate(d.getDate()+1)) {
@@ -5280,9 +5395,9 @@ function agendaPage() {
     }
     calHtml += '</div>';
 
-    // Event list grouped by month
+    // Event list grouped by month (inclui eventos criados pelo ADM)
     const evByMonth = {};
-    EVENTOS_2026.forEach(ev => {
+    [...EVENTOS_2026, ...S.eventosCustom].forEach(ev => {
         const mo = parseInt(ev.start.split('-')[1]) - 1;
         if (!evByMonth[mo]) evByMonth[mo] = [];
         evByMonth[mo].push(ev);
@@ -5309,17 +5424,26 @@ function agendaPage() {
                 const team = EV_INSTR.filter(({k})=>esc[k]).map(({k,emoji,label})=>`<span style="font-size:11px;color:var(--muted);display:inline-flex;align-items:center;gap:4px">${instrIcon(k,12)} <b style="color:var(--text)">${esc[k]}</b></span>`);
                 if (team.length) teamHtml = `<div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:6px;padding:6px 8px;background:rgba(0,150,63,.06);border-radius:6px;border:1px solid rgba(0,150,63,.15)">${team.join('')}</div>`;
             }
-            listHtml += `<div class="ev-item ${ev.alegrai?'ev-alegrai-card':''} ${isMine&&!isPast?'ev-mine':''} ${isUp&&!ev.alegrai&&!isMine?'upcoming':''} ${isPast?'past':''}" onclick="openEvModal('${ev.id}')" style="cursor:pointer">
-                <div class="ev-dot"></div>
+            const isCustom = !!ev.criadoEm; // evento criado pelo ADM no app
+            const corCustom = ev.cor || '#3b82f6';
+            listHtml += `<div class="ev-item ${ev.alegrai?'ev-alegrai-card':''} ${isMine&&!isPast?'ev-mine':''} ${isUp&&!ev.alegrai&&!isMine?'upcoming':''} ${isPast?'past':''}" onclick="${isCustom?'':'openEvModal(\''+ev.id+'\')'}" style="cursor:${isCustom?'default':'pointer'};${isCustom?'border-left-color:'+corCustom+';':''}" >
+                <div class="ev-dot" style="${isCustom?'background:'+corCustom:''}"></div>
                 <div class="ev-date" style="${ev.alegrai?'color:#F15A24;font-weight:800':isMine?'color:var(--purple-light);font-weight:700':''}">
-                    ${isMine&&!isPast?'📍 ':''} ${evDateLabel(ev)}
+                    ${isMine&&!isPast?'📍 ':''} ${evDateLabel(ev)}${ev.horario?' · ⏰ '+ev.horario:''}
                 </div>
-                <div class="ev-title">${ev.title}</div>
+                <div style="display:flex;align-items:center;gap:8px;justify-content:space-between;flex-wrap:wrap">
+                    <div class="ev-title" style="${isCustom?'color:'+corCustom:''}">${ev.title}${isCustom?'<span style="margin-left:6px;font-size:10px;background:rgba(255,255,255,.1);padding:1px 6px;border-radius:6px;font-weight:600">✦ sua ativ.</span>':''}</div>
+                    ${isAdm()&&isCustom?`<div style="display:flex;gap:4px">
+                        <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();openEditAtividade('${ev.id}')">${ic('edit',13)}</button>
+                        <button class="btn btn-danger btn-sm" onclick="event.stopPropagation();delAtividade('${ev.id}')">${ic('trash',13)}</button>
+                    </div>`:''}
+                </div>
                 <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
                     ${alegraiBadge}
                     ${myBadge}
                     ${hasCl&&!isMembro()?`<span style="font-size:11px;color:${clDone===clTotal?'var(--purple-light)':'var(--muted)'}">✅ ${clDone}/${clTotal}</span>`:''}
                     ${isUp ? `<div class="ev-badge">${d===0?'HOJE':d===1?'amanhã':d+' dias'}</div>` : ''}
+                    ${ev.local&&isCustom?`<span style="font-size:11px;color:var(--muted)">${ic('pin',11)} ${escHtml(ev.local)}</span>`:''}
                 </div>
                 ${teamHtml}
             </div>`;
@@ -5342,7 +5466,10 @@ function agendaPage() {
         <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:18px">
             <h2 style="font-size:22px;font-weight:800;display:inline-flex;align-items:center;gap:7px">${ic('agenda',20)} Agenda Hallel 2026</h2>
             ${isAdm()
-                ? `<button class="btn btn-primary btn-sm" onclick="openEscalaPicker()">${ic('setlists',16)} Fazer Escala</button>`
+                ? `<div style="display:flex;gap:8px;flex-wrap:wrap">
+                    <button class="btn btn-primary btn-sm" onclick="openEscalaPicker()">${ic('setlists',16)} Fazer Escala</button>
+                    <button class="btn btn-sm" onclick="openNovaAtividade()" style="background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.25);color:#fff">${ic('plus',16)} Atividade</button>
+                   </div>`
                 : `<span style="font-size:13px;color:var(--muted)">${EVENTOS_2026.length} eventos + semanais</span>`}
         </div>
         ${recSumHtml}
@@ -5368,7 +5495,7 @@ function openRecModal(recId, dateStr) {
 }
 
 function eventsOnDate(dateStr) {
-    const evs  = EVENTOS_2026.filter(ev => dateStr >= ev.start && dateStr <= ev.end);
+    const evs  = [...EVENTOS_2026, ...S.eventosCustom].filter(ev => dateStr >= ev.start && dateStr <= ev.end);
     const recs = REC_2026.filter(e => e.start === dateStr);
     return { evs, recs };
 }
@@ -5387,7 +5514,8 @@ function openDayModal(dateStr) {
 }
 
 function dayPickerModal(data) {
-    const dateStr = data.dateStr;
+    const dateStr = data?.dateStr;
+    if (!dateStr) return '';
     const { evs, recs } = eventsOnDate(dateStr);
     const [y,mo,d] = dateStr.split('-');
     const titulo = `${parseInt(d)} de ${MESES_PT[parseInt(mo)-1]}`;
