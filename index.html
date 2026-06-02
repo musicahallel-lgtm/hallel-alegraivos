@@ -2230,7 +2230,8 @@ function modalHtml() {
     if (type==='sub-request')      return subRequestModal(data);
     if (type==='sub-result')       return subResultModal(data);
     if (type==='fin-add')          return finAddModal(data);
-    if (type==='trocar-senha')     return trocarSenhaModal();
+    if (type==='trocar-senha')          return trocarSenhaModal();
+    if (type==='recusar-solicitacao')   return recusarSolicitacaoModal(data);
     if (type==='novo-aviso')       return novoAvisoModal(data);
     if (type==='inv-add')          return invAddModal(data);
     return '';
@@ -3149,28 +3150,51 @@ function membrosPage() {
                     <h3 style="font-size:17px;font-weight:800">📨 Solicitações de Acesso</h3>
                     <span style="background:#ef4444;color:#fff;border-radius:10px;padding:1px 8px;font-size:12px;font-weight:700">${pending.length}</span>
                 </div>
-                ${pending.map(r=>`
-                <div style="background:var(--bg2);border:1px solid rgba(255,212,0,.3);border-left:4px solid var(--gold);border-radius:var(--radius-sm);padding:14px 16px;margin-bottom:10px">
+                ${pending.map(r=>{
+                    const instrs2 = (r.instruments||[r.instrument]).map(k=>instrLabel2[k]||k).join(', ');
+                    return `<div style="background:var(--bg2);border:1px solid rgba(255,212,0,.3);border-left:4px solid var(--gold);border-radius:var(--radius-sm);padding:14px 16px;margin-bottom:10px">
                     <div style="display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap">
                         <div style="flex:1;min-width:180px">
                             <div style="font-size:15px;font-weight:800;margin-bottom:3px">${r.name}</div>
                             <div style="font-size:12px;color:var(--muted)">
-                                ${instrLabel2[r.instrument]||r.instrument}
-                                ${r.whatsapp?` · 📱 <a href="https://wa.me/55${r.whatsapp.replace(/\D/g,'')}" target="_blank" style="color:#25d366">${r.whatsapp}</a>`:''}
+                                ${instrs2}
+                                ${r.whatsapp?` · <a href="https://wa.me/55${r.whatsapp.replace(/\D/g,'')}" target="_blank" style="color:#25d366">📱 ${r.whatsapp}</a>`:''}
                                 ${r.email?` · 📧 ${r.email}`:''}
                             </div>
-                            ${r.msg?`<div style="font-size:12px;color:var(--muted);margin-top:4px;font-style:italic">"${r.msg}"</div>`:''}
+                            ${r.nascimento?`<div style="font-size:11px;color:var(--muted);margin-top:2px">🎂 ${r.nascimento.split('-').reverse().join('/')}${r.camisa?' · 👕 '+r.camisa:''}</div>`:''}
+                            ${r.msg?`<div style="font-size:12px;color:var(--muted);margin-top:4px;font-style:italic">"${escHtml(r.msg)}"</div>`:''}
                             <div style="font-size:11px;color:var(--muted);margin-top:4px">
                                 ${new Date(r.at).toLocaleDateString('pt-BR')} ${new Date(r.at).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}
                             </div>
                         </div>
                         <div style="display:flex;gap:8px;flex-shrink:0">
-                            <button class="btn btn-primary btn-sm" onclick="approveRequest('${r.id}')">✅ Aprovar</button>
-                            <button class="btn btn-ghost btn-sm" style="color:#f87171;border-color:#f87171" onclick="rejectRequest('${r.id}')">✕ Recusar</button>
+                            <button class="btn btn-primary btn-sm" onclick="approveRequest('${r.id}')">${ic('check',14)} Aprovar</button>
+                            <button class="btn btn-ghost btn-sm" style="color:#f87171;border-color:#f87171" onclick="rejectRequest('${r.id}')">${ic('x',14)} Recusar</button>
                         </div>
                     </div>
-                </div>`).join('')}
-            </div>`;
+                </div>`;}).join('')}
+            </div>
+            ${(()=>{
+                const recusadas = S.accessRequests.filter(r=>r.status==='rejected').sort((a,b)=>(b.rejectedAt||b.at)-(a.rejectedAt||a.at));
+                if (!recusadas.length) return '';
+                return `<div style="margin-top:20px">
+                    <div style="font-size:13px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">Recusadas</div>
+                    ${recusadas.map(r=>`
+                    <div style="background:var(--bg2);border:1px solid var(--border);border-left:4px solid #ef4444;border-radius:var(--radius-sm);padding:12px 14px;margin-bottom:8px;opacity:.75">
+                        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;flex-wrap:wrap">
+                            <div>
+                                <div style="font-size:14px;font-weight:700">${escHtml(r.name)}</div>
+                                <div style="font-size:11px;color:var(--muted)">${instrLabel2[r.instrument]||r.instrument||'—'}${r.whatsapp?' · '+r.whatsapp:''}</div>
+                                ${r.motivo?`<div style="font-size:11px;color:#f87171;margin-top:3px;font-style:italic">Motivo: ${escHtml(r.motivo)}</div>`:''}
+                                <div style="font-size:10px;color:var(--muted);margin-top:3px">
+                                    Recusada em ${r.rejectedAt?new Date(r.rejectedAt).toLocaleDateString('pt-BR'):'—'}
+                                </div>
+                            </div>
+                            <button class="btn btn-ghost btn-sm" onclick="limparRecusa('${r.id}')" style="font-size:11px;color:var(--muted)">${ic('trash',12)}</button>
+                        </div>
+                    </div>`).join('')}
+                </div>`;
+            })()}`;
         })()}
     </div>`;
 }
@@ -3189,10 +3213,60 @@ function approveRequest(rqId) {
 }
 
 function rejectRequest(rqId) {
+    S.modal = { type:'recusar-solicitacao', data:{ rqId } };
+    render();
+}
+function recusarSolicitacaoModal({ rqId }) {
+    const rq = S.accessRequests.find(r=>r.id===rqId);
+    if (!rq) return '';
+    return `<div class="backdrop" onclick="closeModal(event)">
+    <div class="modal" style="max-width:420px">
+        <div class="modal-hd">
+            <div class="modal-title">${ic('x',18)} Recusar Solicitação</div>
+            <button class="close-btn" onclick="closeModal()">${ic('close',20)}</button>
+        </div>
+        <div class="modal-body">
+            <div style="background:var(--bg3);border-radius:var(--radius-sm);padding:12px 14px;margin-bottom:16px">
+                <div style="font-size:15px;font-weight:800">${escHtml(rq.name)}</div>
+                <div style="font-size:12px;color:var(--muted);margin-top:2px">
+                    ${(EV_INSTR.find(x=>x.k===rq.instrument)||{}).label||rq.instrument||'—'}
+                    ${rq.whatsapp?' · '+rq.whatsapp:''}
+                </div>
+                ${rq.msg?`<div style="font-size:12px;color:var(--muted);margin-top:4px;font-style:italic">"${escHtml(rq.msg)}"</div>`:''}
+            </div>
+            <div class="form-group">
+                <label class="form-label">Motivo da recusa <span style="font-weight:400;color:var(--muted)">(opcional — só para seu controle)</span></label>
+                <textarea class="field" id="rj-motivo" rows="3"
+                    placeholder="Ex: Não temos vagas no momento, já temos muitos vocais..."></textarea>
+            </div>
+        </div>
+        <div class="modal-ft">
+            <button class="btn btn-ghost" onclick="closeModal()">Cancelar</button>
+            <button class="btn btn-danger" onclick="confirmarRecusa('${rqId}')">
+                ${ic('x',15)} Confirmar recusa
+            </button>
+        </div>
+    </div></div>`;
+}
+function limparRecusa(rqId) {
+    S.accessRequests = S.accessRequests.filter(r=>r.id!==rqId);
+    persist(); render();
+}
+function confirmarRecusa(rqId) {
     const rq = S.accessRequests.find(r=>r.id===rqId); if(!rq) return;
-    if (!confirm(`Recusar solicitação de ${rq.name}?`)) return;
-    if (rq._cloud) { fbRemoverSolicitacao(rq.id); S.accessRequests = S.accessRequests.filter(r=>r.id!==rqId); }
-    else { rq.status = 'rejected'; persist(); }
+    const motivo = document.getElementById('rj-motivo')?.value?.trim() || '';
+    rq.status  = 'rejected';
+    rq.motivo  = motivo;
+    rq.rejectedAt = Date.now();
+    if (rq._cloud) {
+        // Mantém registro local da recusa antes de remover da nuvem
+        const copia = { ...rq, _cloud: false };
+        S.accessRequests = S.accessRequests.filter(r=>r.id!==rqId);
+        S.accessRequests.push(copia);
+        fbRemoverSolicitacao(rqId);
+    }
+    persist();
+    S.modal = null;
     render();
     toast(`Solicitação de ${rq.name} recusada.`);
 }
