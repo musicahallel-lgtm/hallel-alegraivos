@@ -3016,10 +3016,16 @@ function missionAlertModal({member, escalas}) {
                             onclick="setAvailability('${ev.id}','${member.id}','cannot')">❌ Não posso</button>
                     </div>`;
                 }
+                const evLocal = (S.escalas[ev.id]?.local || '').trim();
+                const localHtml = evLocal ? `<div style="margin-top:8px">
+                    <div style="font-size:12px;color:#a5b4fc;margin-bottom:5px">📍 ${evLocal.replace(/</g,'&lt;')}</div>
+                    ${mapButtons(evLocal)}
+                </div>` : '';
                 return `<div class="mission-ev-item">
                     <div class="mission-ev-name">📅 ${ev.title}</div>
                     <div class="mission-ev-date">${evDateLabel(ev)}${ev.horario?' · '+ev.horario:''} — <b>${whenStr(daysUntil)}</b></div>
                     <div class="mission-ev-role">🎵 Sua função: ${roles.map(r=>r.label).join(', ')}</div>
+                    ${localHtml}
                     ${statusHtml}
                 </div>`;
             }).join('')}
@@ -4674,6 +4680,23 @@ function eventoModal(ev) {
                <button class="btn btn-ghost btn-sm" onclick="addCheckItem('${ev.id}')">+ Adicionar</button>
            </div>`:''}`;
 
+    // ── Local / Endereço ─────────────────────────────────────────────────
+    const local = (esc.local || '').trim();
+    let localHtml = `<div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px 14px;margin-bottom:16px">
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:8px">📍 Local do evento</div>`;
+    if (isAdm()) {
+        localHtml += `<input class="field" type="text" placeholder="Ex: Rua das Flores, 123 — Centro, Cidade"
+            value="${local.replace(/"/g,'&quot;')}"
+            onchange="saveEvLocal('${ev.id}',this.value)" onblur="saveEvLocal('${ev.id}',this.value)"
+            style="margin-bottom:${local?'10px':'0'}">`;
+    } else if (local) {
+        localHtml += `<div style="font-size:14px;color:var(--text);margin-bottom:10px;line-height:1.4">${local.replace(/</g,'&lt;')}</div>`;
+    } else {
+        localHtml += `<div style="font-size:13px;color:var(--muted);font-style:italic">Local ainda não informado.</div>`;
+    }
+    if (local) localHtml += mapButtons(local);
+    localHtml += `</div>`;
+
     return `<div class="backdrop" onclick="closeModal(event)">
     <div class="modal" style="max-width:600px">
         <div class="modal-hd">
@@ -4688,6 +4711,7 @@ function eventoModal(ev) {
             <button class="close-btn" onclick="closeModal()">✕</button>
         </div>
         <div class="modal-body">
+            ${localHtml}
             <div style="display:flex;gap:4px;margin-bottom:16px">
                 <button class="btn ${tab==='escala'?'btn-primary':'btn-ghost'} btn-sm" onclick="setEvTab('escala')">🎼 Escala</button>
                 <button class="btn ${tab==='checklist'?'btn-primary':'btn-ghost'} btn-sm" onclick="setEvTab('checklist')">
@@ -4829,6 +4853,30 @@ function copyWaText(text) {
         document.body.removeChild(ta);
         toast('📋 Texto copiado!');
     }
+}
+
+function mapButtons(addr) {
+    const q = encodeURIComponent(addr);
+    const gmaps = `https://www.google.com/maps/search/?api=1&query=${q}`;
+    const waze  = `https://www.waze.com/ul?q=${q}&navigate=yes`;
+    return `<div style="display:flex;gap:8px;flex-wrap:wrap">
+        <a href="${gmaps}" target="_blank" rel="noopener noreferrer" class="btn btn-sm" style="flex:1;min-width:130px;display:flex;align-items:center;justify-content:center;gap:6px;background:#1a73e8;color:#fff;font-weight:700;text-decoration:none">
+            🗺️ Google Maps
+        </a>
+        <a href="${waze}" target="_blank" rel="noopener noreferrer" class="btn btn-sm" style="flex:1;min-width:130px;display:flex;align-items:center;justify-content:center;gap:6px;background:#33ccff;color:#062d3d;font-weight:700;text-decoration:none">
+            🚗 Waze
+        </a>
+    </div>`;
+}
+
+function saveEvLocal(evId, val) {
+    if (!S.escalas[evId]) S.escalas[evId] = {};
+    S.escalas[evId].local = (val || '').trim();
+    if (S.modal?.data?.id === evId) {
+        S.modal.data = EVENTOS_2026.find(e=>e.id===evId) || REC_2026.find(e=>e.id===evId) || S.modal.data;
+    }
+    persist();
+    render();
 }
 
 function saveEvEscalado(evId, key, val) {
