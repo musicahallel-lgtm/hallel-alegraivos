@@ -1,0 +1,17 @@
+{
+  "name": "Hallel — Ministério de Música",
+  "short_name": "Hallel",
+  "description": "Aplicativo do Ministério de Música da Comunidade Católica Hallel — músicas, set lists, escalas, agenda e mais.",
+  "lang": "pt-BR",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#080810",
+  "theme_color": "#00963F",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

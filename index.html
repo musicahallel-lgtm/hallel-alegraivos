@@ -6,8 +6,12 @@
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="theme-color" content="#080808">
+    <meta name="apple-mobile-web-app-title" content="Hallel">
+    <meta name="theme-color" content="#00963F">
     <title>Hallel — Alegraivos</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
     <link rel="preload" href="logo.png" as="image">
     <!-- EmailJS SDK — defer so it doesn't block first paint -->
     <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js" defer></script>
@@ -5620,6 +5624,13 @@ function maybeInitMixer(song) {
     // Alerta de aniversário do dia — aparece para todos os perfis logados
     if (S.role) setTimeout(() => maybeShowBirthday(), 600);
 })();
+
+// ── PWA: registra o service worker (app instalável + offline) ──
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('sw.js').catch(err => console.warn('SW falhou:', err));
+    });
+}
 </script>
 </body>
 </html>
