@@ -1362,9 +1362,9 @@ async function carregaFirestore() {
 function _escutaFirestore() {
     if (!_fbDB) return;
     _fbDB.collection('ministerio').doc('dados').onSnapshot(snap => {
-        if (!snap.exists || snap.metadata.hasPendingWrites) return; // ignora escrita própria
+        if (!snap.exists) return;
         const d = snap.data();
-        if (!d || !d._updatedAt) return;
+        if (!d) return;
         if (d.songs)         S.songs          = d.songs;
         if (d.setlists)      S.setlists       = d.setlists;
         if (d.escalas)       S.escalas        = d.escalas;
