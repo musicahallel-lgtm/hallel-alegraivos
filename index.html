@@ -1129,7 +1129,8 @@ async function initFirebase() {
             const cloud = snap.docs.map(d => ({ ...d.data(), id: d.id, _cloud: true }));
             const locais = S.accessRequests.filter(r => !r._cloud);
             S.accessRequests = [...locais, ...cloud];
-            if (S.role && (S.page === 'membros' || S.page === 'inicio')) render();
+            // Não re-renderiza se há um modal aberto (evita apagar campos que o usuário está preenchendo)
+            if (S.role && !S.modal && (S.page === 'membros' || S.page === 'inicio')) render();
         }, err => console.warn('Firestore solicitacoes:', err));
     } catch (e) { console.warn('Firebase indisponível:', e); }
 }
@@ -1273,10 +1274,11 @@ function persist(immediate) {
         localStorage.setItem('hl_avisos',        JSON.stringify(S.avisos));
         localStorage.setItem('hl_evCustom',      JSON.stringify(S.eventosCustom));
     } catch(e) { console.warn('localStorage:', e); }
-    if (immediate) { _syncFirestore(); return; }
-    // 2. Envia para o Firestore com debounce (não bloqueia a UI)
+    // Sempre marca dirty ANTES de qualquer sync (evita listener sobrescrever)
     _localDirty = true;
     clearTimeout(_persistTimer);
+    if (immediate) { _syncFirestore(); return; }
+    // Envia para o Firestore com debounce (não bloqueia a UI)
     _persistTimer = setTimeout(_syncFirestore, 100);
 }
 
@@ -3242,7 +3244,9 @@ function approveRequest(rqId) {
         instrument:rq.instrument, instruments:rq.instruments||[rq.instrument],
         whatsapp:rq.whatsapp, email:rq.email, nascimento:rq.nascimento||'', camisa:rq.camisa||'', user:'', pass:'' };
     if (rq._cloud) { fbRemoverSolicitacao(rq.id); S.accessRequests = S.accessRequests.filter(r=>r.id!==rqId); }
-    else { rq.status = 'approved'; persist(); }
+    else { rq.status = 'approved'; }
+    // Sempre persiste e marca dirty para proteger o modal de cadastro contra o listener do Firestore
+    persist();
     S.modal = { type:'member-form', data: newMember };
     render();
     toast(`✅ Aprovando ${rq.name} — defina usuário e senha.`);
