@@ -2,7 +2,7 @@
 // Mantém o app instalável e funcionando offline. Os dados continuam
 // 100% locais no aparelho (localStorage / IndexedDB) — nada é enviado.
 
-const CACHE = 'hallel-v1';
+const CACHE = 'hallel-v2';
 const CORE = [
   './',
   './index.html',
@@ -35,6 +35,10 @@ self.addEventListener('fetch', e => {
   const url = new URL(req.url);
   // Terceiros (CDN, YouTube, Spotify, Deezer…) passam direto pela rede
   if (url.origin !== self.location.origin) return;
+
+  // Mídia pesada (stems do mixer, áudio, vídeo, PDF grande) NÃO entra no cache —
+  // passa direto pela rede pra manter o app instalado leve
+  if (/\.(mp3|wav|m4a|ogg|aac|mp4|webm|mov)$/i.test(url.pathname)) return;
 
   // HTML / navegação → network-first: sempre pega a versão mais nova quando online,
   // e cai pro cache quando offline (assim suas atualizações chegam automaticamente)
