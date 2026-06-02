@@ -1395,6 +1395,10 @@ function accessRequestScreen() {
             <input class="field" id="req-email" type="email" placeholder="seu@email.com" style="background:#f5f5f5;border-color:#ddd;color:#111">
         </div>
         <div class="login-field">
+            <label>🎂 Data de nascimento</label>
+            <input class="field" id="req-nasc" type="date" style="background:#f5f5f5;border-color:#ddd;color:#111">
+        </div>
+        <div class="login-field">
             <label>Mensagem (opcional)</label>
             <input class="field" id="req-msg" type="text" placeholder="Ex: Toco violão há 3 anos..." style="background:#f5f5f5;border-color:#ddd;color:#111">
         </div>
@@ -1413,13 +1417,14 @@ function submitAccessRequest() {
     const instr = document.getElementById('req-instr')?.value;
     const whats = document.getElementById('req-whats')?.value?.trim();
     const email = document.getElementById('req-email')?.value?.trim().toLowerCase();
+    const nasc  = document.getElementById('req-nasc')?.value || '';
     const msg   = document.getElementById('req-msg')?.value?.trim();
     if (!name)  { showReqErr('Informe seu nome completo.'); return; }
     if (!whats) { showReqErr('Informe seu WhatsApp.'); return; }
     // Check duplicate
     const dup = S.accessRequests.find(r => r.name.toLowerCase()===name.toLowerCase() && r.status==='pending');
     if (dup) { showReqErr('Já existe uma solicitação pendente com este nome.'); return; }
-    S.accessRequests.push({ id:'rq'+uid(), name, instrument:instr, whatsapp:whats, email, msg, at:Date.now(), status:'pending' });
+    S.accessRequests.push({ id:'rq'+uid(), name, instrument:instr, whatsapp:whats, email, nascimento:nasc, msg, at:Date.now(), status:'pending' });
     persist();
     document.getElementById('req-ok').classList.add('show');
     document.getElementById('req-btn').style.display = 'none';
@@ -1510,9 +1515,9 @@ function doLogin() {
                 render();
             } else {
                 // Check substitution notifications first, then mission alert
-                if (!checkSubNotifications(member)) {
-                    showMissionAlert(member);
-                }
+                const showPersonal = () => { if (!checkSubNotifications(member)) showMissionAlert(member); };
+                // Aniversário do dia aparece primeiro; ao fechar, mostra os alertas pessoais
+                if (!maybeShowBirthday({ then: showPersonal })) showPersonal();
             }
         }, 300);
         return;
@@ -1539,6 +1544,38 @@ function showMissionAlert(member) {
     }
     S.modal = { type: 'mission-alert', data: { member, escalas: upcoming } };
     render();
+}
+
+// ── Aniversários ──────────────────────────────────────────────────────
+function getTodayBirthdays() {
+    const now = new Date();
+    const mm = String(now.getMonth()+1).padStart(2,'0');
+    const dd = String(now.getDate()).padStart(2,'0');
+    return S.members.filter(m => {
+        if (!m.nascimento) return false;
+        const parts = m.nascimento.split('-'); // YYYY-MM-DD
+        return parts[1]===mm && parts[2]===dd;
+    });
+}
+
+function maybeShowBirthday(opts={}) {
+    const bdays = getTodayBirthdays();
+    if (!bdays.length) return false;
+    const now = new Date();
+    const today = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+    if (localStorage.getItem('hl_bday_seen') === today) return false; // já mostrou hoje
+    localStorage.setItem('hl_bday_seen', today);
+    S._birthdayThen = opts.then || null;
+    S.modal = { type:'birthday-alert', data:{ members:bdays } };
+    render();
+    return true;
+}
+
+function closeBirthday() {
+    S.modal = null;
+    const then = S._birthdayThen; S._birthdayThen = null;
+    render();
+    if (then) setTimeout(then, 250);
 }
 
 function getMemberEscalas(memberName) {
@@ -1743,6 +1780,7 @@ function modalHtml() {
     if (type==='print')   return printModal(data);
     if (type==='evento')       return eventoModal(data);
     if (type==='mission-alert') return missionAlertModal(data);
+    if (type==='birthday-alert') return birthdayAlertModal(data);
     if (type==='member-form')  return memberFormModal(data);
     if (type==='first-access') return firstAccessModal(data);
     if (type==='wa-escala')        return waEscalaModal(data);
@@ -2695,7 +2733,7 @@ function approveRequest(rqId) {
     const rq = S.accessRequests.find(r=>r.id===rqId); if(!rq) return;
     // Pre-fill member form with request data
     const newMember = { id:null, name:rq.name, instrument:rq.instrument,
-        whatsapp:rq.whatsapp, email:rq.email, user:'', pass:'' };
+        whatsapp:rq.whatsapp, email:rq.email, nascimento:rq.nascimento||'', user:'', pass:'' };
     rq.status = 'approved';
     persist();
     S.modal = { type:'member-form', data: newMember };
@@ -2779,6 +2817,10 @@ function memberFormModal(data) {
                         <input class="field" id="mf-email" type="email" placeholder="Ex: raquel@email.com" value="${data.email||''}">
                     </div>
                 </div>
+                <div>
+                    <label style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;display:block;margin-bottom:4px">🎂 Data de nascimento</label>
+                    <input class="field" id="mf-nasc" type="date" value="${data.nascimento||''}">
+                </div>
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
                     <div>
                         <label style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;display:block;margin-bottom:4px">Usuário (login)</label>
@@ -2808,6 +2850,7 @@ function saveMember(id) {
     const instrs = EV_INSTR.map(({k})=>k).filter(k=>document.getElementById('mf-ic-'+k)?.checked);
     const whats  = document.getElementById('mf-whats')?.value?.trim();
     const email  = document.getElementById('mf-email')?.value?.trim().toLowerCase();
+    const nasc   = document.getElementById('mf-nasc')?.value || '';
     const user   = document.getElementById('mf-user')?.value?.trim().toLowerCase();
     const pass   = document.getElementById('mf-pass')?.value?.trim();
     const typeEl = document.querySelector('input[name="mf-type"]:checked');
@@ -2818,9 +2861,9 @@ function saveMember(id) {
     if (conflict) { toast('⚠️ Esse nome de usuário já existe.'); return; }
     if (id) {
         const m = S.members.find(x=>x.id===id);
-        if (m) { m.name=name; m.instruments=instrs; m.instrument=instrs[0]; m.whatsapp=whats; m.email=email; m.user=user; m.pass=pass; m.memberType=memberType; }
+        if (m) { m.name=name; m.instruments=instrs; m.instrument=instrs[0]; m.whatsapp=whats; m.email=email; m.nascimento=nasc; m.user=user; m.pass=pass; m.memberType=memberType; }
     } else {
-        S.members.push({ id:'mb'+uid(), name, instruments:instrs, instrument:instrs[0], whatsapp:whats, email, user, pass, memberType });
+        S.members.push({ id:'mb'+uid(), name, instruments:instrs, instrument:instrs[0], whatsapp:whats, email, nascimento:nasc, user, pass, memberType });
     }
     persist(); closeModal(); render();
     toast(id ? `✅ ${name} atualizado!` : `✅ ${name} cadastrado no ministério!`);
@@ -3036,6 +3079,33 @@ function missionAlertModal({member, escalas}) {
             A Comunidade Católica Hallel conta com a sua entrega e dedicação. Que Deus abençoe o seu serviço! ✨
         </div>
         <button class="mission-btn" onclick="closeModal();nav('minha-escala')">✅ Entendido — Vou me preparar!</button>
+    </div></div>`;
+}
+
+function birthdayAlertModal({members}) {
+    const nowYear = new Date().getFullYear();
+    const nomes = members.map(m => {
+        const parts = (m.nascimento||'').split('-');
+        const idade = (parts[0] && parts[0].length===4) ? (nowYear - parseInt(parts[0])) : null;
+        return `<div class="mission-ev-item" style="border-left-color:var(--gold);text-align:center">
+            <div class="mission-ev-name" style="font-size:17px">🎂 ${m.name}</div>
+            ${idade!==null ? `<div class="mission-ev-date" style="color:var(--gold)">Completando ${idade} anos hoje! 🎉</div>` : `<div class="mission-ev-date" style="color:var(--gold)">É aniversário hoje! 🎉</div>`}
+        </div>`;
+    }).join('');
+    const plural = members.length>1;
+    return `<div class="mission-backdrop" onclick="if(event.target===this)closeBirthday()">
+    <div class="mission-card" style="max-width:460px;background:linear-gradient(160deg,#2a1040 0%,#3d1a10 100%)">
+        <div class="mission-icon">🎉🎂🎈</div>
+        <div class="mission-title" style="color:var(--gold)">${plural?'ANIVERSARIANTES DE HOJE!':'ANIVERSÁRIO HOJE!'}</div>
+        <div class="mission-sub">A família Hallel celebra com você 💛</div>
+        <div class="mission-ev-list">
+            ${nomes}
+        </div>
+        <div class="mission-msg" style="border-left-color:var(--gold)">
+            🙏 Que o Senhor abençoe ${plural?'estes irmãos':'este irmão(ã)'} com saúde, paz e muitas alegrias.
+            Vamos parabenizá-${plural?'los':'lo(a)'}! 🥳
+        </div>
+        <button class="mission-btn" style="background:linear-gradient(90deg,var(--gold),var(--gold-light));color:#3d1a10" onclick="closeBirthday()">🎈 Feliz Aniversário!</button>
     </div></div>`;
 }
 
@@ -5419,6 +5489,8 @@ function maybeInitMixer(song) {
     ytScript.src = 'https://www.youtube.com/iframe_api';
     document.head.appendChild(ytScript);
     render();
+    // Alerta de aniversário do dia — aparece para todos os perfis logados
+    if (S.role) setTimeout(() => maybeShowBirthday(), 600);
 })();
 </script>
 </body>
