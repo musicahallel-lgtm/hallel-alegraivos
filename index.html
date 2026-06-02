@@ -1615,8 +1615,17 @@ function accessRequestScreen() {
             <input class="field" id="req-name" type="text" placeholder="Seu nome" style="background:#f5f5f5;border-color:#ddd;color:#111">
         </div>
         <div class="login-field">
-            <label>Instrumento principal *</label>
-            <select class="field" id="req-instr" style="background:#f5f5f5;border-color:#ddd;color:#111">${instrOpts}</select>
+            <label>Instrumentos * <span style="font-weight:400;font-size:11px;color:#888">(selecione todos que você toca)</span></label>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:4px" id="req-instr-grid">
+                ${EV_INSTR.map(({k,emoji,label})=>`
+                <label id="req-il-${k}" style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:#f5f5f7;border:1px solid #e0e0e0;border-radius:8px;cursor:pointer;transition:.15s">
+                    <input type="checkbox" value="${k}" id="req-ic-${k}"
+                        onchange="document.getElementById('req-il-${k}').style.borderColor=this.checked?'#00963F':'#e0e0e0';document.getElementById('req-il-${k}').style.background=this.checked?'#f0faf4':'#f5f5f7'"
+                        style="accent-color:#00963F;width:15px;height:15px;cursor:pointer;flex-shrink:0">
+                    <span style="font-size:13px;color:#333">${emoji} ${label}</span>
+                </label>`).join('')}
+            </div>
+            <div style="font-size:11px;color:#888;margin-top:6px">O primeiro marcado será seu instrumento principal</div>
         </div>
         <div class="login-field">
             <label>WhatsApp *</label>
@@ -1652,18 +1661,20 @@ function accessRequestScreen() {
 
 function submitAccessRequest() {
     const name  = document.getElementById('req-name')?.value?.trim();
-    const instr = document.getElementById('req-instr')?.value;
-    const whats = document.getElementById('req-whats')?.value?.trim();
+    const instrs = EV_INSTR.map(({k})=>k).filter(k=>document.getElementById('req-ic-'+k)?.checked);
+    const instr  = instrs[0] || '';   // principal = primeiro marcado
+    const whats  = document.getElementById('req-whats')?.value?.trim();
     const email = document.getElementById('req-email')?.value?.trim().toLowerCase();
     const nasc  = document.getElementById('req-nasc')?.value || '';
     const camisa= document.getElementById('req-camisa')?.value || '';
     const msg   = document.getElementById('req-msg')?.value?.trim();
-    if (!name)  { showReqErr('Informe seu nome completo.'); return; }
-    if (!whats) { showReqErr('Informe seu WhatsApp.'); return; }
+    if (!name)           { showReqErr('Informe seu nome completo.'); return; }
+    if (!instrs.length)  { showReqErr('Selecione pelo menos um instrumento.'); return; }
+    if (!whats)          { showReqErr('Informe seu WhatsApp.'); return; }
     // Check duplicate
     const dup = S.accessRequests.find(r => r.name.toLowerCase()===name.toLowerCase() && r.status==='pending');
     if (dup) { showReqErr('Já existe uma solicitação pendente com este nome.'); return; }
-    const reqObj = { instrument:instr, whatsapp:whats, email, nascimento:nasc, camisa, msg, at:Date.now(), status:'pending', name };
+    const reqObj = { instrument:instr, instruments:instrs, whatsapp:whats, email, nascimento:nasc, camisa, msg, at:Date.now(), status:'pending', name };
     // Envia para a nuvem (aparece no app do coordenador). Se não houver nuvem, fica só local.
     if (!fbEnviarSolicitacao(reqObj)) {
         S.accessRequests.push({ id:'rq'+uid(), ...reqObj });
@@ -1674,7 +1685,9 @@ function submitAccessRequest() {
     const err = document.getElementById('req-err'); if (err) err.style.display='none';
 
     // ── Envia a solicitação ao coordenador ──
-    const instrLabel = (EV_INSTR.find(x => x.k === instr) || {}).label || instr || '—';
+    const instrLabel = instrs.length
+        ? instrs.map(k => (EV_INSTR.find(x=>x.k===k)||{}).label||k).join(', ')
+        : (EV_INSTR.find(x=>x.k===instr)||{}).label || instr || '—';
     const nascFmt = nasc ? nasc.split('-').reverse().join('/') : '—';
     const linhas = [
         '🎵 *Nova solicitação de acesso — Hallel*',
@@ -3132,7 +3145,8 @@ function membrosPage() {
 function approveRequest(rqId) {
     const rq = S.accessRequests.find(r=>r.id===rqId); if(!rq) return;
     // Pre-fill member form with request data
-    const newMember = { id:null, name:rq.name, instrument:rq.instrument,
+    const newMember = { id:null, name:rq.name,
+        instrument:rq.instrument, instruments:rq.instruments||[rq.instrument],
         whatsapp:rq.whatsapp, email:rq.email, nascimento:rq.nascimento||'', camisa:rq.camisa||'', user:'', pass:'' };
     if (rq._cloud) { fbRemoverSolicitacao(rq.id); S.accessRequests = S.accessRequests.filter(r=>r.id!==rqId); }
     else { rq.status = 'approved'; persist(); }
