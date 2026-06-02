@@ -1125,13 +1125,20 @@ async function initFirebase() {
         await carregaFirestore();
 
         // ── Solicitações de acesso: listener separado (append-only, não sobrescreve outros dados) ──
+        let _solicitacoesInit = false;
         _fbDB.collection('solicitacoes').onSnapshot(snap => {
             const cloud = snap.docs.map(d => ({ ...d.data(), id: d.id, _cloud: true }));
-            // Mantém solicitações locais + atualiza cloud
             const locais = S.accessRequests.filter(r => !r._cloud);
+            const antesQtd = S.accessRequests.filter(r=>r._cloud && r.status==='pending').length;
             S.accessRequests = [...locais, ...cloud];
-            // Só re-renderiza se não há modal aberto (evita apagar campos sendo preenchidos)
-            if (S.role && !S.modal && (S.page === 'membros' || S.page === 'inicio')) render();
+            const agora = cloud.filter(r=>r.status==='pending').length;
+            // Notifica se chegou pedido novo (não na primeira carga)
+            if (_solicitacoesInit && agora > antesQtd && S.role) {
+                const novos = agora - antesQtd;
+                toast(`📨 ${novos} nova${novos>1?'s':''} solicitação${novos>1?'ões':''} de acesso! Veja em Membros.`);
+            }
+            _solicitacoesInit = true;
+            if (S.role && !S.modal) render();
         }, err => console.warn('Firestore solicitacoes:', err));
 
         // NOTA: _escutaFirestore() foi removido intencionalmente.
@@ -3217,10 +3224,15 @@ function membrosPage() {
             const pending = S.accessRequests.filter(r=>r.status==='pending');
             if (!pending.length) return '';
             const instrLabel2 = {violao:'Violão',teclado:'Teclado',bateria:'Bateria',baixo:'Baixo',guitarra:'Guitarra',sopro:'Sopro',vocal1:'Vocal 1',vocal2:'Vocal 2',vocal3:'Vocal 3',animador:'Animador'};
-            return `<div style="margin-top:28px">
-                <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
-                    <h3 style="font-size:17px;font-weight:800">📨 Solicitações de Acesso</h3>
-                    <span style="background:#ef4444;color:#fff;border-radius:10px;padding:1px 8px;font-size:12px;font-weight:700">${pending.length}</span>
+            return `<div style="margin-top:20px">
+                <div style="background:linear-gradient(135deg,rgba(241,90,36,.18),rgba(241,90,36,.08));border:2px solid rgba(241,90,36,.5);border-radius:var(--radius);padding:14px 18px;margin-bottom:14px;animation:avisoIn .3s ease">
+                    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+                        <span style="font-size:26px">📨</span>
+                        <div style="flex:1">
+                            <div style="font-size:16px;font-weight:800;color:#fb7a3c">${pending.length} solicitação${pending.length>1?'ões':''} aguardando aprovação</div>
+                            <div style="font-size:12px;color:var(--muted);margin-top:2px">Revise e aprove ou recuse cada pedido abaixo</div>
+                        </div>
+                    </div>
                 </div>
                 ${pending.map(r=>{
                     const instrs2 = (r.instruments||[r.instrument]).map(k=>instrLabel2[k]||k).join(', ');
