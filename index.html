@@ -746,7 +746,7 @@
         /* Larger tap targets on mobile */
         @media (max-width:600px) {
             .btn { min-height:44px; font-size:15px; }
-            .main { padding:16px 12px 84px; }
+            .main { padding:16px 12px calc(24px + env(safe-area-inset-bottom,0px)); }
             .header { padding:0 12px; gap:8px; height:56px; }
             .logo img { height:36px; width:36px; }
             .logo-alegraivos { display:none; }
@@ -759,35 +759,11 @@
             .toolbar { gap:8px; }
         }
 
-        /* ── Bottom Navigation (mobile) ── */
-        .bottom-nav { display:none; }
+        /* Bottom navigation removida — navegação fica no header (rolável) + tela Início */
+        .bottom-nav { display:none !important; }
         @media (max-width:640px) {
-            .header .nav { display:none !important; }
             .header-actions .btn-hide-mobile { display:none; }
-            .bottom-nav {
-                display:flex; position:fixed; bottom:0; left:0; right:0;
-                background:rgba(8,8,16,.98); backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px);
-                border-top:1px solid var(--border);
-                padding:4px 0 env(safe-area-inset-bottom,6px);
-                z-index:95; overflow-x:auto; scrollbar-width:none;
-                -webkit-overflow-scrolling:touch;
-            }
-            .bottom-nav::-webkit-scrollbar { display:none; }
         }
-        .bn-item {
-            display:flex; flex-direction:column; align-items:center; gap:2px;
-            padding:5px 10px 4px; color:var(--muted); font-size:10px; font-weight:700;
-            cursor:pointer; border:none; background:transparent; min-width:64px; flex-shrink:0;
-            touch-action:manipulation; font-family:inherit; letter-spacing:.2px;
-            text-transform:uppercase; transition:color .12s;
-        }
-        .bn-item.active { color:var(--purple-light); }
-        .bn-icon {
-            font-size:22px; width:44px; height:32px; display:flex; align-items:center;
-            justify-content:center; border-radius:12px; transition:background .12s;
-        }
-        .bn-item.active .bn-icon { background:rgba(0,150,63,.18); }
-        .bn-label { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:64px; }
 
         /* ── Relatório mensal ── */
         .rel-event-card {
@@ -1648,7 +1624,7 @@ function html() {
     if (S.page === 'financeiro')   page = financeiroPage();
     if (S.page === 'inventario')   page = inventarioPage();
     if (S.page === 'minha-escala') page = minhaEscalaPage();
-    return header() + `<div class="main">${page}</div>` + (S.modal ? modalHtml() : '') + bottomNav();
+    return header() + `<div class="main">${page}</div>` + (S.modal ? modalHtml() : '');
 }
 
 function inicioPage() {
