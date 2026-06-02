@@ -1339,7 +1339,7 @@ function hydrate() {
         const sb = localStorage.getItem('hl_substitutions'); if (sb) S.substitutions   = JSON.parse(sb);
         const fi = localStorage.getItem('hl_financeiro');    if (fi) S.financeiro      = JSON.parse(fi);
         const iv = localStorage.getItem('hl_inventario');    if (iv) S.inventario      = JSON.parse(iv);
-        const av = localStorage.getItem('hl_avisos');        if (av) S.avisos          = JSON.parse(av);
+        const avi = localStorage.getItem('hl_avisos');       if (avi) S.avisos         = JSON.parse(avi);
     } catch(e) { console.error(e); }
     _normalize();
 }
@@ -4816,11 +4816,10 @@ function novoAvisoModal(data) {
             <div>
                 <label class="form-label">Tipo</label>
                 <div style="display:flex;gap:8px;flex-wrap:wrap">
-                    ${Object.entries(AVISO_TIPOS).map(([k,v])=>`
-                    <button onclick="S.modal.data.tipo='${k}';render()" class="btn btn-sm"
-                        style="flex:1;${tipo===k?`background:${v.cor};color:#fff;border-color:${v.cor}`:'background:var(--bg3);border:1px solid var(--border);color:var(--muted)'}">
-                        ${v.label}
-                    </button>`).join('')}
+                    ${Object.entries(AVISO_TIPOS).map(([k,v])=>{
+                        const ativo = tipo===k ? 'background:'+v.cor+';color:#fff;border-color:'+v.cor : 'background:var(--bg3);border:1px solid var(--border);color:var(--muted)';
+                        return '<button onclick="S.modal.data.tipo=\''+k+'\';render()" class="btn btn-sm" style="flex:1;'+ativo+'">'+v.label+'</button>';
+                    }).join('')}
                 </div>
             </div>
             <div>
