@@ -75,6 +75,8 @@
             transition:background-color .15s, color .15s;
             touch-action:manipulation;
         }
+        .nav-btn { display:inline-flex; align-items:center; gap:6px; white-space:nowrap; }
+        .nav-btn svg { flex-shrink:0; }
         .nav-btn:hover { background:rgba(255,255,255,.15); color:#fff; }
         .nav-btn.active { background:rgba(255,255,255,.94); color:#004d20; font-weight:700; box-shadow:0 2px 8px rgba(0,0,0,.25); }
         .header-actions { display:flex; gap:8px; margin-left:auto; }
@@ -871,6 +873,16 @@
         .inv-empty-icon { font-size:56px; margin-bottom:14px; }
 
         /* ── Início (launcher iOS-style) ── */
+        .home-brand {
+            width:84px; height:84px; margin:4px auto 14px; border-radius:24px;
+            background:linear-gradient(145deg,#00963F,#006b2d);
+            display:flex; align-items:center; justify-content:center;
+            box-shadow:0 8px 24px rgba(0,150,63,.35), inset 0 1px 0 rgba(255,255,255,.25);
+        }
+        .home-brand img {
+            width:60px; height:60px; object-fit:contain;
+            filter:brightness(0) invert(1); opacity:.95;
+        }
         .home-hero { text-align:center; margin:8px 0 24px; }
         .home-hero h2 { font-size:24px; font-weight:800; letter-spacing:-.4px; }
         .home-hero p { font-size:13px; color:var(--muted); margin-top:4px; }
@@ -1647,6 +1659,27 @@ function svgIcon(key, size=32) {
     return `<svg viewBox="0 0 24 24" width="${size}" height="${size}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[key]||''}</svg>`;
 }
 
+// ── Versão DUOTONE (preenchida em dois tons) — usada nos tiles coloridos ──
+const F1 = 'rgba(255,255,255,.18)';  // preenchimento suave
+const F2 = 'rgba(255,255,255,.34)';  // preenchimento de destaque
+const ICONS_DUO = {
+    inicio:        `<path d="M3 9.5 12 3l9 6.5"/><path d="M5 10v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V10" fill="${F1}"/><path d="M9 21v-6h6v6" fill="${F2}"/>`,
+    library:       `<path d="M9 18V5l12-2v13" fill="${F1}"/><circle cx="6" cy="18" r="3" fill="${F2}"/><circle cx="18" cy="16" r="3" fill="${F2}"/>`,
+    setlists:      `<path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" fill="${F1}"/><rect x="8" y="2" width="8" height="4" rx="1" fill="${F2}"/><path d="M8 11h.01"/><path d="M8 16h.01"/><path d="M12 11h4"/><path d="M12 16h4"/>`,
+    playlist:      `<polygon points="7 4 19 12 7 20 7 4" fill="currentColor" stroke="none"/>`,
+    agenda:        `<rect x="3" y="4" width="18" height="18" rx="2" fill="${F1}"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/>`,
+    membros:       `<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" fill="${F1}"/><circle cx="9" cy="7" r="4" fill="${F2}"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>`,
+    atividade:     `<rect x="4" y="13" width="4" height="7" rx="1" fill="${F2}"/><rect x="10" y="4" width="4" height="16" rx="1" fill="${F1}"/><rect x="16" y="9" width="4" height="11" rx="1" fill="${F2}"/>`,
+    cadastros:     `<path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" fill="${F1}"/><circle cx="12" cy="12" r="3" fill="${F2}"/>`,
+    relatorio:     `<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" fill="${F1}"/><path d="M14 2v6h6" fill="${F2}"/><path d="M16 13H8"/><path d="M16 17H8"/><path d="M10 9H8"/>`,
+    financeiro:    `<path d="M3 5v14a2 2 0 0 0 2 2h16v-5" fill="${F1}"/><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M18 12a2 2 0 0 0 0 4h4v-4Z" fill="${F2}"/>`,
+    inventario:    `<path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" fill="${F1}"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/>`,
+    'minha-escala':`<circle cx="12" cy="12" r="9" fill="${F1}"/><circle cx="12" cy="12" r="5" fill="${F2}"/><circle cx="12" cy="12" r="1.8" fill="currentColor" stroke="none"/>`,
+};
+function svgIconDuo(key, size=32) {
+    return `<svg viewBox="0 0 24 24" width="${size}" height="${size}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS_DUO[key]||ICONS[key]||''}</svg>`;
+}
+
 function inicioPage() {
     const pending = S.accessRequests.filter(r=>r.status==='pending').length;
     const T = {
@@ -1678,12 +1711,13 @@ function inicioPage() {
     const tiles = order.map(p => {
         const t = T[p];
         return `<button class="app-tile" onclick="nav('${p}')" aria-label="${t.l}">
-            <span class="app-icon" style="background:${t.bg}">${svgIcon(p)}${t.badge?`<span class="app-badge">${t.badge}</span>`:''}</span>
+            <span class="app-icon" style="background:${t.bg}">${svgIconDuo(p)}${t.badge?`<span class="app-badge">${t.badge}</span>`:''}</span>
             <span class="app-label">${t.l}</span>
         </button>`;
     }).join('');
 
     return `
+    <div class="home-brand"><img src="logo.png" alt="Hallel"></div>
     <div class="home-hero">
         <h2>${saud}${nome?`, ${nome}`:''}! 👋</h2>
         <p>Ministério de Música Hallel — escolha uma área</p>
@@ -1740,27 +1774,27 @@ function header() {
         </div>
         <nav class="nav">
             ${isMembro() ? `
-                <button class="nav-btn ${S.page==='inicio'?'active':''}" onclick="nav('inicio')">🏠 Início</button>
-                <button class="nav-btn ${S.page==='minha-escala'?'active':''}" onclick="nav('minha-escala')">🎯 Minha Escala</button>
-                <button class="nav-btn ${S.page==='library'?'active':''}"      onclick="nav('library')">🎸 Biblioteca</button>
-                <button class="nav-btn ${S.page==='setlists'?'active':''}"     onclick="nav('setlists')">📋 Set Lists</button>
-                <button class="nav-btn ${S.page==='playlist'?'active':''}"     onclick="nav('playlist')">▶ Playlist</button>
-                <button class="nav-btn ${S.page==='agenda'?'active':''}"       onclick="nav('agenda')">📅 Agenda</button>
+                <button class="nav-btn ${S.page==='inicio'?'active':''}" onclick="nav('inicio')">${svgIcon('inicio',17)} Início</button>
+                <button class="nav-btn ${S.page==='minha-escala'?'active':''}" onclick="nav('minha-escala')">${svgIcon('minha-escala',17)} Minha Escala</button>
+                <button class="nav-btn ${S.page==='library'?'active':''}"      onclick="nav('library')">${svgIcon('library',17)} Biblioteca</button>
+                <button class="nav-btn ${S.page==='setlists'?'active':''}"     onclick="nav('setlists')">${svgIcon('setlists',17)} Set Lists</button>
+                <button class="nav-btn ${S.page==='playlist'?'active':''}"     onclick="nav('playlist')">${svgIcon('playlist',17)} Playlist</button>
+                <button class="nav-btn ${S.page==='agenda'?'active':''}"       onclick="nav('agenda')">${svgIcon('agenda',17)} Agenda</button>
             ` : `
-                <button class="nav-btn ${S.page==='inicio'?'active':''}" onclick="nav('inicio')">🏠 Início</button>
-                <button class="nav-btn ${S.page==='library'?'active':''}"  onclick="nav('library')">🎸 Biblioteca</button>
-                <button class="nav-btn ${S.page==='setlists'?'active':''}" onclick="nav('setlists')">📋 Set Lists</button>
-                <button class="nav-btn ${S.page==='playlist'?'active':''}" onclick="nav('playlist')">▶ Playlist</button>
-                <button class="nav-btn ${S.page==='agenda'?'active':''}"   onclick="nav('agenda')">📅 Agenda</button>
+                <button class="nav-btn ${S.page==='inicio'?'active':''}" onclick="nav('inicio')">${svgIcon('inicio',17)} Início</button>
+                <button class="nav-btn ${S.page==='library'?'active':''}"  onclick="nav('library')">${svgIcon('library',17)} Biblioteca</button>
+                <button class="nav-btn ${S.page==='setlists'?'active':''}" onclick="nav('setlists')">${svgIcon('setlists',17)} Set Lists</button>
+                <button class="nav-btn ${S.page==='playlist'?'active':''}" onclick="nav('playlist')">${svgIcon('playlist',17)} Playlist</button>
+                <button class="nav-btn ${S.page==='agenda'?'active':''}"   onclick="nav('agenda')">${svgIcon('agenda',17)} Agenda</button>
                 ${isAdm() ? `
-                <button class="nav-btn ${S.page==='membros'?'active':''}" onclick="nav('membros')" style="position:relative">👥 Membros
+                <button class="nav-btn ${S.page==='membros'?'active':''}" onclick="nav('membros')" style="position:relative">${svgIcon('membros',17)} Membros
                     ${S.accessRequests.filter(r=>r.status==='pending').length?`<span style="position:absolute;top:2px;right:2px;width:8px;height:8px;border-radius:50%;background:#ef4444"></span>`:''}
                 </button>
-                <button class="nav-btn ${S.page==='atividade'?'active':''}" onclick="nav('atividade')">📊 Atividade</button>
-                <button class="nav-btn ${S.page==='cadastros'?'active':''}" onclick="nav('cadastros')">👁 Cadastros</button>
-                <button class="nav-btn ${S.page==='relatorio'?'active':''}" onclick="nav('relatorio')">📄 Relatório</button>
-                <button class="nav-btn ${S.page==='financeiro'?'active':''}" onclick="nav('financeiro')">💰 Financeiro</button>
-                <button class="nav-btn ${S.page==='inventario'?'active':''}" onclick="nav('inventario')">📦 Inventário</button>
+                <button class="nav-btn ${S.page==='atividade'?'active':''}" onclick="nav('atividade')">${svgIcon('atividade',17)} Atividade</button>
+                <button class="nav-btn ${S.page==='cadastros'?'active':''}" onclick="nav('cadastros')">${svgIcon('cadastros',17)} Cadastros</button>
+                <button class="nav-btn ${S.page==='relatorio'?'active':''}" onclick="nav('relatorio')">${svgIcon('relatorio',17)} Relatório</button>
+                <button class="nav-btn ${S.page==='financeiro'?'active':''}" onclick="nav('financeiro')">${svgIcon('financeiro',17)} Financeiro</button>
+                <button class="nav-btn ${S.page==='inventario'?'active':''}" onclick="nav('inventario')">${svgIcon('inventario',17)} Inventário</button>
                 ` : ''}
             `}
         </nav>
