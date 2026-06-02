@@ -326,13 +326,18 @@
         }
         .mixer-stems { display:flex; flex-direction:column; gap:8px; }
         .stem-row {
-            display:grid; grid-template-columns:32px 1fr auto auto;
-            align-items:center; gap:10px;
-            padding:12px 12px; background:var(--bg4); border-radius:var(--radius-sm);
+            display:grid; grid-template-columns:36px 1fr auto auto;
+            align-items:center; gap:11px;
+            padding:11px 12px; background:var(--bg4); border-radius:var(--radius-sm);
             transition:opacity .2s;
         }
         .stem-row.muted { opacity:.3; }
-        .stem-emoji { font-size:20px; text-align:center; }
+        .stem-icon {
+            width:36px; height:36px; border-radius:11px;
+            display:flex; align-items:center; justify-content:center; flex-shrink:0;
+            box-shadow:0 2px 7px rgba(0,0,0,.4), inset 0 1px 0 rgba(255,255,255,.2);
+        }
+        .stem-icon svg { filter:drop-shadow(0 1px 1.5px rgba(0,0,0,.3)); }
         .stem-name-vol { display:flex; flex-direction:column; gap:6px; min-width:0; }
         .stem-name { font-size:13px; font-weight:600; color:var(--text); }
         .stem-vol {
@@ -5404,21 +5409,45 @@ function plPrev() { plGoTo(S.pl.idx - 1); }
 const MIXERS = {}; // songId → mixer state
 
 const STEM_META = {
-    vocals:        { label:'Voz',         emoji:'🎤' },
-    backing_vocals:{ label:'Back Vocal',  emoji:'🎤' },
-    drums:         { label:'Bateria',     emoji:'🥁' },
-    bass:          { label:'Baixo',       emoji:'🎸' },
-    electric:      { label:'Elétrica',    emoji:'🎸' },
-    acoustic:      { label:'Acústica',    emoji:'🎸' },
-    piano:         { label:'Piano',       emoji:'🎹' },
-    keys:          { label:'Keys',        emoji:'⌨️' },
-    strings:       { label:'Cordas',      emoji:'🎻' },
-    wind:          { label:'Sopros',      emoji:'🎷' },
-    metronome:     { label:'Metrônomo',   emoji:'🎚' },
-    lead:          { label:'Guitarra Lead', emoji:'🎸' },
-    rhythm:        { label:'Guitarra Ritmo', emoji:'🎸' },
-    other:         { label:'Outros',      emoji:'🔊' },
+    vocals:        { label:'Voz',            icon:'mic',    color:'#ec4899' },
+    backing_vocals:{ label:'Back Vocal',     icon:'mic2',   color:'#f472b6' },
+    drums:         { label:'Bateria',        icon:'drum',   color:'#f59e0b' },
+    bass:          { label:'Baixo',          icon:'amp',    color:'#8b5cf6' },
+    electric:      { label:'Elétrica',       icon:'guitar', color:'#3b82f6' },
+    acoustic:      { label:'Acústica',       icon:'acoustic',color:'#14b8a6' },
+    piano:         { label:'Piano',          icon:'piano',  color:'#22c55e' },
+    keys:          { label:'Keys',           icon:'synth',  color:'#10b981' },
+    strings:       { label:'Cordas',         icon:'strings',color:'#eab308' },
+    wind:          { label:'Sopros',         icon:'wind',   color:'#06b6d4' },
+    metronome:     { label:'Metrônomo',      icon:'metro',  color:'#94a3b8' },
+    lead:          { label:'Guitarra Lead',  icon:'guitar', color:'#ef4444' },
+    rhythm:        { label:'Guitarra Ritmo', icon:'guitar', color:'#6366f1' },
+    other:         { label:'Outros',         icon:'speaker',color:'#64748b' },
 };
+
+// Ícones SVG dos canais do mixer (traço branco sobre o chip colorido)
+const STEM_ICONS = {
+    mic:     '<rect x="9" y="2" width="6" height="11" rx="3"/><path d="M5 10v1a7 7 0 0 0 14 0v-1"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="8" y1="22" x2="16" y2="22"/>',
+    mic2:    '<rect x="6" y="3" width="5" height="9" rx="2.5"/><path d="M3 10a5.5 5.5 0 0 0 11 0"/><line x1="8.5" y1="15.5" x2="8.5" y2="21"/><line x1="5" y1="21" x2="12" y2="21"/><path d="M17 7c1.3 1.8 1.3 4.2 0 6"/><path d="M20 4.5c2.2 3 2.2 7 0 10"/>',
+    drum:    '<ellipse cx="12" cy="8" rx="8" ry="3"/><path d="M4 8v6c0 1.66 3.58 3 8 3s8-1.34 8-3V8"/><line x1="15" y1="9.5" x2="21" y2="3.5"/><line x1="9" y1="9.5" x2="3" y2="3.5"/>',
+    guitar:  '<path d="M20 4l-1.5 1.5"/><path d="M21 3l-2 2"/><path d="M18.5 5.5 13 11"/><path d="M9 10a4.5 4.5 0 1 0 4.2 6.1A4.5 4.5 0 0 0 9 10Z"/><circle cx="10" cy="14.5" r="1.5"/>',
+    acoustic:'<path d="m21 3-6.5 6.5"/><circle cx="9.5" cy="14.5" r="5"/><circle cx="9.5" cy="14.5" r="1.7"/>',
+    amp:     '<rect x="4" y="3" width="16" height="18" rx="2"/><circle cx="12" cy="13" r="4.5"/><circle cx="12" cy="13" r="1.4"/><line x1="7.5" y1="6" x2="7.5" y2="6"/><line x1="16.5" y1="6" x2="16.5" y2="6"/>',
+    piano:   '<rect x="3" y="5" width="18" height="14" rx="2"/><line x1="3" y1="14" x2="21" y2="14"/><line x1="8" y1="5" x2="8" y2="14"/><line x1="13" y1="5" x2="13" y2="14"/><line x1="18" y1="5" x2="18" y2="14"/>',
+    synth:   '<rect x="3" y="4" width="18" height="16" rx="2"/><line x1="3" y1="14" x2="21" y2="14"/><line x1="9" y1="14" x2="9" y2="20"/><line x1="15" y1="14" x2="15" y2="20"/><circle cx="7" cy="8.5" r="1.3"/><circle cx="12" cy="8.5" r="1.3"/><circle cx="17" cy="8.5" r="1.3"/>',
+    strings: '<path d="M9 18V6l10-2v10"/><circle cx="6.5" cy="18" r="2.6"/><circle cx="16.5" cy="14" r="2.6"/>',
+    wind:    '<path d="M9 17V4l8-1"/><circle cx="6.4" cy="17" r="2.6"/><path d="M17 6c2.5.5 4 2 4 4"/>',
+    metro:   '<path d="M9 3h6l3.2 18H5.8z"/><line x1="6.6" y1="16" x2="17.4" y2="16"/><line x1="12" y1="16" x2="15" y2="6"/>',
+    speaker: '<path d="M11 5 6 9H3v6h3l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M18.5 5.5a9 9 0 0 1 0 13"/>',
+};
+function stemChip(name) {
+    const meta = STEM_META[name] || {};
+    const color = meta.color || '#64748b';
+    const glyph = STEM_ICONS[meta.icon] || STEM_ICONS.speaker;
+    return `<span class="stem-icon" style="background:linear-gradient(145deg,${color},${color}aa)">
+        <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${glyph}</svg>
+    </span>`;
+}
 
 const MISSA_BLOCKS = [
     'Canto de Entrada','Ato Penitencial','Hino de Louvor',
@@ -5475,9 +5504,9 @@ function buildMixerUI(songId) {
     const stemsEl = document.getElementById(`mixer-stems-${songId}`);
     if (!stemsEl) return;
     stemsEl.innerHTML = m.tracks.map(t => {
-        const meta = STEM_META[t.name] || { label: t.name, emoji: '🔊' };
+        const meta = STEM_META[t.name] || { label: t.name };
         return `<div class="stem-row" id="stemrow-${songId}-${t.name}">
-            <span class="stem-emoji">${meta.emoji}</span>
+            ${stemChip(t.name)}
             <div class="stem-name-vol">
                 <span class="stem-name">${meta.label}</span>
                 <input type="range" class="stem-vol" min="0" max="1" step="0.01" value="1"
