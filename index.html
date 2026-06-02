@@ -1072,6 +1072,10 @@ const EMAILJS_CFG = {
     serviceId:  'service_2gkvrqc',
     templateId: 'a5mzk48',
 };
+// WhatsApp do coordenador — recebe as solicitações de acesso (DDI 55 + DDD + número)
+const COORD_WHATS = '5592993243020';
+// E-mail do coordenador para receber solicitações (deixe vazio até criar o template próprio)
+const COORD_EMAIL = '';
 // ─────────────────────────────────────────────────────────
 
 const S = {
@@ -1524,6 +1528,42 @@ function submitAccessRequest() {
     document.getElementById('req-ok').classList.add('show');
     document.getElementById('req-btn').style.display = 'none';
     const err = document.getElementById('req-err'); if (err) err.style.display='none';
+
+    // ── Envia a solicitação ao coordenador ──
+    const instrLabel = (EV_INSTR.find(x => x.k === instr) || {}).label || instr || '—';
+    const nascFmt = nasc ? nasc.split('-').reverse().join('/') : '—';
+    const linhas = [
+        '🎵 *Nova solicitação de acesso — Hallel*',
+        '',
+        `*Nome:* ${name}`,
+        `*Instrumento:* ${instrLabel}`,
+        `*WhatsApp:* ${whats}`,
+        `*E-mail:* ${email || '—'}`,
+        `*Nascimento:* ${nascFmt}`,
+        `*Camisa:* ${camisa || '—'}`,
+    ];
+    if (msg) linhas.push(`*Mensagem:* ${msg}`);
+    linhas.push('', '_Cadastre no app em Membros._');
+    const texto = linhas.join('\n');
+
+    // 1) Abre o WhatsApp do coordenador com os dados preenchidos
+    if (COORD_WHATS) {
+        const waUrl = `https://wa.me/${COORD_WHATS}?text=${encodeURIComponent(texto)}`;
+        window.open(waUrl, '_blank');
+    }
+    // 2) Tenta enviar e-mail (se configurado)
+    if (COORD_EMAIL && window.emailjs) {
+        try {
+            emailjs.init(EMAILJS_CFG.publicKey);
+            emailjs.send(EMAILJS_CFG.serviceId, EMAILJS_CFG.templateId, {
+                to_email: COORD_EMAIL,
+                member_name: name,
+                username: 'SOLICITAÇÃO DE ACESSO',
+                password: `${instrLabel} · ${whats} · ${email||'sem e-mail'} · nasc ${nascFmt} · camisa ${camisa||'—'}${msg?(' · '+msg):''}`,
+                app_url: 'https://musicahallel-lgtm.github.io/hallel-alegraivos/',
+            });
+        } catch (e) { console.warn('Email solicitação falhou:', e); }
+    }
 }
 function showReqErr(msg) {
     const el = document.getElementById('req-err');
