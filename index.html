@@ -1011,6 +1011,8 @@ const EVENTOS_2026 = [
   {id:'e15',title:'Despertar de Dons',                              start:'2026-05-24',end:'2026-05-24'},
   {id:'e16',title:'Encontro para Mulheres',                         start:'2026-05-30',end:'2026-05-31'},
   {id:'e17',title:'Acampamento RD Casais',                          start:'2026-06-12',end:'2026-06-14'},
+  {id:'e37',title:'Novena — Igreja Nossa Senhora do Perpétuo Socorro', start:'2026-06-20',end:'2026-06-20', local:'Igreja Nossa Senhora do Perpétuo Socorro'},
+  {id:'e38',title:'Missa e Adoração — Paróquia de São Sebastião',      start:'2026-06-20',end:'2026-06-20', local:'Largo de São Sebastião'},
   {id:'e18',title:'Missa de Aniversário da Fundadora',              start:'2026-06-27',end:'2026-06-27'},
   {id:'e19',title:'Festa Julina',                                   start:'2026-07-11',end:'2026-07-11'},
   {id:'e20',title:'Congresso das Novas Comunidades',                start:'2026-07-18',end:'2026-07-19'},
@@ -4936,7 +4938,7 @@ function eventoModal(ev) {
            </div>`:''}`;
 
     // ── Local / Endereço ─────────────────────────────────────────────────
-    const local = (esc.local || '').trim();
+    const local = (esc.local || ev.local || '').trim();
     let localHtml = `<div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px 14px;margin-bottom:16px">
         <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:8px">📍 Local do evento</div>`;
     if (isAdm()) {
