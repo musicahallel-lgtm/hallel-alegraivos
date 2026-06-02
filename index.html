@@ -894,6 +894,46 @@
         .inv-empty { text-align:center; padding:60px 20px; color:var(--muted); grid-column:1/-1; }
         .inv-empty-icon { font-size:56px; margin-bottom:14px; }
 
+        /* ── Início (launcher iOS-style) ── */
+        .home-hero { text-align:center; margin:8px 0 24px; }
+        .home-hero h2 { font-size:24px; font-weight:800; letter-spacing:-.4px; }
+        .home-hero p { font-size:13px; color:var(--muted); margin-top:4px; }
+        .app-grid {
+            display:grid; grid-template-columns:repeat(4,1fr);
+            gap:22px 10px; max-width:540px; margin:0 auto; padding:8px 4px 24px;
+        }
+        .app-tile {
+            display:flex; flex-direction:column; align-items:center; gap:8px;
+            background:none; border:none; cursor:pointer; padding:0; font-family:inherit;
+            -webkit-tap-highlight-color:transparent; touch-action:manipulation;
+        }
+        .app-icon {
+            width:64px; height:64px; border-radius:17px;
+            display:flex; align-items:center; justify-content:center; font-size:31px;
+            box-shadow:0 5px 16px rgba(0,0,0,.4), inset 0 1px 0 rgba(255,255,255,.18);
+            position:relative; transition:transform .12s ease; line-height:1;
+            contain: layout style;
+        }
+        .app-tile:active .app-icon { transform:scale(.9); }
+        .app-label {
+            font-size:12px; color:var(--text); font-weight:600; text-align:center;
+            line-height:1.2; max-width:80px;
+            text-shadow:0 1px 3px rgba(0,0,0,.4);
+        }
+        .app-badge {
+            position:absolute; top:-6px; right:-6px; min-width:21px; height:21px;
+            padding:0 6px; border-radius:11px; background:#ef4444; color:#fff;
+            font-size:12px; font-weight:800; display:flex; align-items:center; justify-content:center;
+            box-shadow:0 2px 6px rgba(0,0,0,.45); border:2px solid var(--bg);
+        }
+        @media (max-width:380px) {
+            .app-grid { gap:18px 6px; }
+            .app-icon { width:58px; height:58px; font-size:28px; }
+        }
+        @media (hover:hover) {
+            .app-tile:hover .app-icon { transform:translateY(-3px); box-shadow:0 8px 22px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.18); }
+        }
+
         /* ── Print media ── */
         @media print {
             body * { visibility:hidden; }
@@ -987,7 +1027,7 @@ const EMAILJS_CFG = {
 // ─────────────────────────────────────────────────────────
 
 const S = {
-    page: 'library',
+    page: 'inicio',
     songs: [],
     setlists: [],
     modal: null,
@@ -1596,6 +1636,7 @@ function getMemberEscalas(memberName) {
 
 function html() {
     let page = '';
+    if (S.page === 'inicio')       page = inicioPage();
     if (S.page === 'library')      page = libPage();
     if (S.page === 'setlists')     page = slPage();
     if (S.page === 'playlist')     page = playlistPage();
@@ -1610,8 +1651,53 @@ function html() {
     return header() + `<div class="main">${page}</div>` + (S.modal ? modalHtml() : '') + bottomNav();
 }
 
+function inicioPage() {
+    const pending = S.accessRequests.filter(r=>r.status==='pending').length;
+    const T = {
+        'minha-escala':{ i:'🎯', l:'Minha Escala', bg:'linear-gradient(145deg,#FFD400,#F15A24)' },
+        library:       { i:'🎸', l:'Músicas',      bg:'linear-gradient(145deg,#2db85a,#006b2d)' },
+        setlists:      { i:'📋', l:'Set Lists',    bg:'linear-gradient(145deg,#fb923c,#c2410c)' },
+        playlist:      { i:'▶️', l:'Playlist',     bg:'linear-gradient(145deg,#f87171,#b91c1c)' },
+        agenda:        { i:'📅', l:'Agenda',       bg:'linear-gradient(145deg,#60a5fa,#1d4ed8)' },
+        membros:       { i:'👥', l:'Membros',      bg:'linear-gradient(145deg,#2dd4bf,#0f766e)', badge:pending },
+        atividade:     { i:'📊', l:'Atividade',    bg:'linear-gradient(145deg,#a78bfa,#6d28d9)' },
+        cadastros:     { i:'👁', l:'Cadastros',    bg:'linear-gradient(145deg,#818cf8,#4338ca)' },
+        relatorio:     { i:'📄', l:'Relatório',    bg:'linear-gradient(145deg,#94a3b8,#334155)' },
+        financeiro:    { i:'💰', l:'Financeiro',   bg:'linear-gradient(145deg,#FFD400,#16a34a)' },
+        inventario:    { i:'📦', l:'Inventário',   bg:'linear-gradient(145deg,#fbbf24,#92400e)' },
+    };
+    let order;
+    if (isMembro())      order = ['minha-escala','library','setlists','playlist','agenda','financeiro','inventario'];
+    else if (isAdm())    order = ['library','setlists','playlist','agenda','membros','atividade','cadastros','relatorio','financeiro','inventario'];
+    else                 order = ['library','setlists','playlist','agenda','financeiro','inventario'];
+
+    const saud = (() => {
+        const h = new Date().getHours();
+        if (h < 12) return 'Bom dia';
+        if (h < 18) return 'Boa tarde';
+        return 'Boa noite';
+    })();
+    const nome = isMembro() ? (S.currentMember?.name?.split(' ')[0] || '') : isAdm() ? 'Coordenador' : 'Equipe';
+
+    const tiles = order.map(p => {
+        const t = T[p];
+        return `<button class="app-tile" onclick="nav('${p}')" aria-label="${t.l}">
+            <span class="app-icon" style="background:${t.bg}">${t.i}${t.badge?`<span class="app-badge">${t.badge}</span>`:''}</span>
+            <span class="app-label">${t.l}</span>
+        </button>`;
+    }).join('');
+
+    return `
+    <div class="home-hero">
+        <h2>${saud}${nome?`, ${nome}`:''}! 👋</h2>
+        <p>Ministério de Música Hallel — escolha uma área</p>
+    </div>
+    <div class="app-grid">${tiles}</div>`;
+}
+
 function bottomNav() {
     const adm = [
+        { p:'inicio',       i:'🏠', l:'Início'    },
         { p:'library',      i:'🎸', l:'Músicas'  },
         { p:'setlists',     i:'📋', l:'Set Lists' },
         { p:'agenda',       i:'📅', l:'Agenda'    },
@@ -1622,6 +1708,7 @@ function bottomNav() {
         { p:'inventario',   i:'📦', l:'Inventário' },
     ];
     const geral = [
+        { p:'inicio',     i:'🏠', l:'Início'    },
         { p:'library',    i:'🎸', l:'Músicas'   },
         { p:'setlists',   i:'📋', l:'Set Lists' },
         { p:'playlist',   i:'▶️', l:'Playlist'  },
@@ -1630,6 +1717,7 @@ function bottomNav() {
         { p:'inventario', i:'📦', l:'Inventário'},
     ];
     const membro = [
+        { p:'inicio',       i:'🏠', l:'Início'    },
         { p:'minha-escala', i:'🎯', l:'Escala'    },
         { p:'library',      i:'🎸', l:'Músicas'   },
         { p:'setlists',     i:'📋', l:'Set Lists' },
@@ -1651,17 +1739,19 @@ function bottomNav() {
 function header() {
     const roleLabel = isAdm() ? 'ADM' : isMembro() ? (S.currentMember?.name || 'Membro') : 'Equipe';
     return `<div class="header">
-        <div class="logo">
+        <div class="logo" onclick="nav('inicio')" style="cursor:pointer" title="Início">
             <img src="logo.png" alt="Comunidade Católica Hallel" loading="eager" decoding="async">
         </div>
         <nav class="nav">
             ${isMembro() ? `
+                <button class="nav-btn ${S.page==='inicio'?'active':''}" onclick="nav('inicio')">🏠 Início</button>
                 <button class="nav-btn ${S.page==='minha-escala'?'active':''}" onclick="nav('minha-escala')">🎯 Minha Escala</button>
                 <button class="nav-btn ${S.page==='library'?'active':''}"      onclick="nav('library')">🎸 Biblioteca</button>
                 <button class="nav-btn ${S.page==='setlists'?'active':''}"     onclick="nav('setlists')">📋 Set Lists</button>
                 <button class="nav-btn ${S.page==='playlist'?'active':''}"     onclick="nav('playlist')">▶ Playlist</button>
                 <button class="nav-btn ${S.page==='agenda'?'active':''}"       onclick="nav('agenda')">📅 Agenda</button>
             ` : `
+                <button class="nav-btn ${S.page==='inicio'?'active':''}" onclick="nav('inicio')">🏠 Início</button>
                 <button class="nav-btn ${S.page==='library'?'active':''}"  onclick="nav('library')">🎸 Biblioteca</button>
                 <button class="nav-btn ${S.page==='setlists'?'active':''}" onclick="nav('setlists')">📋 Set Lists</button>
                 <button class="nav-btn ${S.page==='playlist'?'active':''}" onclick="nav('playlist')">▶ Playlist</button>
