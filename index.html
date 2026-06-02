@@ -3577,7 +3577,10 @@ function inventarioPage() {
             <h2 class="section-title">📦 Inventário</h2>
             <p style="color:var(--muted);font-size:13px;margin-top:2px">Patrimônio do ministério</p>
         </div>
-        ${isAdm() ? `<button class="btn btn-primary btn-sm" onclick="openInvAdd()">+ Item</button>` : ''}
+        ${isAdm() ? `<div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn btn-primary btn-sm" onclick="openInvAdd()">+ Item</button>
+            <button class="btn btn-sm" onclick="printInventario()" style="background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);color:#fff">🖨 Imprimir</button>
+        </div>` : ''}
     </div>
 
     <!-- Estatísticas rápidas -->
@@ -3783,7 +3786,8 @@ function financeiroPage() {
         </div>
         ${isAdm() ? `<div style="display:flex;gap:8px;flex-wrap:wrap">
             <button class="btn btn-primary btn-sm" onclick="openFinAdd()">+ Lançamento</button>
-            <button class="btn btn-sm" onclick="downloadFinCSV()" style="background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);color:#fff">⬇ Relatório</button>
+            <button class="btn btn-sm" onclick="printFinanceiro()" style="background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);color:#fff">🖨 Imprimir</button>
+            <button class="btn btn-sm" onclick="downloadFinCSV()" style="background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);color:#fff">⬇ CSV</button>
         </div>` : ''}
     </div>
 
@@ -3977,6 +3981,160 @@ function downloadFinCSV() {
     a.click();
     URL.revokeObjectURL(url);
     toast('📥 Relatório baixado!');
+}
+
+function printFinanceiro() {
+    // Respeita os filtros ativos na tela
+    const filtroTipo = S._finFiltro || 'todos';
+    const filtroMes  = S._finMes || '';
+    const MESES_PT = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+    const mesFmt = ym => { if(!ym) return ''; const [y,m]=ym.split('-'); return `${MESES_PT[parseInt(m)-1]}/${y}`; };
+
+    let lista = S.financeiro.slice().sort((a,b)=>a.data.localeCompare(b.data));
+    if (filtroTipo!=='todos') lista = lista.filter(t=>t.tipo===filtroTipo);
+    if (filtroMes)            lista = lista.filter(t=>t.data.startsWith(filtroMes));
+
+    const totEnt = lista.filter(t=>t.tipo==='entrada').reduce((a,t)=>a+Number(t.valor),0);
+    const totSai = lista.filter(t=>t.tipo==='saida'  ).reduce((a,t)=>a+Number(t.valor),0);
+    const saldo  = totEnt - totSai;
+
+    const periodo = filtroMes ? mesFmt(filtroMes) : 'Período completo';
+    const tipoLbl = filtroTipo==='todos' ? 'Todos os lançamentos' : filtroTipo==='entrada' ? 'Apenas entradas' : 'Apenas saídas';
+
+    const rows = lista.map(t=>`<tr>
+        <td style="padding:6px 10px;border-bottom:1px solid #eee;white-space:nowrap">${fmtDataFin(t.data)}</td>
+        <td style="padding:6px 10px;border-bottom:1px solid #eee">
+            <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${t.tipo==='entrada'?'#16a34a':'#dc2626'};margin-right:5px"></span>
+            ${t.tipo==='entrada'?'Entrada':'Saída'}
+        </td>
+        <td style="padding:6px 10px;border-bottom:1px solid #eee">${escHtml(t.categoria)}</td>
+        <td style="padding:6px 10px;border-bottom:1px solid #eee">${escHtml(t.descricao)}${t.obs?`<br><span style="color:#888;font-size:11px;font-style:italic">${escHtml(t.obs)}</span>`:''}</td>
+        <td style="padding:6px 10px;border-bottom:1px solid #eee;text-align:right;white-space:nowrap;font-weight:700;color:${t.tipo==='entrada'?'#16a34a':'#dc2626'}">${t.tipo==='entrada'?'+':'−'} ${fmtBRL(t.valor)}</td>
+    </tr>`).join('');
+
+    const win = window.open('','_blank','width=900,height=700');
+    win.document.write(`<!DOCTYPE html><html lang="pt-BR"><head>
+    <meta charset="UTF-8">
+    <title>Prestação de Contas — Ministério de Música Hallel</title>
+    <style>
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body { font-family: Arial, sans-serif; color:#1a1a1a; padding:32px; font-size:13px; }
+        .header { border-bottom:3px solid #00963F; padding-bottom:16px; margin-bottom:24px; }
+        .header h1 { font-size:22px; color:#00963F; margin-bottom:4px; }
+        .header p { color:#666; font-size:13px; }
+        .cards { display:flex; gap:14px; margin-bottom:24px; }
+        .card { flex:1; border:1px solid #e0e0e0; border-radius:8px; padding:14px 16px; }
+        .card .lb { font-size:11px; text-transform:uppercase; letter-spacing:.5px; color:#888; font-weight:700; }
+        .card .vl { font-size:20px; font-weight:800; margin-top:4px; }
+        table { width:100%; border-collapse:collapse; font-size:12px; }
+        thead tr { background:#f5f5f5; }
+        th { padding:7px 10px; text-align:left; font-size:11px; text-transform:uppercase; color:#666; border-bottom:2px solid #ddd; }
+        .footer { margin-top:36px; border-top:1px solid #e0e0e0; padding-top:12px; font-size:11px; color:#999; display:flex; justify-content:space-between; }
+        @media print { body { padding:16px; } .no-print { display:none; } }
+    </style>
+    </head><body>
+    <div class="header">
+        <h1>💰 Prestação de Contas</h1>
+        <p>Ministério de Música Hallel · ${periodo} · ${tipoLbl}</p>
+        <p>Gerado em ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}</p>
+    </div>
+    <div class="no-print" style="margin-bottom:20px">
+        <button onclick="window.print()" style="background:#00963F;color:#fff;border:none;padding:10px 20px;border-radius:6px;font-size:14px;font-weight:700;cursor:pointer">🖨 Imprimir / Salvar como PDF</button>
+        <button onclick="window.close()" style="background:#eee;border:none;padding:10px 20px;border-radius:6px;font-size:14px;cursor:pointer;margin-left:8px">✕ Fechar</button>
+    </div>
+    <div class="cards">
+        <div class="card"><div class="lb">↑ Entradas</div><div class="vl" style="color:#16a34a">${fmtBRL(totEnt)}</div></div>
+        <div class="card"><div class="lb">↓ Saídas</div><div class="vl" style="color:#dc2626">${fmtBRL(totSai)}</div></div>
+        <div class="card"><div class="lb">= Saldo</div><div class="vl" style="color:${saldo>=0?'#16a34a':'#dc2626'}">${fmtBRL(saldo)}</div></div>
+    </div>
+    ${lista.length ? `<table>
+        <thead><tr><th>Data</th><th>Tipo</th><th>Categoria</th><th>Descrição</th><th style="text-align:right">Valor</th></tr></thead>
+        <tbody>${rows}</tbody>
+    </table>` : '<p style="color:#999;font-style:italic">Nenhum lançamento neste período.</p>'}
+    <div class="footer">
+        <span>Ministério de Música Hallel — Alegraivos</span>
+        <span>${lista.length} lançamento${lista.length!==1?'s':''}</span>
+    </div>
+    </body></html>`);
+    win.document.close();
+    win.focus();
+}
+
+function printInventario() {
+    const q   = (S._invQ || '').toLowerCase();
+    const cat = S._invCat || '';
+    let lista = S.inventario.slice().sort((a,b)=>a.nome.localeCompare(b.nome,'pt-BR'));
+    if (cat) lista = lista.filter(i=>i.categoria===cat);
+    if (q)   lista = lista.filter(i=>i.nome.toLowerCase().includes(q) || (i.descricao||'').toLowerCase().includes(q) || (i.categoria||'').toLowerCase().includes(q));
+
+    const totalUnid  = lista.reduce((s,i)=>s+Number(i.quantidade||0),0);
+    const manutencao = lista.filter(i=>i.estado==='Manutenção').length;
+    const estadoCor  = { 'Ótimo':'#16a34a','Bom':'#2563eb','Regular':'#ca8a04','Manutenção':'#dc2626','Inativo':'#6b7280' };
+
+    // Agrupa por categoria
+    const grupos = {};
+    lista.forEach(i=>{ (grupos[i.categoria] = grupos[i.categoria]||[]).push(i); });
+
+    const secoes = Object.entries(grupos).map(([categoria, itens])=>{
+        const rows = itens.map(i=>`<tr>
+            <td style="padding:6px 10px;border-bottom:1px solid #eee">${escHtml(i.nome)}${i.descricao?`<br><span style="color:#888;font-size:11px">${escHtml(i.descricao)}</span>`:''}</td>
+            <td style="padding:6px 10px;border-bottom:1px solid #eee;text-align:center;white-space:nowrap;font-weight:700">${Number(i.quantidade)} ${escHtml(i.unidade||'un')}</td>
+            <td style="padding:6px 10px;border-bottom:1px solid #eee;white-space:nowrap"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${estadoCor[i.estado]||'#6b7280'};margin-right:5px"></span>${escHtml(i.estado)}</td>
+            <td style="padding:6px 10px;border-bottom:1px solid #eee;color:#666;font-size:11px">${escHtml(i.obs||'')}</td>
+        </tr>`).join('');
+        const subtotal = itens.reduce((s,i)=>s+Number(i.quantidade||0),0);
+        return `<div style="margin-bottom:22px;page-break-inside:avoid">
+            <h2 style="font-size:15px;color:#00963F;border-bottom:2px solid #e0e0e0;padding-bottom:5px;margin-bottom:8px">${INV_CAT_EMOJI[categoria]||'📦'} ${escHtml(categoria)} <span style="color:#999;font-size:12px;font-weight:400">(${itens.length} item${itens.length!==1?'s':''} · ${subtotal} un)</span></h2>
+            <table style="width:100%;border-collapse:collapse;font-size:12px">
+                <thead><tr style="background:#f5f5f5">
+                    <th style="padding:6px 10px;text-align:left;font-size:11px;text-transform:uppercase;color:#666">Item</th>
+                    <th style="padding:6px 10px;text-align:center;font-size:11px;text-transform:uppercase;color:#666">Qtd</th>
+                    <th style="padding:6px 10px;text-align:left;font-size:11px;text-transform:uppercase;color:#666">Estado</th>
+                    <th style="padding:6px 10px;text-align:left;font-size:11px;text-transform:uppercase;color:#666">Observação</th>
+                </tr></thead>
+                <tbody>${rows}</tbody>
+            </table>
+        </div>`;
+    }).join('');
+
+    const win = window.open('','_blank','width=900,height=700');
+    win.document.write(`<!DOCTYPE html><html lang="pt-BR"><head>
+    <meta charset="UTF-8">
+    <title>Inventário de Patrimônio — Ministério de Música Hallel</title>
+    <style>
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body { font-family: Arial, sans-serif; color:#1a1a1a; padding:32px; font-size:13px; }
+        .header { border-bottom:3px solid #00963F; padding-bottom:16px; margin-bottom:24px; }
+        .header h1 { font-size:22px; color:#00963F; margin-bottom:4px; }
+        .header p { color:#666; font-size:13px; }
+        .summary { display:flex; gap:18px; margin-bottom:24px; font-size:13px; }
+        .summary b { color:#00963F; }
+        .footer { margin-top:36px; border-top:1px solid #e0e0e0; padding-top:12px; font-size:11px; color:#999; display:flex; justify-content:space-between; }
+        @media print { body { padding:16px; } .no-print { display:none; } }
+    </style>
+    </head><body>
+    <div class="header">
+        <h1>📦 Inventário de Patrimônio</h1>
+        <p>Ministério de Música Hallel${cat?` · ${cat}`:''}</p>
+        <p>Gerado em ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}</p>
+    </div>
+    <div class="no-print" style="margin-bottom:20px">
+        <button onclick="window.print()" style="background:#00963F;color:#fff;border:none;padding:10px 20px;border-radius:6px;font-size:14px;font-weight:700;cursor:pointer">🖨 Imprimir / Salvar como PDF</button>
+        <button onclick="window.close()" style="background:#eee;border:none;padding:10px 20px;border-radius:6px;font-size:14px;cursor:pointer;margin-left:8px">✕ Fechar</button>
+    </div>
+    <div class="summary">
+        <span>📦 <b>${lista.length}</b> itens</span>
+        <span>🔢 <b>${totalUnid}</b> unidades</span>
+        ${manutencao>0?`<span style="color:#dc2626">🔧 <b>${manutencao}</b> em manutenção</span>`:''}
+    </div>
+    ${lista.length ? secoes : '<p style="color:#999;font-style:italic">Nenhum item no inventário.</p>'}
+    <div class="footer">
+        <span>Ministério de Música Hallel — Alegraivos</span>
+        <span>Inventário de Patrimônio</span>
+    </div>
+    </body></html>`);
+    win.document.close();
+    win.focus();
 }
 
 // ════════════════════════════════════════════════════
