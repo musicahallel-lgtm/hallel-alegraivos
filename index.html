@@ -1121,8 +1121,10 @@ async function initFirebase() {
         firebase.initializeApp(FIREBASE_CFG);
         _fbDB = firebase.firestore();
 
-        // ── Carrega dados apenas na abertura (NUNCA sobrescreve durante a sessão) ──
+        // ── Carrega dados do Firestore (única fonte da verdade) ──
         await carregaFirestore();
+        // ── Listener em tempo real: mudanças de qualquer dispositivo chegam na hora ──
+        _escutaFirestore();
 
         // ── Solicitações de acesso: listener separado (append-only, não sobrescreve outros dados) ──
         let _solicitacoesInit = false;
@@ -1275,125 +1277,16 @@ async function loadPdfIndex() {
 // ═══════════════════════════════════════════════
 //  PERSISTENCE  (songs + setlists in localStorage)
 // ═══════════════════════════════════════════════
-let _persistTimer  = null;
-let _localDirty    = false;
-let _lastPersistAt = parseInt(localStorage.getItem('hl_lastPersist')||'0');
-
-// ══════════════════════════════════════════════════════════════════
-//  PROTEÇÃO DE DADOS — 3 camadas para nunca perder o que foi salvo
-// ══════════════════════════════════════════════════════════════════
-
-// Camada 1: snapshot de segurança rotativo (último estado conhecido bom)
-function _salvaSnapshot() {
-    try {
-        const snap = { songs:S.songs, members:S.members, setlists:S.setlists,
-            financeiro:S.financeiro, inventario:S.inventario, at:Date.now() };
-        localStorage.setItem('hl_snapshot', JSON.stringify(snap));
-    } catch(e) {}
-}
-
-// Camada 2: verifica se a nuvem está tentando apagar dados que temos localmente
-function _dadosSegurosPraAplicar(d) {
-    const CAMPOS = ['songs','members','setlists','financeiro','inventario'];
-    for (const campo of CAMPOS) {
-        const local = S[campo];
-        const remoto = d[campo];
-        if (!Array.isArray(local) || !Array.isArray(remoto)) continue;
-        // Nunca aceita dado remoto que tenha MENOS itens que o local
-        // (exceto se o local está vazio — primeira carga)
-        if (local.length > 0 && remoto.length < local.length) {
-            console.warn(`[PROTEÇÃO] ${campo}: remoto(${remoto.length}) < local(${local.length}) — ignorado`);
-            return false;
-        }
-    }
-    return true;
-}
-
-// Camada 3: restaura snapshot se o estado atual parecer vazio após operação
-function _verificaIntegridade(contexto) {
-    const snap = (() => { try { return JSON.parse(localStorage.getItem('hl_snapshot')||'null'); } catch{ return null; }})();
-    if (!snap) return;
-    const problemasArr = ['songs','members','setlists'];
-    for (const campo of problemasArr) {
-        if (snap[campo]?.length > 0 && S[campo].length === 0) {
-            console.warn(`[PROTEÇÃO] ${campo} esvaziou após ${contexto} — restaurando snapshot`);
-            S[campo] = snap[campo];
-        }
-    }
-}
-
-function _salvaLocal() {
-    try {
-        const now = Date.now();
-        _lastPersistAt = now;
-        localStorage.setItem('hl_lastPersist',   String(now));
-        localStorage.setItem('hl_songs',         JSON.stringify(S.songs));
-        localStorage.setItem('hl_setlists',      JSON.stringify(S.setlists));
-        localStorage.setItem('hl_escalas',       JSON.stringify(S.escalas));
-        localStorage.setItem('hl_members',       JSON.stringify(S.members));
-        localStorage.setItem('hl_activity',      JSON.stringify(S.activityLog.slice(-500)));
-        localStorage.setItem('hl_requests',      JSON.stringify(S.accessRequests.filter(r=>!r._cloud)));
-        // Backup de cloud requests para restaurar antes do listener do Firestore disparar
-        const cloudBackup = S.accessRequests.filter(r=>r._cloud && r.status==='pending');
-        if (cloudBackup.length) localStorage.setItem('hl_requests_cloud_bkp', JSON.stringify(cloudBackup));
-        else localStorage.removeItem('hl_requests_cloud_bkp');
-        localStorage.setItem('hl_availability',  JSON.stringify(S.availability));
-        localStorage.setItem('hl_substitutions', JSON.stringify(S.substitutions));
-        localStorage.setItem('hl_financeiro',    JSON.stringify(S.financeiro));
-        localStorage.setItem('hl_inventario',    JSON.stringify(S.inventario));
-        localStorage.setItem('hl_avisos',        JSON.stringify(S.avisos));
-        localStorage.setItem('hl_evCustom',      JSON.stringify(S.eventosCustom));
-    } catch(e) { console.warn('localStorage:', e); }
-}
-
-function persist(immediate) {
-    _salvaLocal();           // sempre instantâneo
-    _salvaSnapshot();        // [PROTEÇÃO] salva estado bom antes de qualquer sync
-    _localDirty = true;      // protege contra listener até o Firestore confirmar
-    clearTimeout(_persistTimer);
-    if (immediate) { _syncFirestore(); return; }
-    _persistTimer = setTimeout(_syncFirestore, 100);
-}
-
-function _syncFirestore() {
-    if (!_fbDB) { _localDirty = false; return; }
-    _syncPending = true; _setSyncStatus(false);
-    _lastPersistAt = Date.now();
-    // Prepara songs sem cifras longas para o Firestore (cifras ficam só no localStorage)
-    // Isso reduz o doc de ~87KB para ~15KB para 80 músicas
-    const songsLight = S.songs.map(s => {
-        const { chords, ...rest } = s;
-        return chords && chords.length > 500 ? rest : s;  // cifras curtas ficam, longas não
-    });
-    _fbDB.collection('ministerio').doc('dados').set({
-        songs:         songsLight,
-        setlists:      S.setlists,
-        escalas:       S.escalas,
-        members:       S.members,
-        activityLog:   S.activityLog.slice(-50),   // era -200, agora -50
-        availability:  S.availability,
-        substitutions: S.substitutions,
-        financeiro:    S.financeiro,
-        inventario:    S.inventario,
-        avisos:        S.avisos,
-        eventosCustom: S.eventosCustom,
-        _updatedAt:    _lastPersistAt,
-    }).then(() => { _syncPending=false; _localDirty=false; _setSyncStatus(true); })
-      .catch(e  => { console.warn('Firestore save:', e); _localDirty=false; _setSyncStatus(true); });
-}
-// ── Chaves ↔ campos do Firestore ─────────────────────────────────
-const FS_KEYS = {
-    songs: 'hl_songs', setlists: 'hl_setlists', escalas: 'hl_escalas',
-    members: 'hl_members', activityLog: 'hl_activity', accessRequests: 'hl_requests',
-    availability: 'hl_availability', substitutions: 'hl_substitutions',
-    financeiro: 'hl_financeiro', inventario: 'hl_inventario',
-};
+let _persistTimer   = null;
+let _localDirty     = false;   // true enquanto há escrita pendente no Firestore
+let _pendingSnap    = null;    // snapshot aguardando modal fechar para ser aplicado
+let _fbCarregado    = false;   // true após primeira carga do Firestore
 
 // ── Indicador de sincronização ────────────────────────────────────
 let _syncPending = false;
 function _setSyncStatus(ok) {
     const el = document.getElementById('sync-status');
-    if (el) { el.textContent = ok ? '☁️' : '⏳'; el.title = ok ? 'Sincronizado' : 'Salvando…'; }
+    if (el) { el.textContent = ok ? '☁️' : '⏳'; el.title = ok ? 'Clique para atualizar' : 'Salvando…'; }
 }
 
 // ── Normaliza dados (migrations) ─────────────────────────────────
@@ -1404,59 +1297,16 @@ function _normalize() {
     });
     S.setlists.forEach(sl => {
         if (!sl.blocks) {
-            sl.blocks = [{ id: 'b'+uid(), name: 'Geral', songIds: sl.songIds || [] }];
+            sl.blocks = [{ id:'b'+uid(), name:'Geral', songIds: sl.songIds||[] }];
             delete sl.songIds;
         }
     });
 }
 
-// _doPersist mantido como alias para compatibilidade com código existente
-function _doPersist() { persist(true); }
-
-// ── hydrate: carrega localStorage (offline-first) ─────────────────
-function hydrate() {
-    try {
-        const s  = localStorage.getItem('hl_songs');         if (s)  S.songs          = JSON.parse(s);
-        const sl = localStorage.getItem('hl_setlists');      if (sl) S.setlists        = JSON.parse(sl);
-        const es = localStorage.getItem('hl_escalas');       if (es) S.escalas         = JSON.parse(es);
-        const mb = localStorage.getItem('hl_members');       if (mb) S.members         = JSON.parse(mb);
-        const ac = localStorage.getItem('hl_activity');      if (ac) S.activityLog     = JSON.parse(ac).slice(-500);
-        const rq  = localStorage.getItem('hl_requests');      if (rq) S.accessRequests = JSON.parse(rq);
-        // Restaura backup de pedidos cloud (evita sumiço durante recarga antes do listener disparar)
-        const rqBkp = localStorage.getItem('hl_requests_cloud_bkp');
-        if (rqBkp) {
-            const bkp = JSON.parse(rqBkp);
-            // Só adiciona os que ainda não estão no array (evita duplicatas)
-            bkp.forEach(r => { if (!S.accessRequests.find(x=>x.id===r.id)) S.accessRequests.push(r); });
-        }
-        const av = localStorage.getItem('hl_availability');  if (av) S.availability    = JSON.parse(av);
-        const sb = localStorage.getItem('hl_substitutions'); if (sb) S.substitutions   = JSON.parse(sb);
-        const fi = localStorage.getItem('hl_financeiro');    if (fi) S.financeiro      = JSON.parse(fi);
-        const iv = localStorage.getItem('hl_inventario');    if (iv) S.inventario      = JSON.parse(iv);
-        const avi = localStorage.getItem('hl_avisos');       if (avi) S.avisos         = JSON.parse(avi);
-        const evc = localStorage.getItem('hl_evCustom');     if (evc) S.eventosCustom  = JSON.parse(evc);
-    } catch(e) { console.error(e); }
-    _normalize();
-}
-
-// ── carregaFirestore: puxa dados da nuvem e re-renderiza ──────────
-function _aplicaSnapshot(d) {
-    // [PROTEÇÃO] Camada 2: nunca aceita dado remoto que apague itens locais
-    if (!_dadosSegurosPraAplicar(d)) {
-        console.warn('[PROTEÇÃO] Snapshot remoto rejeitado — mantendo dados locais');
-        return;
-    }
-    if (d.songs) {
-        // Restaura cifras do localStorage (não enviadas ao Firestore por serem longas)
-        const localSongs = (() => { try { return JSON.parse(localStorage.getItem('hl_songs')||'[]'); } catch{ return []; }})();
-        S.songs = d.songs.map(s => {
-            if (!s.chords) {
-                const local = localSongs.find(ls => ls.id === s.id);
-                if (local?.chords) return { ...s, chords: local.chords };
-            }
-            return s;
-        });
-    }
+// ── Aplica dados do Firestore no estado local ─────────────────────
+function _aplicaDados(d) {
+    if (!d) return;
+    if (d.songs)         S.songs          = d.songs;
     if (d.setlists)      S.setlists       = d.setlists;
     if (d.escalas)       S.escalas        = d.escalas;
     if (d.members)       S.members        = d.members;
@@ -1468,71 +1318,100 @@ function _aplicaSnapshot(d) {
     if (d.avisos)        S.avisos         = d.avisos;
     if (d.eventosCustom) S.eventosCustom  = d.eventosCustom;
     _normalize();
-    // Atualiza timestamp local para refletir quando o Firestore foi carregado
-    if (d._updatedAt) {
-        _lastPersistAt = d._updatedAt;
-        localStorage.setItem('hl_lastPersist', String(d._updatedAt));
+    // Atualiza membro logado se seus dados mudaram
+    if (S.currentMember) {
+        const m = S.members.find(x=>x.id===S.currentMember.id);
+        if (m) S.currentMember = m;
     }
-    _salvaLocal();
 }
 
-async function carregaFirestore(forcar) {
+// ── persist: escreve no Firestore (Firestore é a única fonte da verdade) ──
+function persist(immediate) {
+    _localDirty = true;
+    clearTimeout(_persistTimer);
+    if (immediate) { _gravaFirestore(); return; }
+    _persistTimer = setTimeout(_gravaFirestore, 300);
+}
+function _doPersist() { persist(true); } // alias de compatibilidade
+
+function _gravaFirestore() {
+    if (!_fbDB) { _localDirty = false; return; }
+    _setSyncStatus(false);
+    _fbDB.collection('ministerio').doc('dados').set({
+        songs:         S.songs,
+        setlists:      S.setlists,
+        escalas:       S.escalas,
+        members:       S.members,
+        activityLog:   S.activityLog.slice(-50),
+        availability:  S.availability,
+        substitutions: S.substitutions,
+        financeiro:    S.financeiro,
+        inventario:    S.inventario,
+        avisos:        S.avisos,
+        eventosCustom: S.eventosCustom,
+        _updatedAt:    Date.now(),
+    }).then(() => { _localDirty = false; _setSyncStatus(true); })
+      .catch(e  => { _localDirty = false; _setSyncStatus(true);
+                     console.warn('Firestore save:', e);
+                     toast('⚠️ Erro ao salvar. Verifique a conexão.'); });
+}
+
+// ── hydrate: carrega só sessão do localStorage (dados vêm do Firestore) ──
+function hydrate() {
+    // localStorage guarda apenas sessão e preferências de UI
+    // Os dados do ministério (songs, members...) vêm sempre do Firestore
+    try {
+        const rq = localStorage.getItem('hl_requests');
+        if (rq) S.accessRequests = JSON.parse(rq); // solicitações locais (não-cloud)
+    } catch(e) {}
+    _normalize();
+}
+
+// ── carregaFirestore: sempre carrega do Firestore ao abrir ────────
+async function carregaFirestore() {
     if (!_fbDB) return;
     try {
         const snap = await _fbDB.collection('ministerio').doc('dados').get();
         if (!snap.exists) {
-            // Nuvem vazia → primeiro sync: envia dados locais
-            persist(true); return;
+            // Primeira vez: nuvem vazia. Se tiver dados locais antigos, migra uma vez.
+            const localSongs = (() => { try { return JSON.parse(localStorage.getItem('hl_songs')||'[]'); } catch{ return []; }})();
+            if (localSongs.length) {
+                const campos = ['songs','setlists','escalas','members','activityLog',
+                    'availability','substitutions','financeiro','inventario','avisos','eventosCustom'];
+                campos.forEach(k => {
+                    const v = localStorage.getItem('hl_'+k.replace(/([A-Z])/g,c=>c.toLowerCase()));
+                    if (v) try { S[k] = JSON.parse(v); } catch{}
+                });
+                _normalize();
+                persist(true); // sobe para nuvem
+            }
+            _fbCarregado = true; render(); return;
         }
-        const d = snap.data();
-        const firestoreTs = d._updatedAt || 0;
-        const localTs     = parseInt(localStorage.getItem('hl_lastPersist') || '0');
-
-        // Sempre carrega do Firestore se:
-        // - for forçado (ex: botão recarregar)
-        // - Firestore é mais novo
-        // - Firestore tem membros e local não tem (device nunca sincronizou)
-        const firestoreTemMembros = (d.members||[]).length > 0;
-        const localVazio = S.members.length === 0 && S.songs.length <= 5; // só seeds
-        if (forcar || firestoreTs >= localTs || localVazio || firestoreTemMembros) {
-            _aplicaSnapshot(d);
-            render();
-        } else {
-            // Local genuinamente mais novo (offline e salvou algo) → envia para nuvem
-            persist(true);
-        }
+        _aplicaDados(snap.data());
+        _fbCarregado = true;
+        render();
         _setSyncStatus(true);
-    } catch(e) { console.warn('Firestore load:', e); }
+    } catch(e) { console.warn('Firestore load:', e); _fbCarregado = true; render(); }
 }
 
-// Recarrega dados do Firestore manualmente (botão para o ADM)
+// Força recarregamento do Firestore (botão ☁️ no header)
 async function recarregarDados() {
     if (!_fbDB) { toast('⚠️ Sem conexão com a nuvem.'); return; }
     _setSyncStatus(false);
-    await carregaFirestore(true);
-    toast('✅ Dados atualizados da nuvem!');
+    await carregaFirestore();
+    toast('✅ Dados atualizados!');
 }
 
-// ── escuta mudanças em tempo real feitas por outros ───────────────
+// ── listener em tempo real: atualiza todos os dispositivos na hora ─
 function _escutaFirestore() {
     if (!_fbDB) return;
     _fbDB.collection('ministerio').doc('dados').onSnapshot(snap => {
-        if (!snap.exists) return;
+        if (!snap.exists || !snap.data()) return;
+        if (_localDirty) return;  // temos escrita pendente, ignora
         const d = snap.data();
-        if (!d) return;
-        // Ignora se temos edição local ainda não enviada (evita sobrescrever dados recém-adicionados)
-        if (_localDirty) return;
-        // Ignora snapshots mais antigos que nosso último persist (evita race condition)
-        // Ignora snapshots mais antigos ou iguais ao nosso último save
-        if (_localDirty) return;
-        if (d._updatedAt && d._updatedAt <= _lastPersistAt) return;
-        // Snapshot genuinamente mais novo (outro dispositivo)
-        _aplicaSnapshot(d);
-        // Restaura membro logado (pode ter sido atualizado)
-        if (S.currentMember) {
-            const m = S.members.find(x=>x.id===S.currentMember.id);
-            if (m) S.currentMember = m;
-        }
+        // Se modal aberto, guarda para aplicar depois (não interrompe edição)
+        if (S.modal) { _pendingSnap = d; return; }
+        _aplicaDados(d);
         render();
         _setSyncStatus(true);
     }, err => console.warn('Firestore listen:', err));
@@ -1673,6 +1552,16 @@ function render() {
 function _doRender() {
     if (!S.role) {
         document.getElementById('app').innerHTML = loginScreen();
+        return;
+    }
+    // Mostra carregando enquanto Firestore não respondeu
+    if (FIREBASE_CFG && !_fbCarregado) {
+        document.getElementById('app').innerHTML = `
+        <div style="min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;background:var(--bg)">
+            <div class="home-brand"><img src="logo.png" alt="Hallel"></div>
+            <div style="font-size:16px;font-weight:700;color:var(--text)">Carregando dados...</div>
+            <div style="font-size:13px;color:var(--muted)">Sincronizando com a nuvem ☁️</div>
+        </div>`;
         return;
     }
     document.getElementById('app').innerHTML = html();
@@ -2873,6 +2762,11 @@ function closeModal(e) {
     }
     S.modal=null; S.transpose=0; S.ptab='youtube'; S.cifraTab='texto';
     S.pendingPdfFile=null; S.pendingPdfRemove=false;
+    // Aplica snapshot que ficou aguardando durante o modal
+    if (_pendingSnap && !_localDirty) {
+        _aplicaDados(_pendingSnap);
+        _pendingSnap = null;
+    }
     render();
 }
 
