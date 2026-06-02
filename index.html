@@ -1254,13 +1254,15 @@ async function loadPdfIndex() {
 // ═══════════════════════════════════════════════
 //  PERSISTENCE  (songs + setlists in localStorage)
 // ═══════════════════════════════════════════════
-let _persistTimer = null;
-let _localDirty   = false;
-let _lastPersistAt = 0;
+let _persistTimer  = null;
+let _localDirty    = false;
+let _lastPersistAt = parseInt(localStorage.getItem('hl_lastPersist')||'0');
 
-function persist(immediate) {
-    // 1. Salva no localStorage IMEDIATAMENTE (sem esperar)
+function _salvaLocal() {
     try {
+        const now = Date.now();
+        _lastPersistAt = now;
+        localStorage.setItem('hl_lastPersist',   String(now));
         localStorage.setItem('hl_songs',         JSON.stringify(S.songs));
         localStorage.setItem('hl_setlists',      JSON.stringify(S.setlists));
         localStorage.setItem('hl_escalas',       JSON.stringify(S.escalas));
@@ -1274,11 +1276,13 @@ function persist(immediate) {
         localStorage.setItem('hl_avisos',        JSON.stringify(S.avisos));
         localStorage.setItem('hl_evCustom',      JSON.stringify(S.eventosCustom));
     } catch(e) { console.warn('localStorage:', e); }
-    // Sempre marca dirty ANTES de qualquer sync (evita listener sobrescrever)
-    _localDirty = true;
+}
+
+function persist(immediate) {
+    _salvaLocal();           // sempre instantâneo
+    _localDirty = true;      // protege contra listener até o Firestore confirmar
     clearTimeout(_persistTimer);
     if (immediate) { _syncFirestore(); return; }
-    // Envia para o Firestore com debounce (não bloqueia a UI)
     _persistTimer = setTimeout(_syncFirestore, 100);
 }
 
@@ -1354,38 +1358,49 @@ function hydrate() {
 }
 
 // ── carregaFirestore: puxa dados da nuvem e re-renderiza ──────────
+function _aplicaSnapshot(d) {
+    if (d.songs)         S.songs          = d.songs;
+    if (d.setlists)      S.setlists       = d.setlists;
+    if (d.escalas)       S.escalas        = d.escalas;
+    if (d.members)       S.members        = d.members;
+    if (d.activityLog)   S.activityLog    = d.activityLog;
+    if (d.availability)  S.availability   = d.availability;
+    if (d.substitutions) S.substitutions  = d.substitutions;
+    if (d.financeiro)    S.financeiro     = d.financeiro;
+    if (d.inventario)    S.inventario     = d.inventario;
+    if (d.avisos)        S.avisos         = d.avisos;
+    if (d.eventosCustom) S.eventosCustom  = d.eventosCustom;
+    _normalize();
+    // Atualiza timestamp local para refletir quando o Firestore foi carregado
+    if (d._updatedAt) {
+        _lastPersistAt = d._updatedAt;
+        localStorage.setItem('hl_lastPersist', String(d._updatedAt));
+    }
+    _salvaLocal();
+}
+
 async function carregaFirestore() {
     if (!_fbDB) return;
     try {
         const snap = await _fbDB.collection('ministerio').doc('dados').get();
         if (!snap.exists) {
             // Nuvem vazia → envia dados locais (primeiro sync)
-            _doPersist(); return;
+            persist(true); return;
         }
         const d = snap.data();
-        if (d.songs)         S.songs          = d.songs;
-        if (d.setlists)      S.setlists       = d.setlists;
-        if (d.escalas)       S.escalas        = d.escalas;
-        if (d.members)       S.members        = d.members;
-        if (d.activityLog)   S.activityLog    = d.activityLog;
-        if (d.availability)  S.availability   = d.availability;
-        if (d.substitutions) S.substitutions  = d.substitutions;
-        if (d.financeiro)    S.financeiro     = d.financeiro;
-        if (d.inventario)    S.inventario     = d.inventario;
-        if (d.avisos)        S.avisos         = d.avisos;
-        if (d.eventosCustom) S.eventosCustom  = d.eventosCustom;
-        _normalize();
-        // Salva no localStorage como cache
-        localStorage.setItem('hl_songs',         JSON.stringify(S.songs));
-        localStorage.setItem('hl_setlists',      JSON.stringify(S.setlists));
-        localStorage.setItem('hl_escalas',       JSON.stringify(S.escalas));
-        localStorage.setItem('hl_members',       JSON.stringify(S.members));
-        localStorage.setItem('hl_activity',      JSON.stringify(S.activityLog));
-        localStorage.setItem('hl_availability',  JSON.stringify(S.availability));
-        localStorage.setItem('hl_substitutions', JSON.stringify(S.substitutions));
-        localStorage.setItem('hl_financeiro',    JSON.stringify(S.financeiro));
-        localStorage.setItem('hl_inventario',    JSON.stringify(S.inventario));
-        render();
+        const firestoreTs = d._updatedAt || 0;
+        const localTs     = parseInt(localStorage.getItem('hl_lastPersist') || '0');
+
+        if (localTs > firestoreTs) {
+            // Local é mais novo (ex: mudanças offline, sessão anterior não sincronizou)
+            // Empurra os dados locais para o Firestore em vez de sobrescrever
+            console.log('Local mais novo que Firestore — enviando dados locais');
+            persist(true);
+        } else {
+            // Firestore é mais novo (outro dispositivo fez alterações) → carrega
+            _aplicaSnapshot(d);
+            render();
+        }
         _setSyncStatus(true);
     } catch(e) { console.warn('Firestore load:', e); }
 }
@@ -1400,19 +1415,11 @@ function _escutaFirestore() {
         // Ignora se temos edição local ainda não enviada (evita sobrescrever dados recém-adicionados)
         if (_localDirty) return;
         // Ignora snapshots mais antigos que nosso último persist (evita race condition)
-        if (_lastPersistAt && d._updatedAt && d._updatedAt < _lastPersistAt) return;
-        if (d.songs)         S.songs          = d.songs;
-        if (d.setlists)      S.setlists       = d.setlists;
-        if (d.escalas)       S.escalas        = d.escalas;
-        if (d.members)       S.members        = d.members;
-        if (d.activityLog)   S.activityLog    = d.activityLog;
-        if (d.availability)  S.availability   = d.availability;
-        if (d.substitutions) S.substitutions  = d.substitutions;
-        if (d.financeiro)    S.financeiro     = d.financeiro;
-        if (d.inventario)    S.inventario     = d.inventario;
-        if (d.avisos)        S.avisos         = d.avisos;
-        if (d.eventosCustom) S.eventosCustom  = d.eventosCustom;
-        _normalize();
+        // Ignora snapshots mais antigos ou iguais ao nosso último save
+        if (_localDirty) return;
+        if (d._updatedAt && d._updatedAt <= _lastPersistAt) return;
+        // Snapshot genuinamente mais novo (outro dispositivo)
+        _aplicaSnapshot(d);
         // Restaura membro logado (pode ter sido atualizado)
         if (S.currentMember) {
             const m = S.members.find(x=>x.id===S.currentMember.id);
