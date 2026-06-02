@@ -1591,7 +1591,7 @@ function recoveryScreen() {
         <div class="login-logo"><img src="logo.png" alt="Hallel"></div>
         <div class="login-sub">Recuperar senha</div>
         <div style="font-size:13px;color:#666;text-align:center;margin-bottom:20px;line-height:1.5">
-            Informe seu usuário e email cadastrado para confirmar sua identidade.
+            Informe seu usuário e confirme sua identidade pelo email <b>ou</b> nome completo.
         </div>
         <div class="login-err" id="rec-err" style="display:none"></div>
         <div class="login-field">
@@ -1601,10 +1601,11 @@ function recoveryScreen() {
                 onkeydown="if(event.key==='Enter')document.getElementById('rec-email').focus()">
         </div>
         <div class="login-field">
-            <label>Email cadastrado</label>
-            <input class="field" id="rec-email" type="email" placeholder="seu@email.com"
+            <label>Email cadastrado <span style="font-weight:400;color:#aaa">— ou —</span> Nome completo</label>
+            <input class="field" id="rec-email" type="text" placeholder="seu@email.com ou João da Silva"
                 style="background:#f5f5f7;border-color:#e0e0e0;color:#111"
                 onkeydown="if(event.key==='Enter')doRecovery()">
+            <div style="font-size:11px;color:#aaa;margin-top:4px">Use o email se cadastrou, ou seu nome completo</div>
         </div>
         <div class="recovery-success" id="rec-ok" style="display:none;background:#f0faf4;border:1px solid #00963F;border-radius:10px;padding:14px;text-align:center;color:#006b2d;font-size:14px;margin-bottom:14px">
             <span id="rec-ok-msg"></span>
@@ -1751,34 +1752,19 @@ function showReqErr(msg) {
 
 function doRecovery() {
     const userInput  = document.getElementById('rec-user')?.value?.trim().toLowerCase();
-    const emailInput = document.getElementById('rec-email')?.value?.trim().toLowerCase();
-    if (!userInput)  { showRecErr('Digite seu nome de usuário.'); return; }
-    if (!emailInput) { showRecErr('Digite o email cadastrado.'); return; }
+    const identInput = document.getElementById('rec-email')?.value?.trim();
+    if (!userInput)   { showRecErr('Digite seu nome de usuário.'); return; }
+    if (!identInput)  { showRecErr('Digite seu email ou nome completo.'); return; }
 
     const member = S.members.find(m => m.user.toLowerCase() === userInput);
     if (!member) { showRecErr('Usuário não encontrado. Verifique ou contate o coordenador.'); return; }
 
-    // Valida o email — precisa bater com o cadastrado
-    if (!member.email) {
-        // Se não tem email cadastrado, envia pro coordenador resolver
-        const txt = encodeURIComponent(
-            '🔑 *Recuperação de senha — Hallel*\n\n'
-            + 'O membro *' + member.name + '* (@' + member.user + ') '
-            + 'precisa recuperar a senha.\n\n_Envie a nova senha diretamente para ele._'
-        );
-        window.open('https://wa.me/' + COORD_WHATS + '?text=' + txt, '_blank');
-        const okDiv = document.getElementById('rec-ok');
-        const okMsg = document.getElementById('rec-ok-msg');
-        if (okDiv) { okDiv.style.display='block'; }
-        if (okMsg) okMsg.textContent = 'O coordenador foi avisado via WhatsApp e vai te enviar a nova senha em breve. 🙏';
-        const btn = document.getElementById('rec-btn');
-        if (btn) btn.style.display='none';
-        return;
-    }
+    // Valida por email OU por nome completo
+    const emailOk = member.email && member.email.toLowerCase() === identInput.toLowerCase();
+    const nomeOk  = member.name.toLowerCase() === identInput.toLowerCase();
 
-    const emailOk = member.email.toLowerCase() === emailInput;
-    if (!emailOk) {
-        showRecErr('Email não confere com o cadastrado. Verifique ou contate o coordenador.');
+    if (!emailOk && !nomeOk) {
+        showRecErr('Os dados não conferem. Use seu email ou nome completo exato como cadastrado.');
         return;
     }
 
