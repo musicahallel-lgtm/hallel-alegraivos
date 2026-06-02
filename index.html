@@ -1945,7 +1945,7 @@ function doLogin() {
         localStorage.setItem('hl_role', cred.role);
         render();
         setTimeout(() => {
-            const pending = S.accessRequests.filter(r=>r.status==='pending');
+            const pending = S.accessRequests.filter(r=>r.status==='pending'||r.status==='approving');
             if (pending.length) {
                 toast(`📨 ${pending.length} solicitação${pending.length>1?'ões':''} de acesso pendente${pending.length>1?'s':''}! Veja em 👥 Membros.`);
                 return;
@@ -2853,8 +2853,13 @@ function doFilterKey(v) { S.filterKey=v; render(); }
 
 function closeModal(e) {
     if (e && e.target!==e.currentTarget) return;
-    stopActTimer(); // save any active tracking session
+    stopActTimer();
     if (S.currentPdfUrl) { URL.revokeObjectURL(S.currentPdfUrl); S.currentPdfUrl=null; }
+    // Se fechou o form de aprovação sem salvar, reverte o pedido para 'pending'
+    if (S.modal?.type === 'member-form' && S.modal?.data?._fromRqId) {
+        const rq = S.accessRequests.find(r=>r.id===S.modal.data._fromRqId);
+        if (rq && rq.status === 'approving') { rq.status = 'pending'; persist(); }
+    }
     S.modal=null; S.transpose=0; S.ptab='youtube'; S.cifraTab='texto';
     S.pendingPdfFile=null; S.pendingPdfRemove=false;
     render();
@@ -3305,7 +3310,7 @@ function membrosPage() {
         }).join('')}
 
         ${(()=>{
-            const pending = S.accessRequests.filter(r=>r.status==='pending');
+            const pending = S.accessRequests.filter(r=>r.status==='pending'||r.status==='approving');
             if (!pending.length) return '';
             const instrLabel2 = {violao:'Violão',teclado:'Teclado',bateria:'Bateria',baixo:'Baixo',guitarra:'Guitarra',sopro:'Sopro',vocal1:'Vocal 1',vocal2:'Vocal 2',vocal3:'Vocal 3',animador:'Animador'};
             return `<div style="margin-top:20px">
@@ -3349,14 +3354,18 @@ function membrosPage() {
 
 function approveRequest(rqId) {
     const rq = S.accessRequests.find(r=>r.id===rqId); if(!rq) return;
-    // Pre-fill member form with request data
-    const newMember = { id:null, name:rq.name,
-        instrument:rq.instrument, instruments:rq.instruments||[rq.instrument],
-        whatsapp:rq.whatsapp, email:rq.email, nascimento:rq.nascimento||'', camisa:rq.camisa||'', user:'', pass:'' };
-    if (rq._cloud) { fbRemoverSolicitacao(rq.id); S.accessRequests = S.accessRequests.filter(r=>r.id!==rqId); }
-    else { rq.status = 'approved'; }
-    // Sempre persiste e marca dirty para proteger o modal de cadastro contra o listener do Firestore
-    persist();
+    // Marca como "em aprovação" — NÃO remove ainda (só remove quando o membro for salvo)
+    rq.status = 'approving';
+    // Pre-fill member form com o rqId guardado para remover depois
+    const newMember = {
+        id: null, _fromRqId: rqId, _fromRqCloud: rq._cloud,
+        name: rq.name, instrument: rq.instrument,
+        instruments: rq.instruments||[rq.instrument],
+        whatsapp: rq.whatsapp, email: rq.email,
+        nascimento: rq.nascimento||'', camisa: rq.camisa||'',
+        user: '', pass: ''
+    };
+    persist(); // salva status 'approving' — protege contra listener
     S.modal = { type:'member-form', data: newMember };
     render();
     toast(`✅ Aprovando ${rq.name} — defina usuário e senha.`);
@@ -3579,6 +3588,15 @@ function saveMember(id) {
     } else {
         S.members.push({ id:'mb'+uid(), name, instruments:instrs, instrument:instrs[0], whatsapp:whats, email, nascimento:nasc, camisa, accessRole, user, pass, memberType });
     }
+
+    // Agora sim: remove o pedido de solicitação (só após membro salvo com sucesso)
+    const rqId = S.modal?.data?._fromRqId;
+    const rqCloud = S.modal?.data?._fromRqCloud;
+    if (rqId) {
+        if (rqCloud) { fbRemoverSolicitacao(rqId); }
+        S.accessRequests = S.accessRequests.filter(r => r.id !== rqId);
+    }
+
     persist(); closeModal(); render();
     toast(id ? `✅ ${name} atualizado!` : `✅ ${name} cadastrado no ministério!`);
 }
