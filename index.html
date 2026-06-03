@@ -1894,12 +1894,14 @@ function _iniciaPresenca() {
     _fbDB.collection('presenca').onSnapshot(snap => {
         const agora = Date.now();
         const ativos = snap.docs.filter(d => (agora - (d.data().at||0)) < 120000);
-        _onlineCount = ativos.length;
-        // Atualiza indicador sem re-renderizar a página toda
-        const el = document.getElementById('online-count');
-        if (el) {
-            el.textContent = _onlineCount;
-            el.parentElement.style.display = _onlineCount > 0 ? 'flex' : 'none';
+        const novo = ativos.length;
+        if (novo !== _onlineCount) {
+            _onlineCount = novo;
+            // Atualiza só os elementos do badge sem re-renderizar a página
+            const el = document.getElementById('online-count');
+            const badge = document.getElementById('online-badge');
+            if (el) el.textContent = _onlineCount;
+            if (badge) badge.style.display = _onlineCount > 0 ? 'flex' : 'none';
         }
     }, ()=>{});
 }
@@ -2254,12 +2256,11 @@ function header() {
             ${S.page==='library'  && isAdm() ? `<button class="btn btn-sm" style="background:rgba(255,255,255,.92);color:#004d20;font-weight:800;box-shadow:0 2px 10px rgba(0,0,0,.25)" onclick="openAdd()">+ Música</button>` : ''}
             ${S.page==='setlists' && isAdm() ? `<button class="btn btn-sm" style="background:rgba(255,255,255,.92);color:#004d20;font-weight:800;box-shadow:0 2px 10px rgba(0,0,0,.25)" onclick="newSL()">+ Set List</button>` : ''}
             ${isMembro() ? `<button class="btn btn-sm" style="background:rgba(255,212,0,.22);border:1px solid rgba(255,212,0,.45);color:#ffe066;font-size:11px" onclick="showMissionAlert(S.currentMember)">🎯 Ver Missões</button>` : ''}
-            ${FIREBASE_CFG ? `
-            <span id="sync-status" onclick="recarregarDados()" title="Clique para atualizar" style="font-size:16px;opacity:.8;cursor:pointer">☁️</span>
-            <span id="online-badge" style="display:flex;align-items:center;gap:4px;background:rgba(0,150,63,.2);border:1px solid rgba(0,150,63,.4);border-radius:100px;padding:3px 9px;font-size:12px;font-weight:700;color:#4ade80;white-space:nowrap">
+            <span id="sync-status" onclick="recarregarDados()" title="Clique para atualizar" style="font-size:16px;opacity:.8;cursor:pointer;display:${_fbDB?'inline':'none'}">☁️</span>
+            <span id="online-badge" style="display:${_onlineCount>0?'flex':'none'};align-items:center;gap:4px;background:rgba(0,150,63,.2);border:1px solid rgba(0,150,63,.4);border-radius:100px;padding:3px 9px;font-size:12px;font-weight:700;color:#4ade80;white-space:nowrap">
                 <span style="width:7px;height:7px;border-radius:50%;background:#4ade80;flex-shrink:0;animation:onlinePulse 2s ease infinite"></span>
-                <span id="online-count">1</span> online
-            </span>` : ''}
+                <span id="online-count">${_onlineCount}</span> online
+            </span>
             <span class="role-badge ${S.role}">${roleLabel}</span>
             ${S.currentMember ? `<button class="btn btn-sm" onclick="openTrocarSenha()" style="background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.25);color:rgba(255,255,255,.85)" title="Trocar senha">${ic('warn',15)}</button>` : ''}
             <button class="btn btn-sm" onclick="doLogout()" style="background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.25);color:rgba(255,255,255,.85)">Sair</button>
