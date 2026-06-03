@@ -1341,18 +1341,21 @@ function _doPersist() { persist(true); } // alias de compatibilidade
 
 async function _gravaFirestore() {
     if (!_fbDB) { _localDirty = false; return; }
-    _setSyncStatus(false);
 
-    // ── Merge seguro de MEMBROS ──────────────────────────────────────
-    // Membros nunca são deletados acidentalmente.
-    // Se um membro existe no Firestore mas não na memória local
-    // (dispositivo desatualizado), ele é preservado antes da escrita.
-    // Outros dados (músicas, financeiro, etc.) confiam no estado local
-    // para permitir exclusões intencionais.
+    // ── TRAVA CRÍTICA: nunca escreve com membros vazios ──────────────
+    // Se S.members está vazio mas Firebase tem membros, é um bug — aborta
     try {
-        const snap = await _fbDB.collection('ministerio').doc('dados').get();
-        if (snap.exists) {
-            const remotos = snap.data().members || [];
+        const check = await _fbDB.collection('ministerio').doc('dados').get();
+        if (check.exists) {
+            const remotos = check.data().members || [];
+            if (remotos.length > 0 && S.members.length === 0) {
+                console.warn('[TRAVA] S.members vazio mas Firestore tem', remotos.length, 'membros — abortando escrita');
+                S.members = remotos; // restaura membros na memória
+                _localDirty = false;
+                render();
+                return; // não escreve
+            }
+            // Merge: preserva membros do Firestore que não estão na memória
             const localIds = new Set(S.members.map(m => m.id));
             remotos.forEach(r => {
                 if (r.id && !localIds.has(r.id)) {
@@ -1361,7 +1364,11 @@ async function _gravaFirestore() {
                 }
             });
         }
-    } catch(e) { console.warn('merge-members:', e); }
+    } catch(e) { console.warn('pre-write-check:', e); }
+
+    _setSyncStatus(false);
+
+    // ── (trava e merge feitos no bloco acima) ────────────────────────
 
     const ts = Date.now();
     _lastWriteTs = ts;
