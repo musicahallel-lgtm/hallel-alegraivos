@@ -1123,8 +1123,9 @@ async function initFirebase() {
 
         // ── Carrega dados do Firestore (única fonte da verdade) ──
         await carregaFirestore();
-        // ── Listener em tempo real: mudanças de qualquer dispositivo chegam na hora ──
-        _escutaFirestore();
+        // Listener em tempo real DESATIVADO — causava perda de dados
+        // Dados são atualizados ao abrir o app ou clicar no ☁️
+        // _escutaFirestore();
 
         // ── Solicitações de acesso: listener separado (append-only, não sobrescreve outros dados) ──
         let _solicitacoesInit = false;
