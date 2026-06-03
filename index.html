@@ -1370,8 +1370,17 @@ function hydrate() {
 // ── carregaFirestore: sempre carrega do Firestore ao abrir ────────
 async function carregaFirestore() {
     if (!_fbDB) return;
+    // Timeout de 8 segundos — se Firebase não responder, mostra o app mesmo assim
+    const timeout = new Promise(res => setTimeout(() => {
+        if (!_fbCarregado) { _fbCarregado = true; render(); }
+        res(null);
+    }, 8000));
     try {
-        const snap = await _fbDB.collection('ministerio').doc('dados').get();
+        const snap = await Promise.race([
+            _fbDB.collection('ministerio').doc('dados').get(),
+            timeout.then(() => null)
+        ]);
+        if (!snap) return; // timeout
         if (!snap.exists) {
             // Primeira vez: nuvem vazia. Se tiver dados locais antigos, migra uma vez.
             const localSongs = (() => { try { return JSON.parse(localStorage.getItem('hl_songs')||'[]'); } catch{ return []; }})();
@@ -6603,30 +6612,39 @@ function maybeInitMixer(song) {
             });
         }
     });
-    persist();
-    // [PROTEÇÃO] Camada 3: verifica se nada foi perdido durante a inicialização
-    _verificaIntegridade('inicialização');
+    // SEED: não persiste agora — Firebase ainda não conectou
+    // Os seeds são sincronizados depois que o Firestore carregar
     await openDB();
     await loadPdfIndex();
-    // Load YouTube IFrame API (async, no blocking)
     const ytScript = document.createElement('script');
     ytScript.src = 'https://www.youtube.com/iframe_api';
     document.head.appendChild(ytScript);
     render();
-    // Alerta de aniversário do dia — aparece para todos os perfis logados
     if (S.role) setTimeout(() => maybeShowBirthday(), 600);
-    // Sincronização das solicitações de acesso (se o Firebase estiver configurado)
-    initFirebase();
+    // Firebase: conecta e carrega dados (única fonte da verdade)
+    await initFirebase();
+    // Após carregar do Firestore, sincroniza seeds sem sobrescrever dados existentes
+    if (_fbCarregado) {
+        let seedChanged = false;
+        SEED.forEach(seed => {
+            const existing = S.songs.find(s=>s.title.toLowerCase()===seed.title.toLowerCase());
+            if (!existing) { S.songs.push(seed); seedChanged=true; }
+            else {
+                ['stemsPath','moisesUrl','youtubeUrl','spotifyUrl','deezerUrl'].forEach(k=>{
+                    if (seed[k] && existing[k]!==seed[k]) { existing[k]=seed[k]; seedChanged=true; }
+                });
+            }
+        });
+        if (seedChanged) persist();
+    }
 })();
 
-// ── Recarrega do Firestore quando o app volta ao foco (celular desbloqueado, aba ativada) ──
+// ── Recarrega do Firestore quando o app volta ao foco ──
 let _lastVisibleAt = Date.now();
 document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible' && _fbDB && S.role) {
         const mins = (Date.now() - _lastVisibleAt) / 60000;
-        if (mins >= 2) { // só recarrega se ficou 2+ minutos em segundo plano
-            carregaFirestore(true);
-        }
+        if (mins >= 2) carregaFirestore();
     } else {
         _lastVisibleAt = Date.now();
     }
