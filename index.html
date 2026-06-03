@@ -1339,11 +1339,29 @@ function persist(immediate) {
 }
 function _doPersist() { persist(true); } // alias de compatibilidade
 
-function _gravaFirestore() {
+async function _gravaFirestore() {
     if (!_fbDB) { _localDirty = false; return; }
     _setSyncStatus(false);
+
+    // ── Merge seguro: nunca apaga membros que existem no Firestore ──
+    // Lê o estado atual antes de escrever e mescla membros
+    try {
+        const snap = await _fbDB.collection('ministerio').doc('dados').get();
+        if (snap.exists) {
+            const remotos = snap.data().members || [];
+            const locaisIds = new Set(S.members.map(m => m.id));
+            // Adiciona ao local qualquer membro remoto que não está em memória
+            remotos.forEach(r => {
+                if (r.id && !locaisIds.has(r.id)) {
+                    S.members.push(r);
+                    console.log('[MERGE] membro preservado do Firestore:', r.name);
+                }
+            });
+        }
+    } catch(e) { console.warn('merge-read:', e); }
+
     const ts = Date.now();
-    _lastWriteTs = ts;  // marca quando nós escrevemos
+    _lastWriteTs = ts;
     _fbDB.collection('ministerio').doc('dados').set({
         songs:         S.songs,
         setlists:      S.setlists,
