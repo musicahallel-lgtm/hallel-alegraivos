@@ -6693,7 +6693,7 @@ function maybeInitMixer(song) {
     if (S.role) setTimeout(() => maybeShowBirthday(), 600);
     // Firebase: conecta e carrega dados (única fonte da verdade)
     await initFirebase();
-    // Após carregar do Firestore, sincroniza seeds sem sobrescrever dados existentes
+    // Após carregar do Firestore, sincroniza seeds SÓ nas músicas (nunca toca membros/outros dados)
     if (_fbCarregado) {
         let seedChanged = false;
         SEED.forEach(seed => {
@@ -6705,7 +6705,13 @@ function maybeInitMixer(song) {
                 });
             }
         });
-        if (seedChanged) persist();
+        if (seedChanged && _fbDB) {
+            // Usa UPDATE (não set!) para só atualizar o campo songs — nunca sobrescreve membros
+            _fbDB.collection('ministerio').doc('dados').update({
+                songs: S.songs,
+                _updatedAt: Date.now()
+            }).catch(e => console.warn('Seed sync:', e));
+        }
     }
 })();
 
