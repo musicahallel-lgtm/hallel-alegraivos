@@ -1281,6 +1281,7 @@ let _persistTimer   = null;
 let _localDirty     = false;   // true enquanto há escrita pendente no Firestore
 let _pendingSnap    = null;    // snapshot aguardando modal fechar para ser aplicado
 let _fbCarregado    = false;   // true após primeira carga do Firestore
+let _lastWriteTs    = 0;       // timestamp da última escrita nossa no Firestore
 
 // ── Indicador de sincronização ────────────────────────────────────
 let _syncPending = false;
@@ -1337,6 +1338,8 @@ function _doPersist() { persist(true); } // alias de compatibilidade
 function _gravaFirestore() {
     if (!_fbDB) { _localDirty = false; return; }
     _setSyncStatus(false);
+    const ts = Date.now();
+    _lastWriteTs = ts;  // marca quando nós escrevemos
     _fbDB.collection('ministerio').doc('dados').set({
         songs:         S.songs,
         setlists:      S.setlists,
@@ -1349,7 +1352,7 @@ function _gravaFirestore() {
         inventario:    S.inventario,
         avisos:        S.avisos,
         eventosCustom: S.eventosCustom,
-        _updatedAt:    Date.now(),
+        _updatedAt:    ts,
     }).then(() => { _localDirty = false; _setSyncStatus(true); })
       .catch(e  => { _localDirty = false; _setSyncStatus(true);
                      console.warn('Firestore save:', e);
@@ -1416,10 +1419,13 @@ function _escutaFirestore() {
     if (!_fbDB) return;
     _fbDB.collection('ministerio').doc('dados').onSnapshot(snap => {
         if (!snap.exists || !snap.data()) return;
-        if (_localDirty) return;  // temos escrita pendente, ignora
+        if (_localDirty) return;  // nossa escrita pendente — ignora
         const d = snap.data();
-        // Se modal aberto, guarda para aplicar depois (não interrompe edição)
-        if (S.modal) { _pendingSnap = d; return; }
+        const snapTs = d._updatedAt || 0;
+        // Se é eco da nossa própria escrita: só confirma o sync, não sobrescreve
+        if (snapTs <= _lastWriteTs) { _setSyncStatus(true); return; }
+        // É mudança de OUTRO dispositivo — aplica
+        if (S.modal) { _pendingSnap = d; return; } // aguarda modal fechar
         _aplicaDados(d);
         render();
         _setSyncStatus(true);
