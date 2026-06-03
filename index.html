@@ -1343,34 +1343,25 @@ async function _gravaFirestore() {
     if (!_fbDB) { _localDirty = false; return; }
     _setSyncStatus(false);
 
-    // ── Merge seguro: nunca apaga dados do Firestore que não estão na memória ──
-    // Garante que nenhum dispositivo desatualizado apague o trabalho de outro
+    // ── Merge seguro de MEMBROS ──────────────────────────────────────
+    // Membros nunca são deletados acidentalmente.
+    // Se um membro existe no Firestore mas não na memória local
+    // (dispositivo desatualizado), ele é preservado antes da escrita.
+    // Outros dados (músicas, financeiro, etc.) confiam no estado local
+    // para permitir exclusões intencionais.
     try {
         const snap = await _fbDB.collection('ministerio').doc('dados').get();
         if (snap.exists) {
-            const r = snap.data();
-            // Para cada array: preserva itens do Firestore que não estão na memória local
-            const ARRAYS = [
-                { remote: r.members,       local: S.members,       key:'id',   dest: S.members       },
-                { remote: r.songs,         local: S.songs,         key:'id',   dest: S.songs         },
-                { remote: r.setlists,      local: S.setlists,      key:'id',   dest: S.setlists      },
-                { remote: r.financeiro,    local: S.financeiro,    key:'id',   dest: S.financeiro    },
-                { remote: r.inventario,    local: S.inventario,    key:'id',   dest: S.inventario    },
-                { remote: r.avisos,        local: S.avisos,        key:'id',   dest: S.avisos        },
-                { remote: r.eventosCustom, local: S.eventosCustom, key:'id',   dest: S.eventosCustom },
-            ];
-            ARRAYS.forEach(({ remote, local, key, dest }) => {
-                if (!Array.isArray(remote) || !Array.isArray(local)) return;
-                const localIds = new Set(local.map(x => x[key]));
-                remote.forEach(item => {
-                    if (item[key] && !localIds.has(item[key])) {
-                        dest.push(item);
-                        console.log(`[MERGE] ${key} preservado:`, item.name || item.title || item[key]);
-                    }
-                });
+            const remotos = snap.data().members || [];
+            const localIds = new Set(S.members.map(m => m.id));
+            remotos.forEach(r => {
+                if (r.id && !localIds.has(r.id)) {
+                    S.members.push(r);
+                    console.log('[MERGE] membro preservado:', r.name);
+                }
             });
         }
-    } catch(e) { console.warn('merge-read:', e); }
+    } catch(e) { console.warn('merge-members:', e); }
 
     const ts = Date.now();
     _lastWriteTs = ts;
