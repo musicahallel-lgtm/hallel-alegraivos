@@ -1355,12 +1355,24 @@ async function _gravaFirestore() {
                 render();
                 return; // não escreve
             }
-            // Merge: preserva membros do Firestore que não estão na memória
-            const localIds = new Set(S.members.map(m => m.id));
+            // Merge membros: preserva membros do Firestore que não estão na memória
+            const localMemberIds = new Set(S.members.map(m => m.id));
             remotos.forEach(r => {
-                if (r.id && !localIds.has(r.id)) {
+                if (r.id && !localMemberIds.has(r.id)) {
                     S.members.push(r);
                     console.log('[MERGE] membro preservado:', r.name);
+                }
+            });
+
+            // Merge músicas: preserva músicas adicionadas por qualquer ADM
+            // Respeita tombstone de exclusões intencionais
+            const deletedIds = new Set(JSON.parse(localStorage.getItem('hl_deleted_songs')||'[]'));
+            const remoteSongs = check.data().songs || [];
+            const localSongIds = new Set(S.songs.map(s => s.id));
+            remoteSongs.forEach(r => {
+                if (r.id && !localSongIds.has(r.id) && !deletedIds.has(r.id)) {
+                    S.songs.push(r);
+                    console.log('[MERGE] música preservada:', r.title);
                 }
             });
         }
@@ -1726,6 +1738,12 @@ const SEED = [
         youtubeUrl:'https://www.youtube.com/watch?v=fSBl0NE24YM',
         spotifyUrl:'https://open.spotify.com/intl-pt/track/1YxIHDb8MO2eeObSamK3a1',
         deezerUrl:'', moisesUrl:'', stemsPath:'stems/espirito-santo-repousa', reaperUrl:'', bandUrl:'', chords:'', notes:''
+    },
+    {
+        id:'seed-pentecostes-hoje-aqui', title:'Pentecostes Hoje Aqui', artist:'',
+        key:'', bpm:'', category:'Espírito Santo',
+        youtubeUrl:'', spotifyUrl:'',
+        deezerUrl:'', moisesUrl:'', stemsPath:'', reaperUrl:'', bandUrl:'', chords:'', notes:''
     },
 ];
 
@@ -3177,6 +3195,9 @@ async function delSong(id) {
         (sl.blocks||[]).forEach(b=>{ b.songIds=b.songIds.filter(x=>x!==id); });
     });
     if (S.hasPdf.has(id)) { await dbDeletePDF(id); S.hasPdf.delete(id); }
+    // Registra como excluída intencionalmente (evita que o merge restaure)
+    const del = JSON.parse(localStorage.getItem('hl_deleted_songs')||'[]');
+    if (!del.includes(id)) { del.push(id); localStorage.setItem('hl_deleted_songs', JSON.stringify(del.slice(-200))); }
     persist(); S.modal=null; toast('🗑 Música excluída.'); render();
 }
 
