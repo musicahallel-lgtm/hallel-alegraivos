@@ -1377,6 +1377,15 @@ async function _gravaFirestore() {
                 }
             });
 
+            // Merge atividade — preserva a movimentação de TODOS os membros
+            // (cada dispositivo só tem a sua; une por id e mantém as 300 mais recentes)
+            const actMap = new Map();
+            (remote.activityLog || []).forEach(a => { if (a.id) actMap.set(a.id, a); });
+            (S.activityLog || []).forEach(a => { if (a.id) actMap.set(a.id, a); });
+            S.activityLog = Array.from(actMap.values())
+                .sort((a,b) => (a.at||0) - (b.at||0))
+                .slice(-300);
+
             const ts = Date.now();
             _lastWriteTs = ts;
             tx.set(docRef, {
@@ -1384,7 +1393,7 @@ async function _gravaFirestore() {
                 setlists:      S.setlists,
                 escalas:       S.escalas,
                 members:       S.members,
-                activityLog:   S.activityLog.slice(-50),
+                activityLog:   S.activityLog,
                 availability:  S.availability,
                 substitutions: S.substitutions,
                 financeiro:    S.financeiro,
@@ -2137,8 +2146,8 @@ function _iniciaPresenca() {
     // Atualiza presença a cada 60s (heartbeat)
     _atualizaPresenca();
     _presencaTimer = setInterval(_atualizaPresenca, 60000);
-    // Remove ao fechar/sair
-    window.addEventListener('beforeunload', _removePresenca);
+    // Remove presença e salva última atividade ao fechar/sair
+    window.addEventListener('beforeunload', () => { stopActTimer(); _removePresenca(); });
     // Escuta quem está online (última atualização < 2 minutos)
     _fbDB.collection('presenca').onSnapshot(snap => {
         const agora = Date.now();
@@ -6974,6 +6983,7 @@ document.addEventListener('visibilitychange', () => {
         const mins = (Date.now() - _lastVisibleAt) / 60000;
         if (mins >= 2) carregaFirestore();
     } else {
+        stopActTimer(); // salva a atividade em andamento ao minimizar/bloquear
         _lastVisibleAt = Date.now();
     }
 });
