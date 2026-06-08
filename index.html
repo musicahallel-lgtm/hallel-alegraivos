@@ -1477,6 +1477,41 @@ async function recarregarDados() {
     toast('✅ Dados atualizados!');
 }
 
+// ── BACKUP automático: 7 cópias rotativas (uma por dia da semana) ──
+async function _backupAutomatico() {
+    if (!_fbDB) return;
+    try {
+        const now = new Date();
+        const slot = 'bkp-' + now.getDay();   // bkp-0 (dom) ... bkp-6 (sáb)
+        const hoje = now.toISOString().slice(0,10);
+        const bkpRef = _fbDB.collection('ministerio').doc(slot);
+        const existe = await bkpRef.get();
+        if (existe.exists && existe.data()._backupDate === hoje) return; // já tem hoje
+        const dados = await _fbDB.collection('ministerio').doc('dados').get();
+        if (dados.exists && (dados.data().members||[]).length > 0) {
+            await bkpRef.set({ ...dados.data(), _backupDate: hoje, _backupAt: Date.now() });
+            console.log('[BACKUP] slot', slot, 'salvo para', hoje);
+        }
+    } catch(e) { console.warn('backup:', e); }
+}
+
+// ── Baixar backup manual (arquivo JSON) ──
+function baixarBackup() {
+    const dados = {
+        _versao: 'hallel-backup-v1', _backupAt: Date.now(),
+        songs: S.songs, setlists: S.setlists, escalas: S.escalas, members: S.members,
+        financeiro: S.financeiro, inventario: S.inventario, avisos: S.avisos,
+        eventosCustom: S.eventosCustom, availability: S.availability,
+        substitutions: S.substitutions, activityLog: S.activityLog,
+    };
+    const blob = new Blob([JSON.stringify(dados, null, 2)], { type:'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `hallel-backup-${new Date().toISOString().slice(0,10)}.json`;
+    a.click(); URL.revokeObjectURL(url);
+    toast('💾 Backup baixado!');
+}
+
 // ── listener em tempo real: atualiza todos os dispositivos na hora ─
 function _escutaFirestore() {
     if (!_fbDB) return;
@@ -2430,10 +2465,14 @@ function inicioPage() {
         <p>Ministério de Música Hallel — escolha uma área</p>
     </div>
     ${avisosInicio}
-    ${isAdm() ? `<div style="text-align:center;margin-bottom:16px">
+    ${isAdm() ? `<div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-bottom:16px">
         <button class="btn btn-sm" onclick="openNovoAviso()"
             style="background:rgba(239,68,68,.15);border:1px solid rgba(239,68,68,.4);color:#f87171;font-weight:700">
             ${ic('warn',15)} Publicar aviso urgente
+        </button>
+        <button class="btn btn-sm" onclick="baixarBackup()"
+            style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.2);color:var(--muted);font-weight:700">
+            ${ic('download',15)} Baixar backup
         </button>
     </div>` : ''}
     <div class="app-grid">${tiles}</div>`;
@@ -6980,6 +7019,8 @@ function maybeInitMixer(song) {
             persist(true);
         }
     }
+    // Backup automático diário (rede de segurança)
+    setTimeout(_backupAutomatico, 4000);
 })();
 
 // ── Recarrega do Firestore quando o app volta ao foco ──
