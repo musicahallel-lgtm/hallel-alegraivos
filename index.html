@@ -1382,6 +1382,8 @@ function _normalize() {
             delete sl.songIds;
         }
     });
+    // Garante id em itens antigos da lixeira (pré-merge por id)
+    (S.lixeira||[]).forEach(x => { if (x && x.id == null) x.id = 'lx'+uid(); });
 }
 
 // ── Aplica dados do Firestore no estado local ─────────────────────
@@ -1508,7 +1510,7 @@ async function _gravaFirestore() {
                 eventosCustom: _mergeArr(S.eventosCustom, remote.eventosCustom, _tombSet('eventosCustom')),
                 ensaios:       _mergeArr(S.ensaios,       remote.ensaios,       _tombSet('ensaios'), true),
                 comentarios:   _mergeArr(S.comentarios,   remote.comentarios,   _tombSet('comentarios')),
-                lixeira:       (S.lixeira && S.lixeira.length) ? S.lixeira : (remote.lixeira || []),
+                lixeira:       _mergeArr(S.lixeira,        remote.lixeira,       _tombSet('lixeira')),
             };
 
             // Atividade — une por id, mantém as 300 mais recentes
@@ -3533,7 +3535,7 @@ async function delSong(id) {
     });
     if (S.hasPdf.has(id)) { await dbDeletePDF(id); S.hasPdf.delete(id); }
     // Guarda na lixeira (recuperável por 30 dias)
-    if (song) S.lixeira.push({ tipo:'musica', item:song, excluidoEm:Date.now(),
+    if (song) S.lixeira.push({ id:'lx'+uid(), tipo:'musica', item:song, excluidoEm:Date.now(),
         excluidoPor: S.currentMember?.name || 'ADM' });
     _limpaLixeiraAntiga();
     // Registra como excluída intencionalmente (evita que o merge restaure)
@@ -3552,12 +3554,15 @@ function restaurarLixeira(idx) {
         if (!S.songs.find(s=>s.id===item.item.id)) S.songs.push(item.item);
         _rmTomb('songs', item.item.id);    // remove do tombstone para não apagar de novo
     }
+    if (item.id) _addTomb('lixeira', item.id);  // a ENTRADA da lixeira não volta no merge
     S.lixeira.splice(idx, 1);
     persist(); render();
     toast('♻️ Restaurado com sucesso!');
 }
 function excluirDaLixeira(idx) {
     if (!confirm('Excluir permanentemente? Esta ação não pode ser desfeita.')) return;
+    const item = S.lixeira[idx];
+    if (item && item.id) _addTomb('lixeira', item.id);  // não ressuscita no merge
     S.lixeira.splice(idx, 1);
     persist(); render();
     toast('Excluído permanentemente.');
@@ -4307,7 +4312,7 @@ function deleteMember(id) {
     if (!confirm(`Remover ${m.name} do ministério?\n\n(Fica na Lixeira por 30 dias — dá para recuperar)`)) return;
     S.members = S.members.filter(x=>x.id!==id);
     _addTomb('members', id);  // impede que o membro "ressuscite" no merge
-    S.lixeira.push({ tipo:'membro', item:m, excluidoEm:Date.now(),
+    S.lixeira.push({ id:'lx'+uid(), tipo:'membro', item:m, excluidoEm:Date.now(),
         excluidoPor: S.currentMember?.name || 'ADM' });
     _limpaLixeiraAntiga();
     persist(); render();
