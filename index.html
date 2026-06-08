@@ -3618,6 +3618,47 @@ const _origClose = window.closeModal;
 //  MEMBERS — Cadastro e Gestão
 // ════════════════════════════════════════════════════
 
+function resumoMembrosHtml() {
+    const mbs = S.members.filter(m => m.status !== 'rejected');
+    if (!mbs.length) return '';
+
+    // ── Resumo de camisas ──
+    const ORDEM = ['PP','P','M','G','GG','XG','XGG'];
+    const camisas = {};
+    mbs.forEach(m => { if (m.camisa) camisas[m.camisa] = (camisas[m.camisa]||0)+1; });
+    const semCamisa = mbs.filter(m => !m.camisa).length;
+    const chipsCamisa = ORDEM.filter(t=>camisas[t]).map(t =>
+        `<span style="background:rgba(0,150,63,.15);border:1px solid rgba(0,150,63,.3);border-radius:8px;padding:3px 10px;font-size:13px;font-weight:700;color:#4ade80">${t}: ${camisas[t]}</span>`
+    ).join('');
+
+    // ── Aniversariantes do mês ──
+    const mesAtual = new Date().getMonth()+1;
+    const MESES = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+    const aniv = mbs.filter(m => m.nascimento && parseInt(m.nascimento.split('-')[1])===mesAtual)
+        .sort((a,b) => parseInt(a.nascimento.split('-')[2]) - parseInt(b.nascimento.split('-')[2]));
+    const hoje = new Date().getDate();
+    const linhasAniv = aniv.map(m => {
+        const dia = parseInt(m.nascimento.split('-')[2]);
+        const ehHoje = dia===hoje;
+        return `<div style="display:flex;align-items:center;gap:8px;font-size:13px;padding:2px 0">
+            <span style="font-weight:700;color:${ehHoje?'#FFD400':'var(--text)'};min-width:42px">${String(dia).padStart(2,'0')}/${String(mesAtual).padStart(2,'0')}</span>
+            <span style="color:${ehHoje?'#FFD400':'var(--muted)'}">${ehHoje?'🎂 ':''}${escHtml(m.name)}</span>
+        </div>`;
+    }).join('');
+
+    return `<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px">
+        <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px">
+            <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:10px">👕 Camisas (${mbs.length-semCamisa}/${mbs.length})</div>
+            <div style="display:flex;flex-wrap:wrap;gap:6px">${chipsCamisa||'<span style="font-size:12px;color:var(--muted)">Nenhuma definida</span>'}</div>
+            ${semCamisa?`<div style="font-size:11px;color:var(--muted);margin-top:8px">${semCamisa} sem tamanho definido</div>`:''}
+        </div>
+        <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px">
+            <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:10px">🎂 Aniversários de ${MESES[mesAtual-1]}</div>
+            ${linhasAniv||'<span style="font-size:12px;color:var(--muted)">Ninguém este mês</span>'}
+        </div>
+    </div>`;
+}
+
 function membrosPage() {
     const mbs = S.members;
     const instrEmoji = {violao:'🎸',teclado:'🎹',bateria:'🥁',baixo:'🎸',guitarra:'🎸',sopro:'🎷',vocal1:'🎤',vocal2:'🎤',vocal3:'🎤',animador:'🎙'};
@@ -3627,6 +3668,7 @@ function membrosPage() {
             <h2 style="font-size:22px;font-weight:800">👥 Membros do Ministério</h2>
             <button class="btn btn-primary" onclick="openMemberForm(null)">+ Novo Membro</button>
         </div>
+        ${resumoMembrosHtml()}
         ${mbs.length===0 ? `<div style="text-align:center;padding:40px;color:var(--muted);background:var(--bg2);border-radius:var(--radius);border:1px dashed var(--border)">
             <div style="font-size:36px;margin-bottom:8px">👥</div>
             Nenhum membro cadastrado ainda.<br>
