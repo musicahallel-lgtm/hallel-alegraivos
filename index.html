@@ -1416,79 +1416,120 @@ function persist(immediate) {
 }
 function _doPersist() { persist(true); } // alias de compatibilidade
 
+// ═══════════════════════════════════════════════════════════════════
+//  TOMBSTONES + MERGE  — blindagem contra perda de dados com vários
+//  dispositivos editando ao mesmo tempo. Cada exclusão é registrada
+//  (tombstone) para não "ressuscitar" no merge; cada gravação une os
+//  dados do dispositivo com os da nuvem (nunca sobrescreve cego).
+// ═══════════════════════════════════════════════════════════════════
+function _getTombs() { try { return JSON.parse(localStorage.getItem('hl_tombstones')||'{}'); } catch { return {}; } }
+function _addTomb(coll, id) {
+    if (id==null) return;
+    const t = _getTombs();
+    t[coll] = t[coll] || [];
+    if (!t[coll].includes(id)) t[coll].push(id);
+    t[coll] = t[coll].slice(-500);
+    localStorage.setItem('hl_tombstones', JSON.stringify(t));
+}
+function _rmTomb(coll, id) {
+    const t = _getTombs();
+    if (t[coll]) { t[coll] = t[coll].filter(x => x !== id); localStorage.setItem('hl_tombstones', JSON.stringify(t)); }
+    if (coll === 'songs') { // compatibilidade com tombstone antigo de músicas
+        const d = JSON.parse(localStorage.getItem('hl_deleted_songs')||'[]').filter(x => x !== id);
+        localStorage.setItem('hl_deleted_songs', JSON.stringify(d));
+    }
+}
+function _tombSet(coll) {
+    const arr = (_getTombs()[coll] || []).slice();
+    if (coll === 'songs') { try { JSON.parse(localStorage.getItem('hl_deleted_songs')||'[]').forEach(x=>arr.push(x)); } catch{} }
+    return new Set(arr);
+}
+// Une dois arrays de objetos {id}: nuvem + local (local vence em conflito),
+// remove os marcados como excluídos. confMerge une sub-objeto confirmacoes.
+function _mergeArr(local, remote, tombs, confMerge) {
+    const map = new Map();
+    (remote||[]).forEach(r => { if (r && r.id != null) map.set(r.id, r); });
+    (local||[]).forEach(l => {
+        if (!l || l.id == null) return;
+        const r = map.get(l.id);
+        if (confMerge && r) map.set(l.id, { ...r, ...l, confirmacoes: { ...(r.confirmacoes||{}), ...(l.confirmacoes||{}) } });
+        else map.set(l.id, l);
+    });
+    let arr = [...map.values()];
+    if (tombs && tombs.size) arr = arr.filter(x => !tombs.has(x.id));
+    return arr;
+}
+// Une objetos indexados por chave (escalas/availability); para escalas,
+// une também o sub-objeto confirmacoes de cada evento.
+function _mergeKeyed(local, remote, confMerge) {
+    const out = { ...(remote||{}) };
+    Object.entries(local||{}).forEach(([k, v]) => {
+        if (confMerge && out[k] && v && typeof v === 'object')
+            out[k] = { ...out[k], ...v, confirmacoes: { ...(out[k].confirmacoes||{}), ...(v.confirmacoes||{}) } };
+        else out[k] = v;
+    });
+    return out;
+}
+
 async function _gravaFirestore() {
     if (!_fbDB) { _localDirty = false; return; }
     _setSyncStatus(false);
 
-    const deletedSongIds = new Set(JSON.parse(localStorage.getItem('hl_deleted_songs')||'[]'));
     const docRef = _fbDB.collection('ministerio').doc('dados');
 
     // ── TRANSACTION: leitura + merge + escrita atômicos ───────────────
     // Sem race condition: nenhum outro dispositivo pode escrever no meio
+    let _merged = null;
     try {
         await _fbDB.runTransaction(async (tx) => {
             const snap = await tx.get(docRef);
             const remote = snap.exists ? snap.data() : {};
 
-            // Merge membros — nunca perde membro de nenhum ADM
-            const localMemberIds = new Set(S.members.map(m => m.id));
-            (remote.members || []).forEach(r => {
-                if (r.id && !localMemberIds.has(r.id)) {
-                    S.members.push(r);
-                    console.log('[TX-MERGE] membro:', r.name);
-                }
-            });
-
-            // Trava: se local tem 0 membros mas remoto tem, aborta e restaura
+            // Trava de segurança: se local tem 0 membros mas remoto tem, aborta e restaura
+            // (cobre falha de carga da nuvem — nunca grava vazio por cima de dados reais)
             if (S.members.length === 0 && (remote.members||[]).length > 0) {
                 S.members = remote.members;
                 throw new Error('ABORT_EMPTY_MEMBERS');
             }
 
-            // Merge músicas — preserva músicas adicionadas por qualquer ADM
-            const localSongIds = new Set(S.songs.map(s => s.id));
-            (remote.songs || []).forEach(r => {
-                if (r.id && !localSongIds.has(r.id) && !deletedSongIds.has(r.id)) {
-                    S.songs.push(r);
-                    console.log('[TX-MERGE] música:', r.title);
-                }
-            });
+            // ── MERGE de TODAS as coleções (nuvem + local, exclusões respeitadas) ──
+            const m = {
+                songs:         _mergeArr(S.songs,         remote.songs,         _tombSet('songs')),
+                setlists:      _mergeArr(S.setlists,      remote.setlists,      _tombSet('setlists')),
+                escalas:       _mergeKeyed(S.escalas,     remote.escalas, true),
+                members:       _mergeArr(S.members,       remote.members,       _tombSet('members')),
+                availability:  _mergeKeyed(S.availability, remote.availability),
+                substitutions: _mergeArr(S.substitutions, remote.substitutions, _tombSet('substitutions')),
+                financeiro:    _mergeArr(S.financeiro,    remote.financeiro,    _tombSet('financeiro')),
+                inventario:    _mergeArr(S.inventario,    remote.inventario,    _tombSet('inventario')),
+                avisos:        _mergeArr(S.avisos,        remote.avisos,        _tombSet('avisos')),
+                eventosCustom: _mergeArr(S.eventosCustom, remote.eventosCustom, _tombSet('eventosCustom')),
+                ensaios:       _mergeArr(S.ensaios,       remote.ensaios,       _tombSet('ensaios'), true),
+                lixeira:       (S.lixeira && S.lixeira.length) ? S.lixeira : (remote.lixeira || []),
+            };
 
-            // Merge atividade — preserva a movimentação de TODOS os membros
-            // (cada dispositivo só tem a sua; une por id e mantém as 300 mais recentes)
+            // Atividade — une por id, mantém as 300 mais recentes
             const actMap = new Map();
             (remote.activityLog || []).forEach(a => { if (a.id) actMap.set(a.id, a); });
             (S.activityLog || []).forEach(a => { if (a.id) actMap.set(a.id, a); });
-            S.activityLog = Array.from(actMap.values())
-                .sort((a,b) => (a.at||0) - (b.at||0))
-                .slice(-300);
-
-            // Proteção: se local está vazio mas remoto tem dados, mantém o remoto
-            // (cobre o caso de carga da nuvem ter falhado — nunca apaga com vazio)
-            const keep = (local, rem) =>
-                (Array.isArray(local) && local.length === 0 && Array.isArray(rem) && rem.length > 0) ? rem : local;
-            const keepObj = (local, rem) =>
-                (local && Object.keys(local).length === 0 && rem && Object.keys(rem).length > 0) ? rem : local;
+            m.activityLog = Array.from(actMap.values()).sort((a,b)=>(a.at||0)-(b.at||0)).slice(-300);
 
             const ts = Date.now();
             _lastWriteTs = ts;
-            tx.set(docRef, {
-                songs:         S.songs,
-                setlists:      keep(S.setlists,      remote.setlists),
-                escalas:       keepObj(S.escalas,    remote.escalas),
-                members:       S.members,
-                activityLog:   S.activityLog,
-                availability:  keepObj(S.availability, remote.availability),
-                substitutions: keep(S.substitutions, remote.substitutions),
-                financeiro:    keep(S.financeiro,    remote.financeiro),
-                inventario:    keep(S.inventario,    remote.inventario),
-                avisos:        keep(S.avisos,        remote.avisos),
-                eventosCustom: keep(S.eventosCustom, remote.eventosCustom),
-                ensaios:       keep(S.ensaios,       remote.ensaios),
-                lixeira:       keep(S.lixeira,       remote.lixeira),
-                _updatedAt:    ts,
-            });
+            _merged = m;
+            tx.set(docRef, { ...m, _updatedAt: ts });
         });
+        // Aplica o resultado do merge no estado local (sem roubar foco/atrapalhar digitação)
+        if (_merged) {
+            Object.assign(S, _merged);
+            _normalize();
+            if (S.currentMember) { const m=S.members.find(x=>x.id===S.currentMember.id); if(m) S.currentMember=m; }
+            if (!S.modal) {
+                const ae = document.activeElement;
+                const digitando = ae && /^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName);
+                if (!digitando) render();
+            }
+        }
         _localDirty = false; _setSyncStatus(true);
     } catch(e) {
         _localDirty = false; _setSyncStatus(true);
@@ -3501,11 +3542,10 @@ function restaurarLixeira(idx) {
     const item = S.lixeira[idx]; if (!item) return;
     if (item.tipo === 'membro') {
         if (!S.members.find(m=>m.id===item.item.id)) S.members.push(item.item);
+        _rmTomb('members', item.item.id);  // tira da lista de excluídos ao restaurar
     } else if (item.tipo === 'musica') {
         if (!S.songs.find(s=>s.id===item.item.id)) S.songs.push(item.item);
-        // remove do tombstone para não ser apagada de novo
-        const del = JSON.parse(localStorage.getItem('hl_deleted_songs')||'[]').filter(x=>x!==item.item.id);
-        localStorage.setItem('hl_deleted_songs', JSON.stringify(del));
+        _rmTomb('songs', item.item.id);    // remove do tombstone para não apagar de novo
     }
     S.lixeira.splice(idx, 1);
     persist(); render();
@@ -3642,7 +3682,7 @@ function editSLMeta(id) {
 }
 function delSL(id) {
     if(!confirm('Excluir este set list?'))return;
-    S.setlists=S.setlists.filter(x=>x.id!==id);
+    S.setlists=S.setlists.filter(x=>x.id!==id); _addTomb('setlists', id);
     persist(); S.modal=null; toast('🗑 Set list excluído.'); render();
 }
 // Legacy stubs (kept for safety)
@@ -4261,6 +4301,7 @@ function deleteMember(id) {
     const m = S.members.find(x=>x.id===id); if(!m) return;
     if (!confirm(`Remover ${m.name} do ministério?\n\n(Fica na Lixeira por 30 dias — dá para recuperar)`)) return;
     S.members = S.members.filter(x=>x.id!==id);
+    _addTomb('members', id);  // impede que o membro "ressuscite" no merge
     S.lixeira.push({ tipo:'membro', item:m, excluidoEm:Date.now(),
         excluidoPor: S.currentMember?.name || 'ADM' });
     _limpaLixeiraAntiga();
@@ -4692,6 +4733,7 @@ function indicarSubstituto(evId, fromId, toId, rolesStr, roleLabel, evTitle, evD
     const toMember   = S.members.find(m=>m.id===toId);
     if (!fromMember || !toMember) return;
     // Remove any previous pending substitution for this slot
+    S.substitutions.filter(s => s.fromId===fromId && s.evId===evId).forEach(s => _addTomb('substitutions', s.id));
     S.substitutions = S.substitutions.filter(s => !(s.fromId===fromId && s.evId===evId));
     S.substitutions.push({
         id: 'sub'+uid(),
@@ -5322,7 +5364,7 @@ function saveInv(editId) {
 
 function delInv(id) {
     if (!confirm('Excluir este item do inventário?')) return;
-    S.inventario = S.inventario.filter(x=>x.id!==id);
+    S.inventario = S.inventario.filter(x=>x.id!==id); _addTomb('inventario', id);
     persist();
     toast('🗑 Item excluído.');
     render();
@@ -5539,7 +5581,7 @@ function saveFin(editId) {
 
 function delFin(id) {
     if (!confirm('Excluir este lançamento?')) return;
-    S.financeiro = S.financeiro.filter(x=>x.id!==id);
+    S.financeiro = S.financeiro.filter(x=>x.id!==id); _addTomb('financeiro', id);
     persist();
     toast('🗑 Lançamento excluído.');
     render();
@@ -5776,7 +5818,7 @@ function dismissAviso(id) {
 
 function delAviso(id) {
     if (!confirm('Remover este aviso para todos?')) return;
-    S.avisos = S.avisos.filter(a => a.id !== id);
+    S.avisos = S.avisos.filter(a => a.id !== id); _addTomb('avisos', id);
     persist();
     toast('Aviso removido.');
     render();
@@ -5913,7 +5955,7 @@ function openEditEnsaio(id) {
 }
 function delEnsaio(id) {
     if (!confirm('Excluir este ensaio?')) return;
-    S.ensaios = (S.ensaios||[]).filter(e=>e.id!==id);
+    S.ensaios = (S.ensaios||[]).filter(e=>e.id!==id); _addTomb('ensaios', id);
     persist(true); render(); toast('Ensaio excluído.');
 }
 function confirmarEnsaio(id, status) {
@@ -6263,7 +6305,7 @@ function openEditAtividade(id) {
 }
 function delAtividade(id) {
     if (!confirm('Remover esta atividade?')) return;
-    S.eventosCustom = S.eventosCustom.filter(e=>e.id!==id);
+    S.eventosCustom = S.eventosCustom.filter(e=>e.id!==id); _addTomb('eventosCustom', id);
     persist(); toast('🗑 Atividade removida.'); render();
 }
 
