@@ -1276,6 +1276,7 @@ const S = {
     avisos: [],          // [{ id, titulo, texto, tipo:'urgente'|'info'|'ensaio', criadoPor, criadoEm }]
     eventosCustom: [],   // [{ id, title, start, end, horario, local, obs, cor, criadoPor }]
     ensaios: [],         // [{ id, data:'YYYY-MM-DD', hora, local, obs, criadoPor, criadoEm, confirmacoes:{nome:'sim'|'nao'} }]
+    comentarios: [],     // [{ id, alvo:'song:ID'|'event:ID', autor, autorId, texto, at }]
     lixeira: [],         // [{ tipo:'membro'|'musica', item, excluidoEm, excluidoPor }]
     financeiro: [],      // [{ id, tipo:'entrada'|'saida', categoria, descricao, valor, data, obs, criadoPor, criadoEm }]
     _finFiltro: 'todos', // 'todos'|'entrada'|'saida'
@@ -1398,6 +1399,7 @@ function _aplicaDados(d) {
     if (d.avisos)        S.avisos         = d.avisos;
     if (d.eventosCustom) S.eventosCustom  = d.eventosCustom;
     if (d.ensaios)       S.ensaios         = d.ensaios;
+    if (d.comentarios)   S.comentarios     = d.comentarios;
     if (d.lixeira)       S.lixeira         = d.lixeira;
     _normalize();
     // Atualiza membro logado se seus dados mudaram
@@ -1505,6 +1507,7 @@ async function _gravaFirestore() {
                 avisos:        _mergeArr(S.avisos,        remote.avisos,        _tombSet('avisos')),
                 eventosCustom: _mergeArr(S.eventosCustom, remote.eventosCustom, _tombSet('eventosCustom')),
                 ensaios:       _mergeArr(S.ensaios,       remote.ensaios,       _tombSet('ensaios'), true),
+                comentarios:   _mergeArr(S.comentarios,   remote.comentarios,   _tombSet('comentarios')),
                 lixeira:       (S.lixeira && S.lixeira.length) ? S.lixeira : (remote.lixeira || []),
             };
 
@@ -1572,7 +1575,7 @@ async function carregaFirestore() {
             const localSongs = (() => { try { return JSON.parse(localStorage.getItem('hl_songs')||'[]'); } catch{ return []; }})();
             if (localSongs.length) {
                 const campos = ['songs','setlists','escalas','members','activityLog',
-                    'availability','substitutions','financeiro','inventario','avisos','eventosCustom','ensaios'];
+                    'availability','substitutions','financeiro','inventario','avisos','eventosCustom','ensaios','comentarios'];
                 campos.forEach(k => {
                     const v = localStorage.getItem('hl_'+k.replace(/([A-Z])/g,c=>c.toLowerCase()));
                     if (v) try { S[k] = JSON.parse(v); } catch{}
@@ -1623,7 +1626,7 @@ function baixarBackup() {
         financeiro: S.financeiro, inventario: S.inventario, avisos: S.avisos,
         eventosCustom: S.eventosCustom, availability: S.availability,
         substitutions: S.substitutions, activityLog: S.activityLog,
-        ensaios: S.ensaios, lixeira: S.lixeira,
+        ensaios: S.ensaios, comentarios: S.comentarios, lixeira: S.lixeira,
     };
     const blob = new Blob([JSON.stringify(dados, null, 2)], { type:'application/json' });
     const url = URL.createObjectURL(blob);
@@ -3046,6 +3049,8 @@ function detailModal(song) {
                         <div style="padding:12px;font-size:13px;line-height:1.7;color:var(--muted)">${song.notes}</div></div>`:''}
                 </div>
             </div>
+
+            ${comentariosHtml('song:'+song.id)}
 
         </div>
         <div class="modal-ft">
@@ -6029,6 +6034,67 @@ function salvarEnsaio(editId) {
 }
 
 // ════════════════════════════════════════════════════
+//  COMENTÁRIOS / CONVERSA (em músicas e eventos)
+// ════════════════════════════════════════════════════
+function _meuNomeChat() {
+    return S.currentMember?.name || (isAdm() ? 'Coordenador' : 'Equipe');
+}
+function _meuIdChat() {
+    return S.currentMember?.id || (isAdm() ? '_adm' : '_geral');
+}
+function comentariosHtml(alvo) {
+    const lista = (S.comentarios||[]).filter(c => c.alvo === alvo).sort((a,b)=>(a.at||0)-(b.at||0));
+    const meuId = _meuIdChat();
+    const inputId = 'cmt-input-' + alvo.replace(/[^a-z0-9]/gi,'');
+    const itens = lista.length ? lista.map(c => {
+        const dt = new Date(c.at);
+        const quando = dt.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'}) + ' ' + dt.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+        const meu = c.autorId === meuId;
+        const podeApagar = meu || isAdm();
+        return `<div style="display:flex;flex-direction:column;align-items:${meu?'flex-end':'flex-start'};margin-bottom:8px">
+            <div style="max-width:85%;background:${meu?'rgba(0,150,63,.18)':'var(--bg3)'};border:1px solid ${meu?'rgba(0,150,63,.3)':'var(--border)'};border-radius:12px;padding:8px 11px">
+                <div style="font-size:11px;font-weight:700;color:${meu?'#4ade80':'var(--purple-light)'};margin-bottom:2px">${escHtml(c.autor)}</div>
+                <div style="font-size:13px;line-height:1.4;white-space:pre-wrap;word-break:break-word">${escHtml(c.texto)}</div>
+                <div style="display:flex;align-items:center;gap:8px;justify-content:flex-end;margin-top:3px">
+                    <span style="font-size:10px;color:var(--muted)">${quando}</span>
+                    ${podeApagar?`<span onclick="delComentario('${c.id}')" style="cursor:pointer;font-size:11px;color:#f87171">excluir</span>`:''}
+                </div>
+            </div>
+        </div>`;
+    }).join('') : `<div style="text-align:center;color:var(--muted);font-size:13px;font-style:italic;padding:10px 0">Nenhuma mensagem ainda. Comece a conversa! 💬</div>`;
+    const podeEscrever = !!S.role;
+    return `<div class="dsec" style="margin-top:14px">
+        <div class="dsec-title">💬 Conversa ${lista.length?`<span style="color:var(--muted);font-weight:400">(${lista.length})</span>`:''}</div>
+        <div style="max-height:280px;overflow-y:auto;padding:4px 2px 2px">${itens}</div>
+        ${podeEscrever ? `<div style="display:flex;gap:8px;margin-top:10px">
+            <textarea id="${inputId}" rows="1" placeholder="Escreva uma mensagem…" style="flex:1;resize:none;background:var(--bg3);border:1px solid var(--border);border-radius:10px;color:var(--text);padding:9px 12px;font-size:13px;font-family:inherit"
+                onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();addComentario('${alvo}','${inputId}')}"></textarea>
+            <button class="btn btn-primary btn-sm" style="flex-shrink:0;align-self:stretch;padding:0 16px" onclick="addComentario('${alvo}','${inputId}')">Enviar</button>
+        </div>` : `<div style="font-size:12px;color:var(--muted);margin-top:8px">Entre como membro para participar da conversa.</div>`}
+    </div>`;
+}
+function addComentario(alvo, inputId) {
+    if (!S.role) { toast('Entre para comentar.'); return; }
+    const el = document.getElementById(inputId);
+    const texto = (el?.value || '').trim();
+    if (!texto) return;
+    if (!S.comentarios) S.comentarios = [];
+    S.comentarios.push({ id:'c'+uid(), alvo, autor:_meuNomeChat(), autorId:_meuIdChat(), texto, at:Date.now() });
+    if (el) el.value = '';
+    persist(true);
+    render();
+}
+function delComentario(id) {
+    const c = (S.comentarios||[]).find(x=>x.id===id); if(!c) return;
+    if (!(c.autorId===_meuIdChat() || isAdm())) { toast('Você só pode excluir suas mensagens.'); return; }
+    if (!confirm('Excluir esta mensagem?')) return;
+    S.comentarios = S.comentarios.filter(x=>x.id!==id);
+    _addTomb('comentarios', id);
+    persist(true);
+    render();
+}
+
+// ════════════════════════════════════════════════════
 //  RELATÓRIO MENSAL
 // ════════════════════════════════════════════════════
 function relatorioPage() {
@@ -6863,6 +6929,7 @@ function eventoModal(ev) {
             </div>
             ${tab==='escala' ? escalaHtml : checkHtml}
             ${tab==='escala' ? repertorioEventoHtml(ev.id) : ''}
+            ${tab==='escala' ? comentariosHtml('event:'+ev.id) : ''}
         </div>
     </div></div>`;
 }
