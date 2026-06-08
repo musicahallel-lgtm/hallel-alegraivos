@@ -1852,6 +1852,17 @@ function offsetLbl(n)  { return n===0?'Original':(n>0?'+':'')+n; }
 function fmtSize(b)    { return b > 1048576 ? (b/1048576).toFixed(1)+' MB' : Math.round(b/1024)+' KB'; }
 
 const KEYS = ['C','C#/Db','D','D#/Eb','E','F','F#/Gb','G','G#/Ab','A','A#/Bb','B'];
+const MOMENTOS = ['Entrada','Ato Penitencial','Glória','Aclamação','Ofertório','Santo','Comunhão','Ação de Graças','Final','Adoração','Louvor','Espírito Santo','Mariana'];
+
+// ── Favoritos (pessoais, por dispositivo — não vão pro Firestore) ──
+let _favs = (() => { try { return new Set(JSON.parse(localStorage.getItem('hl_favs')||'[]')); } catch { return new Set(); } })();
+function isFav(id) { return _favs.has(id); }
+function toggleFav(id, ev) {
+    if (ev) { ev.stopPropagation(); }
+    if (_favs.has(id)) _favs.delete(id); else _favs.add(id);
+    try { localStorage.setItem('hl_favs', JSON.stringify([..._favs])); } catch {}
+    render();
+}
 
 function toast(msg) {
     document.querySelectorAll('.toast').forEach(el=>el.remove());
@@ -2611,8 +2622,11 @@ function libPage() {
     const list = S.songs.filter(s => {
         const mq = !q || s.title.toLowerCase().includes(q) || (s.artist||'').toLowerCase().includes(q);
         const mk = !S.filterKey || s.key===S.filterKey;
-        return mq && mk;
+        const mm = !S.filterMomento || s.momento===S.filterMomento;
+        const mf = !S.favOnly || isFav(s.id);
+        return mq && mk && mm && mf;
     });
+    const favCount = S.songs.filter(s=>isFav(s.id)).length;
     return `
     <div class="section-header">
         <h2 class="section-title">Biblioteca de Músicas</h2>
@@ -2629,6 +2643,11 @@ function libPage() {
             <option value="">Todos os tons</option>
             ${KEYS.map(k=>`<option value="${k}" ${S.filterKey===k?'selected':''}>${k}</option>`).join('')}
         </select>
+        <select onchange="doFilterMomento(this.value)">
+            <option value="">Todos os momentos</option>
+            ${MOMENTOS.map(m=>`<option value="${m}" ${S.filterMomento===m?'selected':''}>${m}</option>`).join('')}
+        </select>
+        <button class="btn btn-sm" style="background:${S.favOnly?'#f59e0b':'var(--bg4)'};color:${S.favOnly?'#fff':'var(--text)'};border:1px solid ${S.favOnly?'#f59e0b':'var(--border)'};font-weight:700;white-space:nowrap" onclick="toggleFavFilter()" title="Mostrar só favoritas">★ ${favCount}</button>
     </div>
     ${list.length===0 ? `<div class="empty"><div class="ei">${S.songs.length===0?'🎵':'🔍'}</div>
         <h3>${S.songs.length===0?'Nenhuma música ainda':'Sem resultados'}</h3>
@@ -2639,14 +2658,19 @@ function libPage() {
 function songCard(s, i) {
     const hasYt=!!ytId(s.youtubeUrl), hasSp=!!spId(s.spotifyUrl), hasDz=!!dzId(s.deezerUrl);
     const hasPdf=S.hasPdf.has(s.id);
+    const fav = isFav(s.id);
     return `<div class="song-card" onclick="openDetail('${s.id}')">
         <div class="card-top">
             <div class="song-num">${i+1}</div>
-            ${s.key?`<div class="key-badge">${s.key}</div>`:''}
+            <div style="display:flex;align-items:center;gap:6px">
+                ${s.key?`<div class="key-badge">${s.key}</div>`:''}
+                <span onclick="toggleFav('${s.id}',event)" title="${fav?'Remover dos favoritos':'Adicionar aos favoritos'}" style="cursor:pointer;font-size:17px;line-height:1;color:${fav?'#f59e0b':'var(--muted)'};opacity:${fav?1:.5}">${fav?'★':'☆'}</span>
+            </div>
         </div>
         <div class="song-title">${s.title}</div>
         <div class="song-artist">${s.artist||''}</div>
         <div class="song-tags">
+            ${s.momento?`<span class="tag" style="background:rgba(0,150,63,.12);color:#4ade80">⛪ ${s.momento}</span>`:''}
             ${s.bpm?`<span class="tag tag-bpm">♩ ${s.bpm}</span>`:''}
             ${hasYt?`<span class="tag tag-yt">▶ YouTube</span>`:''}
             ${hasSp?`<span class="tag tag-sp">● Spotify</span>`:''}
@@ -2913,6 +2937,11 @@ function addModal(v) {
                     </select></div>
                 <div class="fg"><label>BPM</label>
                     <input type="number" id="f_bpm" value="${v.bpm||''}" placeholder="ex: 120" min="40" max="300"></div>
+                <div class="fg"><label>⛪ Momento litúrgico</label>
+                    <select class="field" id="f_momento">
+                        <option value="">— selecionar —</option>
+                        ${MOMENTOS.map(m=>`<option value="${m}" ${v.momento===m?'selected':''}>${m}</option>`).join('')}
+                    </select></div>
 
                 <div class="fg full"><div class="divider"></div></div>
 
@@ -3166,6 +3195,8 @@ function printModal(sl) {
 function nav(p)  { S.page=p; render(); }
 function doSearch(v)    { S.q=v;        render(); }
 function doFilterKey(v) { S.filterKey=v; render(); }
+function doFilterMomento(v) { S.filterMomento=v; render(); }
+function toggleFavFilter() { S.favOnly=!S.favOnly; render(); }
 
 function closeModal(e) {
     if (e && e.target!==e.currentTarget) return;
@@ -3232,6 +3263,7 @@ async function saveSong(eid) {
         moisesUrl:  document.getElementById('f_mo')?.value?.trim()||'',
         reaperUrl:  document.getElementById('f_rp')?.value?.trim()||'',
         bandUrl:    document.getElementById('f_bd')?.value?.trim()||'',
+        momento:  document.getElementById('f_momento')?.value||'',
         chords:  document.getElementById('f_ch')?.value||'',
         notes:   document.getElementById('f_nt')?.value?.trim()||'',
     };
@@ -3252,8 +3284,8 @@ async function saveSong(eid) {
     if (eid) {
         const i=S.songs.findIndex(s=>s.id===eid);
         if(i!==-1) {
-            d.stemsPath = d.stemsPath || S.songs[i].stemsPath; // preserve stemsPath
-            S.songs[i]=d;
+            // preserva campos extras não presentes no formulário (stemsPath, bpm de stem, etc.)
+            S.songs[i]={...S.songs[i], ...d};
         }
     } else { S.songs.push(d); }
 
@@ -6296,9 +6328,15 @@ function eventoModal(ev) {
                     return instrs.includes(k);
                 });
                 const thisDl = instrMatch.length ? `dl-${k}-${ev.id}` : dlId;
+                const cst = (esc.confirmacoes||{})[esc[k]];
+                const cbadge = esc[k] ? (cst==='sim'
+                    ? `<span style="font-size:10px;color:#22c55e;font-weight:700;white-space:nowrap">✅</span>`
+                    : cst==='nao'
+                    ? `<span style="font-size:10px;color:#ef4444;font-weight:700;white-space:nowrap">❌</span>`
+                    : `<span style="font-size:10px;color:var(--muted);white-space:nowrap">⏳</span>`) : '';
                 return `${instrMatch.length?`<datalist id="${thisDl}">${instrMatch.map(m=>`<option value="${m.name}">`).join('')}</datalist>`:''}
                 <div class="escal-row">
-                    <div class="escal-inst">${instrIcon(k,15)} ${label}</div>
+                    <div class="escal-inst">${instrIcon(k,15)} ${label} ${cbadge}</div>
                     <input class="escal-input" type="text" placeholder="—" list="${thisDl}"
                         value="${(esc[k]||'').replace(/"/g,'&quot;')}"
                         onchange="saveEvEscalado('${ev.id}','${k}',this.value)"
@@ -6327,6 +6365,15 @@ function eventoModal(ev) {
         // Read-only view for membros/geral
         const myName = S.currentMember?.name?.toLowerCase() || '';
         const filled = EV_INSTR.filter(({k})=>esc[k]);
+        const conf = esc.confirmacoes || {};
+        const souEscalado = myName && filled.some(({k})=>(esc[k]||'').toLowerCase().includes(myName));
+        const meuStatus = S.currentMember ? conf[S.currentMember.name] : null;
+        const confBadge = (nome)=>{
+            const st = conf[nome];
+            if (st==='sim') return `<span style="font-size:11px;color:#22c55e;font-weight:700;white-space:nowrap">✅ confirmou</span>`;
+            if (st==='nao') return `<span style="font-size:11px;color:#ef4444;font-weight:700;white-space:nowrap">❌ não vai</span>`;
+            return `<span style="font-size:11px;color:var(--muted);white-space:nowrap">⏳ aguardando</span>`;
+        };
         escalaHtml = `
         <div class="escal-grid" style="margin-bottom:12px">
             ${filled.length === 0
@@ -6336,12 +6383,20 @@ function eventoModal(ev) {
                     const isMine = myName && val.toLowerCase().includes(myName);
                     return `<div class="escal-row" style="pointer-events:none">
                         <div class="escal-inst">${instrIcon(k,15)} ${label}</div>
-                        <div class="escal-input" style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:${isMine?'800':'500'};color:${isMine?'var(--purple-light)':'var(--text)'};background:${isMine?'rgba(0,150,63,.1)':'transparent'};border-color:${isMine?'rgba(0,150,63,.3)':'var(--border)'}">
-                            ${isMine?'⭐ ':''}${val}
+                        <div class="escal-input" style="display:flex;align-items:center;justify-content:space-between;gap:6px;font-size:13px;font-weight:${isMine?'800':'500'};color:${isMine?'var(--purple-light)':'var(--text)'};background:${isMine?'rgba(0,150,63,.1)':'transparent'};border-color:${isMine?'rgba(0,150,63,.3)':'var(--border)'}">
+                            <span>${isMine?'⭐ ':''}${val}</span>
+                            ${confBadge(val)}
                         </div>
                     </div>`;
                 }).join('')}
-        </div>`;
+        </div>
+        ${souEscalado ? `<div style="background:${meuStatus==='sim'?'rgba(34,197,94,.1)':meuStatus==='nao'?'rgba(239,68,68,.1)':'rgba(255,212,0,.08)'};border:1px solid ${meuStatus==='sim'?'rgba(34,197,94,.35)':meuStatus==='nao'?'rgba(239,68,68,.35)':'rgba(255,212,0,.25)'};border-radius:10px;padding:12px 14px;margin-bottom:12px">
+            <div style="font-size:13px;font-weight:700;margin-bottom:${meuStatus?'6px':'10px'}">${meuStatus==='sim'?'✅ Você confirmou presença!':meuStatus==='nao'?'❌ Você marcou que não poderá ir.':'🎯 Você está escalado neste evento. Pode confirmar?'}</div>
+            <div style="display:flex;gap:8px">
+                <button class="btn btn-sm" style="flex:1;background:${meuStatus==='sim'?'#16a34a':'var(--bg4)'};color:${meuStatus==='sim'?'#fff':'var(--text)'};font-weight:700;border:1px solid ${meuStatus==='sim'?'#16a34a':'var(--border)'}" onclick="confirmarPresenca('${ev.id}','sim')">✅ Confirmar</button>
+                <button class="btn btn-sm" style="flex:1;background:${meuStatus==='nao'?'#dc2626':'var(--bg4)'};color:${meuStatus==='nao'?'#fff':'var(--text)'};font-weight:700;border:1px solid ${meuStatus==='nao'?'#dc2626':'var(--border)'}" onclick="confirmarPresenca('${ev.id}','nao')">❌ Não poderei</button>
+            </div>
+        </div>` : ''}`;
     }
 
     // ── Checklist ────────────────────────────────────────────────────────
@@ -6580,6 +6635,19 @@ function saveEvEscalado(evId, key, val) {
     }
     if (S.modal?.data?.id===evId) S.modal.data = EVENTOS_2026.find(e=>e.id===evId);
     persist();
+}
+
+function confirmarPresenca(evId, status) {
+    if (!S.currentMember) { toast('Apenas membros podem confirmar presença.'); return; }
+    if (!S.escalas[evId]) S.escalas[evId] = {};
+    if (!S.escalas[evId].confirmacoes) S.escalas[evId].confirmacoes = {};
+    const nome = S.currentMember.name;
+    // toggle: clicar de novo no mesmo status remove
+    if (S.escalas[evId].confirmacoes[nome] === status) delete S.escalas[evId].confirmacoes[nome];
+    else S.escalas[evId].confirmacoes[nome] = status;
+    persist(true);
+    toast(status==='sim'?'✅ Presença confirmada!':'Resposta registrada.');
+    render();
 }
 
 function criarSetListDoEvento(evId) {
