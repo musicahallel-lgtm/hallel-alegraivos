@@ -1152,6 +1152,9 @@ async function initFirebase() {
         // ── Presença em tempo real ──
         _iniciaPresenca();
 
+        // ── Notificações (avisos/ensaios) — listener seguro em doc separado ──
+        _iniciaNotificacoes();
+
     } catch (e) { console.warn('Firebase indisponível:', e); }
 }
 // Envia uma solicitação para a nuvem (chamado no submit)
@@ -1160,6 +1163,76 @@ function fbEnviarSolicitacao(req) {
     try { _fbDB.collection('solicitacoes').add(req); return true; }
     catch (e) { console.warn('Falha ao enviar solicitação à nuvem:', e); return false; }
 }
+// ════════════════════════════════════════════════════
+//  NOTIFICAÇÕES (push em primeiro plano / aba em segundo plano)
+//  Usa um doc separado (ministerio/notificacoes) — NÃO mexe nos dados
+//  principais, então é seguro e não causa perda de dados.
+// ════════════════════════════════════════════════════
+const _pushSessionIds = new Set();   // ids de notificações criadas por mim nesta sessão
+let _pushInit = false;
+
+function _notifRef() { return _fbDB ? _fbDB.collection('ministerio').doc('notificacoes') : null; }
+
+function _iniciaNotificacoes() {
+    const ref = _notifRef(); if (!ref) return;
+    ref.onSnapshot(snap => {
+        const lista = (snap.exists && snap.data().lista) || [];
+        const seen = parseInt(localStorage.getItem('hl_push_seen') || '0');
+        let maxAt = seen;
+        if (_pushInit && Notification.permission === 'granted') {
+            lista.filter(n => n.at > seen && !_pushSessionIds.has(n.id))
+                 .forEach(n => { _mostrarNotificacao(n.titulo, n.corpo); });
+        }
+        lista.forEach(n => { if (n.at > maxAt) maxAt = n.at; });
+        if (maxAt > seen) localStorage.setItem('hl_push_seen', String(maxAt));
+        _pushInit = true;
+    }, err => console.warn('notificacoes:', err));
+}
+
+function _mostrarNotificacao(titulo, corpo) {
+    try {
+        const opts = { body: corpo || '', icon: 'icon-192.png', badge: 'icon-192.png', tag: 'hallel' };
+        if (navigator.serviceWorker && navigator.serviceWorker.ready) {
+            navigator.serviceWorker.ready.then(reg => reg.showNotification('🎵 ' + titulo, opts)).catch(()=>{ new Notification('🎵 '+titulo, opts); });
+        } else {
+            new Notification('🎵 ' + titulo, opts);
+        }
+    } catch(e) { console.warn('notif show:', e); }
+}
+
+// Publica uma notificação para todos os dispositivos
+async function pushNotificar(titulo, corpo) {
+    const ref = _notifRef(); if (!ref) return;
+    try {
+        const id = 'n' + uid();
+        const at = Date.now();
+        _pushSessionIds.add(id);
+        localStorage.setItem('hl_push_seen', String(at)); // não notifica a mim mesmo
+        const snap = await ref.get();
+        let lista = (snap.exists && snap.data().lista) || [];
+        lista.push({ id, titulo, corpo: corpo || '', at });
+        lista = lista.slice(-30); // mantém só as 30 mais recentes
+        await ref.set({ lista });
+    } catch(e) { console.warn('pushNotificar:', e); }
+}
+
+// Pede permissão de notificação ao usuário
+async function pedirNotificacoes() {
+    if (!('Notification' in window)) { toast('Seu navegador não suporta notificações.'); return; }
+    if (Notification.permission === 'granted') { toast('🔔 Notificações já estão ativas!'); return; }
+    if (Notification.permission === 'denied') { toast('⚠️ Notificações bloqueadas. Ative nas configurações do navegador.'); return; }
+    try {
+        const p = await Notification.requestPermission();
+        if (p === 'granted') {
+            toast('🔔 Notificações ativadas! Você será avisado de avisos e ensaios.');
+            _mostrarNotificacao('Notificações ativadas', 'Você receberá avisos do Ministério Hallel aqui.');
+            render();
+        } else {
+            toast('Notificações não ativadas.');
+        }
+    } catch(e) { console.warn(e); }
+}
+
 // Remove da nuvem quando aprovada/recusada
 function fbRemoverSolicitacao(id) {
     if (_fbDB && id) { try { _fbDB.collection('solicitacoes').doc(id).delete(); } catch (e) {} }
@@ -1842,7 +1915,11 @@ function tNote(n, d) {
 }
 function tChord(c, d) {
     const m = c.match(/^([A-G][b#]?)(.*)$/);
-    return m ? tNote(m[1],d)+m[2] : c;
+    if (!m) return c;
+    let suffix = m[2];
+    // transpõe também a nota do baixo em acordes com barra (ex: D/F#)
+    suffix = suffix.replace(/\/([A-G][b#]?)/, (_, bass) => '/' + tNote(bass, d));
+    return tNote(m[1], d) + suffix;
 }
 function tText(txt, d) {
     if (!d) return txt;
@@ -2505,12 +2582,19 @@ function inicioPage() {
     }).join('');
 
     const avisosInicio = avisosHtml();
+    const notifBtn = (('Notification' in window) && Notification.permission==='default')
+        ? `<div style="display:flex;justify-content:center;margin-bottom:14px">
+            <button class="btn btn-sm" onclick="pedirNotificacoes()" style="background:rgba(96,165,250,.15);border:1px solid rgba(96,165,250,.4);color:#93c5fd;font-weight:700">
+                🔔 Ativar notificações de avisos e ensaios
+            </button>
+        </div>` : '';
     return `
     <div class="home-brand"><img src="logo.png" alt="Hallel"></div>
     <div class="home-hero">
         <h2>${saud}${nome?`, ${nome}`:''}! 👋</h2>
         <p>Ministério de Música Hallel — escolha uma área</p>
     </div>
+    ${notifBtn}
     ${avisosInicio}
     ${lembreteEscalaHtml()}
     ${ensaiosHtml()}
@@ -5673,6 +5757,7 @@ function salvarAviso() {
     const criadoPor = isAdm() && S.currentMember ? S.currentMember.name : 'ADM';
     S.avisos.unshift({ id:'av'+uid(), titulo, texto, tipo, criadoPor, criadoEm: Date.now() });
     persist();
+    pushNotificar(titulo, texto);
     S.modal = null;
     render();
     toast('📢 Aviso publicado para todos!');
@@ -5816,6 +5901,8 @@ function salvarEnsaio(editId) {
         obj.criadoEm = Date.now();
         obj.confirmacoes = {};
         S.ensaios.push(obj);
+        const [yy,mm,dd] = obj.data.split('-');
+        pushNotificar('Novo ensaio agendado', `📅 ${dd}/${mm}${obj.hora?' às '+obj.hora:''}${obj.local?' — '+obj.local:''}`);
     }
     persist(true);
     S.modal = null; render();
