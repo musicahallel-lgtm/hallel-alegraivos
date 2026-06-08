@@ -3483,7 +3483,9 @@ function evDateLabel(ev) {
 let _actTimer = null; // { type, songId, songTitle, tab, startAt }
 
 function trackActivity(type, data = {}) {
-    if (!isMembro() || !S.currentMember) return;
+    // Rastreia QUALQUER membro logado — incluindo os que são ADM
+    // (antes só rastreava perfil 'membro', perdendo Rodrigo/Milene/Luciana que são ADM)
+    if (!S.currentMember) return;
     const entry = { id: uid(), memberId: S.currentMember.id,
         memberName: S.currentMember.name, type, at: Date.now(), duration: 0, ...data };
     S.activityLog.push(entry);
