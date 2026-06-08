@@ -2744,6 +2744,56 @@ function libPage() {
     `<div class="songs-grid">${list.map((s,i)=>songCard(s,i)).join('')}</div>`}`;
 }
 
+// ── Tom preferido de cada vocalista (por música) ──
+function _vocalistas() {
+    const vk = ['vocal1','vocal2','vocal3','animador'];
+    return S.members.filter(m => {
+        if (m.status==='rejected') return false;
+        const instrs = m.instruments || (m.instrument?[m.instrument]:[]);
+        return instrs.some(i => vk.includes(i));
+    });
+}
+function tonsVocalistasHtml(song) {
+    const vocs = _vocalistas();
+    const tons = song.tonsVocalistas || {};
+    const comTom = Object.entries(tons).filter(([,v])=>v);
+    // Membros não-adm só veem (sem editar). Se não houver vocalistas nem tons, esconde.
+    if (!isAdm() && !comTom.length) return '';
+    if (isAdm()) {
+        if (!vocs.length) return '';
+        return `<div class="dsec" style="margin-top:14px">
+            <div class="dsec-title">🎤 Tom por vocalista</div>
+            <div style="display:flex;flex-direction:column;gap:7px">
+                ${vocs.map(m=>{
+                    const cur = tons[m.name] || '';
+                    return `<div style="display:flex;align-items:center;gap:8px">
+                        <span style="flex:1;font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escHtml(m.name)}</span>
+                        <select onchange="saveTomVocalista('${song.id}','${escHtml(m.name).replace(/'/g,"\\'")}',this.value)" style="background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:4px 8px;font-size:13px;font-weight:700">
+                            <option value="">—</option>
+                            ${KEYS.map(k=>`<option value="${k}" ${cur===k?'selected':''}>${k}</option>`).join('')}
+                        </select>
+                    </div>`;
+                }).join('')}
+            </div>
+            <div style="font-size:11px;color:var(--muted);margin-top:8px">💡 Marque o tom em que cada vocalista canta melhor — agiliza montar a escala.</div>
+        </div>`;
+    }
+    // Visão membro/geral (somente leitura)
+    return `<div class="dsec" style="margin-top:14px">
+        <div class="dsec-title">🎤 Tom por vocalista</div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px">
+            ${comTom.map(([nome,tom])=>`<span style="background:rgba(0,150,63,.12);border:1px solid rgba(0,150,63,.25);border-radius:8px;padding:3px 9px;font-size:12px"><b>${escHtml(nome)}</b>: <span style="color:#4ade80;font-weight:800">${tom}</span></span>`).join('')}
+        </div>
+    </div>`;
+}
+function saveTomVocalista(songId, nome, tom) {
+    const s = S.songs.find(x=>x.id===songId); if(!s) return;
+    if (!s.tonsVocalistas) s.tonsVocalistas = {};
+    if (tom) s.tonsVocalistas[nome] = tom; else delete s.tonsVocalistas[nome];
+    persist();
+    toast(tom?`🎤 ${nome}: tom ${tom}`:'Tom removido.');
+}
+
 function songCard(s, i) {
     const hasYt=!!ytId(s.youtubeUrl), hasSp=!!spId(s.spotifyUrl), hasDz=!!dzId(s.deezerUrl);
     const hasPdf=S.hasPdf.has(s.id);
@@ -2909,6 +2959,8 @@ function detailModal(song) {
                                 <div><div class="link-label">Metrônomo + Voz</div><div class="link-desc">Drive — ensaio banda</div></div>
                                 <span style="margin-left:auto;color:var(--muted)">↗</span></a>`:''}
                         </div></div>`:''}
+
+                    ${tonsVocalistasHtml(song)}
                 </div>
 
                 <!-- RIGHT: Cifra (texto ou PDF) -->
@@ -3282,7 +3334,32 @@ function printModal(sl) {
 // ═══════════════════════════════════════════════
 //  ACTIONS
 // ═══════════════════════════════════════════════
-function nav(p)  { S.page=p; render(); }
+function nav(p)  { S.page=p; render(); if (p==='inicio') _checkLembretesEnsaio(); }
+
+// ── Lembrete automático de ensaio (véspera + dia) para quem confirmou ──
+function _checkLembretesEnsaio() {
+    if (!S.currentMember) return;
+    const nome = S.currentMember.name;
+    (S.ensaios||[]).forEach(e => {
+        const conf = (e.confirmacoes||{})[nome];
+        if (conf !== 'sim') return;            // só lembra quem confirmou presença
+        const dias = _ensaioDias(e.data);
+        let fase = null;
+        if (dias === 1) fase = 'vespera';
+        else if (dias === 0) fase = 'dia';
+        if (!fase) return;
+        const chave = 'hl_lemb_' + e.id + '_' + fase;
+        if (localStorage.getItem(chave)) return;
+        localStorage.setItem(chave, '1');
+        const [yy,mm,dd] = e.data.split('-');
+        const quando = fase==='dia' ? 'É HOJE' : 'é amanhã';
+        const corpo = `${quando}${e.hora?' às '+e.hora:''}${e.local?' — '+e.local:''}`;
+        toast(`🎼 Lembrete: ensaio ${quando.toLowerCase()}!`);
+        if (('Notification' in window) && Notification.permission==='granted') {
+            _mostrarNotificacao(`Ensaio ${fase==='dia'?'hoje':'amanhã'}`, corpo);
+        }
+    });
+}
 function doSearch(v)    { S.q=v;        render(); }
 function doFilterKey(v) { S.filterKey=v; render(); }
 function doFilterMomento(v) { S.filterMomento=v; render(); }
@@ -6636,6 +6713,9 @@ function eventoModal(ev) {
         </div>
         ${hasEsc ? `<button class="btn btn-sm" style="margin-top:10px;width:100%;background:#25d366;color:#fff;font-weight:700;font-size:14px;display:flex;align-items:center;justify-content:center;gap:7px" onclick="openWaEscala('${ev.id}')">
             ${ic('whatsapp',16)} Notificar escalados via WhatsApp
+        </button>
+        <button class="btn btn-sm btn-ghost" style="margin-top:8px;width:100%;font-weight:700;font-size:13px;display:flex;align-items:center;justify-content:center;gap:7px;border:1px solid var(--border)" onclick="exportarEscalaPDF('${ev.id}')">
+            ${ic('print',15)} Exportar escala em PDF
         </button>` : ''}`;
     } else {
         // Read-only view for membros/geral
@@ -6953,6 +7033,80 @@ function repertorioEventoHtml(evId) {
         </div>
         ${linhas}
     </div>`;
+}
+
+function exportarEscalaPDF(evId) {
+    const ev = EVENTOS_2026.find(e=>e.id===evId) || REC_2026.find(e=>e.id===evId) || (S.eventosCustom||[]).find(e=>e.id===evId);
+    if (!ev) { toast('Evento não encontrado.'); return; }
+    const esc = S.escalas[evId] || {};
+    const conf = esc.confirmacoes || {};
+    const dataLbl = ev.dateLabel || (typeof evDateLabel==='function' ? evDateLabel(ev) : (ev.start||''));
+    const local = (esc.local || ev.local || '').trim();
+
+    const statusBadge = (nome) => {
+        const st = conf[nome];
+        if (st==='sim') return '<span style="color:#16a34a;font-weight:700">✓ confirmado</span>';
+        if (st==='nao') return '<span style="color:#dc2626;font-weight:700">✕ não vai</span>';
+        return '<span style="color:#999">— aguardando</span>';
+    };
+    const escRows = EV_INSTR.filter(({k})=>esc[k]).map(({k,label})=>`<tr>
+        <td style="padding:7px 12px;border-bottom:1px solid #eee;font-weight:700;width:140px">${label}</td>
+        <td style="padding:7px 12px;border-bottom:1px solid #eee">${escHtml(esc[k])}</td>
+        <td style="padding:7px 12px;border-bottom:1px solid #eee;text-align:right;font-size:12px">${statusBadge(esc[k])}</td>
+    </tr>`).join('');
+
+    // Repertório
+    const sl = esc.setListId && S.setlists.find(x=>x.id===esc.setListId);
+    let repHtml = '';
+    if (sl) {
+        let n = 0;
+        const linhas = (sl.blocks||[]).map(b => {
+            const songs = (b.songIds||[]).map(id=>S.songs.find(s=>s.id===id)).filter(Boolean);
+            if (!songs.length) return '';
+            const hdr = (sl.blocks.length>1) ? `<tr><td colspan="3" style="padding:8px 12px 3px;font-weight:700;color:#c2410c;font-size:12px">${escHtml(b.name||'Bloco')}</td></tr>` : '';
+            return hdr + songs.map(s=>{ n++; return `<tr>
+                <td style="padding:6px 12px;border-bottom:1px solid #eee;width:30px;font-weight:700;color:#00963F">${n}</td>
+                <td style="padding:6px 12px;border-bottom:1px solid #eee">${escHtml(s.title)}${s.artist?` <span style="color:#999;font-size:11px">— ${escHtml(s.artist)}</span>`:''}${s.momento?`<br><span style="color:#16a34a;font-size:11px">⛪ ${escHtml(s.momento)}</span>`:''}</td>
+                <td style="padding:6px 12px;border-bottom:1px solid #eee;text-align:right;font-weight:700">${s.key||''}</td>
+            </tr>`; }).join('');
+        }).join('');
+        if (linhas) repHtml = `<h2 style="font-size:15px;color:#00963F;border-bottom:2px solid #e0e0e0;padding-bottom:5px;margin:26px 0 8px">🎵 Repertório</h2>
+            <table style="width:100%;border-collapse:collapse;font-size:13px"><tbody>${linhas}</tbody></table>`;
+    }
+
+    const win = window.open('','_blank','width=900,height=700');
+    if (!win) { toast('Permita pop-ups para exportar.'); return; }
+    win.document.write(`<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">
+    <title>Escala — ${escHtml(ev.title)}</title>
+    <style>
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body { font-family: Arial, sans-serif; color:#1a1a1a; padding:32px; font-size:13px; }
+        .header { border-bottom:3px solid #00963F; padding-bottom:16px; margin-bottom:22px; }
+        .header h1 { font-size:21px; color:#00963F; margin-bottom:4px; }
+        .header p { color:#555; font-size:13px; margin-top:2px; }
+        table { width:100%; border-collapse:collapse; }
+        h2 { page-break-after:avoid; }
+        .footer { margin-top:36px; border-top:1px solid #e0e0e0; padding-top:12px; font-size:11px; color:#999; }
+        @media print { body { padding:16px; } .no-print { display:none; } }
+    </style></head><body>
+    <div class="header">
+        <h1>🎯 Escala — ${escHtml(ev.title)}</h1>
+        <p>📅 ${escHtml(dataLbl)}${ev.horario?` · ⏰ ${escHtml(ev.horario)}`:''}</p>
+        ${local?`<p>📍 ${escHtml(local)}</p>`:''}
+        <p style="color:#999">Ministério de Música Hallel · gerado em ${new Date().toLocaleDateString('pt-BR')}</p>
+    </div>
+    <div class="no-print" style="margin-bottom:20px">
+        <button onclick="window.print()" style="background:#00963F;color:#fff;border:none;padding:10px 20px;border-radius:6px;font-size:14px;font-weight:700;cursor:pointer">🖨 Imprimir / Salvar como PDF</button>
+        <button onclick="window.close()" style="background:#eee;border:none;padding:10px 20px;border-radius:6px;font-size:14px;cursor:pointer;margin-left:8px">✕ Fechar</button>
+    </div>
+    <h2 style="font-size:15px;color:#00963F;border-bottom:2px solid #e0e0e0;padding-bottom:5px;margin-bottom:8px">👥 Equipe escalada</h2>
+    ${escRows ? `<table style="font-size:13px"><tbody>${escRows}</tbody></table>` : '<p style="color:#999;font-style:italic">Escala ainda não preenchida.</p>'}
+    ${repHtml}
+    <div class="footer">Comunidade Católica Hallel — Ministério de Música</div>
+    </body></html>`);
+    win.document.close();
+    win.focus();
+    toast('📄 Escala pronta para imprimir/salvar!');
 }
 
 function confirmarPresenca(evId, status) {
@@ -7541,6 +7695,8 @@ function maybeInitMixer(song) {
     }
     // Backup automático diário (rede de segurança)
     setTimeout(_backupAutomatico, 4000);
+    // Lembrete de ensaio (véspera/dia) após os dados carregarem
+    setTimeout(_checkLembretesEnsaio, 6000);
 })();
 
 // ── Recarrega do Firestore quando o app volta ao foco ──
