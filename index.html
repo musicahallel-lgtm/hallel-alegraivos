@@ -1202,6 +1202,7 @@ const S = {
     substitutions: [],   // [{ id, fromId, fromName, toId, toName, evId, evTitle, evDate, role, roleLabel, status:'pending'|'accepted'|'rejected', at, notifiedFrom, notifiedTo }]
     avisos: [],          // [{ id, titulo, texto, tipo:'urgente'|'info'|'ensaio', criadoPor, criadoEm }]
     eventosCustom: [],   // [{ id, title, start, end, horario, local, obs, cor, criadoPor }]
+    ensaios: [],         // [{ id, data:'YYYY-MM-DD', hora, local, obs, criadoPor, criadoEm, confirmacoes:{nome:'sim'|'nao'} }]
     lixeira: [],         // [{ tipo:'membro'|'musica', item, excluidoEm, excluidoPor }]
     financeiro: [],      // [{ id, tipo:'entrada'|'saida', categoria, descricao, valor, data, obs, criadoPor, criadoEm }]
     _finFiltro: 'todos', // 'todos'|'entrada'|'saida'
@@ -1323,6 +1324,7 @@ function _aplicaDados(d) {
     if (d.inventario)    S.inventario     = d.inventario;
     if (d.avisos)        S.avisos         = d.avisos;
     if (d.eventosCustom) S.eventosCustom  = d.eventosCustom;
+    if (d.ensaios)       S.ensaios         = d.ensaios;
     if (d.lixeira)       S.lixeira         = d.lixeira;
     _normalize();
     // Atualiza membro logado se seus dados mudaram
@@ -1409,6 +1411,7 @@ async function _gravaFirestore() {
                 inventario:    keep(S.inventario,    remote.inventario),
                 avisos:        keep(S.avisos,        remote.avisos),
                 eventosCustom: keep(S.eventosCustom, remote.eventosCustom),
+                ensaios:       keep(S.ensaios,       remote.ensaios),
                 lixeira:       keep(S.lixeira,       remote.lixeira),
                 _updatedAt:    ts,
             });
@@ -1455,7 +1458,7 @@ async function carregaFirestore() {
             const localSongs = (() => { try { return JSON.parse(localStorage.getItem('hl_songs')||'[]'); } catch{ return []; }})();
             if (localSongs.length) {
                 const campos = ['songs','setlists','escalas','members','activityLog',
-                    'availability','substitutions','financeiro','inventario','avisos','eventosCustom'];
+                    'availability','substitutions','financeiro','inventario','avisos','eventosCustom','ensaios'];
                 campos.forEach(k => {
                     const v = localStorage.getItem('hl_'+k.replace(/([A-Z])/g,c=>c.toLowerCase()));
                     if (v) try { S[k] = JSON.parse(v); } catch{}
@@ -1506,6 +1509,7 @@ function baixarBackup() {
         financeiro: S.financeiro, inventario: S.inventario, avisos: S.avisos,
         eventosCustom: S.eventosCustom, availability: S.availability,
         substitutions: S.substitutions, activityLog: S.activityLog,
+        ensaios: S.ensaios, lixeira: S.lixeira,
     };
     const blob = new Blob([JSON.stringify(dados, null, 2)], { type:'application/json' });
     const url = URL.createObjectURL(blob);
@@ -2509,6 +2513,7 @@ function inicioPage() {
     </div>
     ${avisosInicio}
     ${lembreteEscalaHtml()}
+    ${ensaiosHtml()}
     ${isAdm() ? `<div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-bottom:16px">
         <button class="btn btn-sm" onclick="openNovoAviso()"
             style="background:rgba(239,68,68,.15);border:1px solid rgba(239,68,68,.4);color:#f87171;font-weight:700">
@@ -2736,6 +2741,7 @@ function modalHtml() {
     if (type==='trocar-senha')          return trocarSenhaModal();
     if (type==='recusar-solicitacao')   return recusarSolicitacaoModal(data);
     if (type==='novo-aviso')       return novoAvisoModal(data);
+    if (type==='ensaio')           return ensaioModal(data);
     if (type==='inv-add')          return invAddModal(data);
     return '';
 }
@@ -3701,6 +3707,7 @@ function membrosPage() {
             <button class="btn btn-primary" onclick="openMemberForm(null)">+ Novo Membro</button>
         </div>
         ${resumoMembrosHtml()}
+        ${participacaoHtml()}
         ${mbs.length===0 ? `<div style="text-align:center;padding:40px;color:var(--muted);background:var(--bg2);border-radius:var(--radius);border:1px dashed var(--border)">
             <div style="font-size:36px;margin-bottom:8px">👥</div>
             Nenhum membro cadastrado ainda.<br>
@@ -3778,6 +3785,44 @@ function membrosPage() {
         ${recusadasHtml({violao:'Violão',teclado:'Teclado',bateria:'Bateria',baixo:'Baixo',guitarra:'Guitarra',sopro:'Sopro',vocal1:'Vocal 1',vocal2:'Vocal 2',vocal3:'Vocal 3',animador:'Animador'})}
         ${lixeiraHtml()}
     </div>`;
+}
+
+function participacaoHtml() {
+    const mbs = S.members.filter(m => m.status !== 'rejected');
+    if (mbs.length < 2) return '';
+    // conta participações em escalas (total e futuras)
+    const stats = mbs.map(m => {
+        const all = getMemberEscalas(m.name);
+        const futuras = all.filter(e => e.daysUntil >= 0).length;
+        return { name: m.name, total: all.length, futuras };
+    });
+    const algumaEscala = stats.some(s => s.total > 0);
+    if (!algumaEscala) return '';
+    stats.sort((a,b) => b.total - a.total || b.futuras - a.futuras);
+    const max = Math.max(1, ...stats.map(s => s.total));
+    const top = stats.slice(0, 12);
+    const corBarra = (n) => n===0 ? 'var(--border)' : 'linear-gradient(90deg,#00963F,#22c55e)';
+    return `<details style="margin-bottom:20px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden">
+        <summary style="cursor:pointer;padding:14px 16px;font-size:13px;font-weight:700;display:flex;align-items:center;gap:8px;user-select:none">
+            📊 Participação nas escalas
+            <span style="font-weight:400;color:var(--muted);font-size:12px">— quem está sendo mais/menos escalado</span>
+        </summary>
+        <div style="padding:4px 16px 16px">
+            ${top.map(s => {
+                const pct = Math.round(s.total / max * 100);
+                return `<div style="margin-bottom:10px">
+                    <div style="display:flex;justify-content:space-between;align-items:center;font-size:13px;margin-bottom:3px">
+                        <span style="font-weight:600">${escHtml(s.name)}</span>
+                        <span style="color:var(--muted);font-size:12px">${s.total} escala${s.total!==1?'s':''}${s.futuras?` · ${s.futuras} futura${s.futuras!==1?'s':''}`:''}</span>
+                    </div>
+                    <div style="height:8px;background:var(--bg4);border-radius:4px;overflow:hidden">
+                        <div style="height:100%;width:${Math.max(pct,s.total?6:0)}%;background:${corBarra(s.total)};border-radius:4px;transition:width .3s"></div>
+                    </div>
+                </div>`;
+            }).join('')}
+            <div style="font-size:11px;color:var(--muted);margin-top:8px;line-height:1.4">💡 Ajuda a distribuir as escalas com justiça e a notar quem está participando pouco.</div>
+        </div>
+    </details>`;
 }
 
 function lixeiraHtml() {
@@ -5631,6 +5676,150 @@ function salvarAviso() {
     S.modal = null;
     render();
     toast('📢 Aviso publicado para todos!');
+}
+
+// ════════════════════════════════════════════════════
+//  MURAL DE ENSAIOS
+// ════════════════════════════════════════════════════
+function _ensaioDias(dataStr) {
+    if (!dataStr) return 999;
+    const hoje = new Date(); hoje.setHours(0,0,0,0);
+    const [y,m,d] = dataStr.split('-').map(Number);
+    const dt = new Date(y, m-1, d);
+    return Math.round((dt - hoje) / 86400000);
+}
+function _ensaioLabel(dataStr) {
+    const dias = _ensaioDias(dataStr);
+    if (dias === 0) return '🔴 HOJE';
+    if (dias === 1) return '🟡 AMANHÃ';
+    if (dias > 1)   return `em ${dias} dias`;
+    return 'passado';
+}
+
+function ensaiosHtml() {
+    const futuros = (S.ensaios||[]).filter(e => _ensaioDias(e.data) >= 0)
+        .sort((a,b) => _ensaioDias(a.data) - _ensaioDias(b.data));
+    if (!futuros.length && !isAdm()) return '';
+    const meuNome = S.currentMember?.name || '';
+    const cards = futuros.map(e => {
+        const conf = e.confirmacoes || {};
+        const sim = Object.values(conf).filter(v=>v==='sim').length;
+        const nao = Object.values(conf).filter(v=>v==='nao').length;
+        const [y,mo,d] = e.data.split('-');
+        const dataFmt = `${d}/${mo}`;
+        const dias = _ensaioDias(e.data);
+        const meuStatus = meuNome ? conf[meuNome] : null;
+        const isMembroView = isMembro();
+        return `<div style="background:var(--bg2);border:1px solid ${dias<=1?'rgba(255,212,0,.4)':'var(--border)'};border-radius:12px;padding:14px 16px;margin-bottom:10px">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+                <div>
+                    <div style="font-size:15px;font-weight:800;display:flex;align-items:center;gap:8px">🎼 Ensaio <span style="font-size:12px;font-weight:700;color:${dias<=1?'var(--gold)':'var(--purple-light)'}">${_ensaioLabel(e.data)}</span></div>
+                    <div style="font-size:13px;color:var(--muted);margin-top:3px">📅 ${dataFmt}${e.hora?` · ⏰ ${e.hora}`:''}</div>
+                    ${e.local?`<div style="font-size:13px;color:var(--text);margin-top:3px">📍 ${escHtml(e.local)}</div>`:''}
+                    ${e.obs?`<div style="font-size:12px;color:var(--muted);margin-top:4px;font-style:italic">${escHtml(e.obs).replace(/\n/g,'<br>')}</div>`:''}
+                </div>
+                ${isAdm()?`<div style="display:flex;gap:6px;flex-shrink:0">
+                    <button class="btn btn-ghost btn-sm btn-icon" onclick="openEditEnsaio('${e.id}')" title="Editar">${ic('edit',14)}</button>
+                    <button class="btn btn-ghost btn-sm btn-icon" style="color:#f87171" onclick="delEnsaio('${e.id}')" title="Excluir">${ic('trash',14)}</button>
+                </div>`:''}
+            </div>
+            ${e.local?`<div style="margin-top:8px">${mapButtons(e.local)}</div>`:''}
+            ${isMembroView ? `<div style="display:flex;gap:8px;margin-top:10px">
+                <button class="btn btn-sm" style="flex:1;background:${meuStatus==='sim'?'#16a34a':'var(--bg4)'};color:${meuStatus==='sim'?'#fff':'var(--text)'};font-weight:700;border:1px solid ${meuStatus==='sim'?'#16a34a':'var(--border)'}" onclick="confirmarEnsaio('${e.id}','sim')">✅ Vou</button>
+                <button class="btn btn-sm" style="flex:1;background:${meuStatus==='nao'?'#dc2626':'var(--bg4)'};color:${meuStatus==='nao'?'#fff':'var(--text)'};font-weight:700;border:1px solid ${meuStatus==='nao'?'#dc2626':'var(--border)'}" onclick="confirmarEnsaio('${e.id}','nao')">❌ Não vou</button>
+            </div>`:''}
+            <div style="display:flex;gap:12px;margin-top:10px;font-size:12px;color:var(--muted);align-items:center;flex-wrap:wrap">
+                <span style="color:#22c55e;font-weight:700">✅ ${sim} confirmado${sim!==1?'s':''}</span>
+                ${nao?`<span style="color:#ef4444;font-weight:700">❌ ${nao}</span>`:''}
+                ${isAdm() && (sim+nao)>0 ? `<button class="btn btn-ghost btn-sm" style="font-size:11px;padding:2px 8px;margin-left:auto" onclick="verConfirmacoesEnsaio('${e.id}')">Ver quem</button>`:''}
+            </div>
+        </div>`;
+    }).join('');
+    return `<div style="margin-bottom:16px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+            <h3 style="font-size:15px;font-weight:800;display:flex;align-items:center;gap:6px">🎼 Mural de Ensaios</h3>
+            ${isAdm()?`<button class="btn btn-sm btn-primary" onclick="openNovoEnsaio()">+ Agendar</button>`:''}
+        </div>
+        ${cards || `<div style="text-align:center;padding:18px;color:var(--muted);background:var(--bg2);border:1px dashed var(--border);border-radius:12px;font-size:13px">Nenhum ensaio agendado.</div>`}
+    </div>`;
+}
+
+function openNovoEnsaio() { S.modal = { type:'ensaio', data:{} }; render(); }
+function openEditEnsaio(id) {
+    const e = (S.ensaios||[]).find(x=>x.id===id);
+    if (e) { S.modal = { type:'ensaio', data:{...e} }; render(); }
+}
+function delEnsaio(id) {
+    if (!confirm('Excluir este ensaio?')) return;
+    S.ensaios = (S.ensaios||[]).filter(e=>e.id!==id);
+    persist(true); render(); toast('Ensaio excluído.');
+}
+function confirmarEnsaio(id, status) {
+    if (!S.currentMember) { toast('Apenas membros confirmam presença.'); return; }
+    const e = (S.ensaios||[]).find(x=>x.id===id); if(!e) return;
+    if (!e.confirmacoes) e.confirmacoes = {};
+    const nome = S.currentMember.name;
+    if (e.confirmacoes[nome] === status) delete e.confirmacoes[nome];
+    else e.confirmacoes[nome] = status;
+    persist(true); render();
+    toast(status==='sim'?'✅ Presença confirmada!':'Resposta registrada.');
+}
+function verConfirmacoesEnsaio(id) {
+    const e = (S.ensaios||[]).find(x=>x.id===id); if(!e) return;
+    const conf = e.confirmacoes||{};
+    const sim = Object.entries(conf).filter(([,v])=>v==='sim').map(([n])=>'✅ '+n);
+    const nao = Object.entries(conf).filter(([,v])=>v==='nao').map(([n])=>'❌ '+n);
+    alert('Confirmações do ensaio:\n\n'+([...sim,...nao].join('\n')||'Ninguém respondeu ainda.'));
+}
+function ensaioModal(data) {
+    const isEdit = !!data?.id;
+    return `<div class="backdrop" onclick="closeModal(event)">
+    <div class="modal" style="max-width:460px">
+        <div class="modal-hd">
+            <div class="modal-title">🎼 ${isEdit?'Editar Ensaio':'Agendar Ensaio'}</div>
+            <button class="close-btn" onclick="closeModal()">${ic('close',20)}</button>
+        </div>
+        <div class="modal-body" style="display:flex;flex-direction:column;gap:14px">
+            <div style="display:flex;gap:10px">
+                <div style="flex:1"><label class="form-label">Data *</label>
+                    <input class="field" id="en-data" type="date" value="${data?.data||''}"></div>
+                <div style="width:120px"><label class="form-label">Hora</label>
+                    <input class="field" id="en-hora" type="time" value="${data?.hora||''}"></div>
+            </div>
+            <div><label class="form-label">Local</label>
+                <input class="field" id="en-local" type="text" placeholder="Ex: Salão paroquial" value="${escHtml(data?.local||'')}"></div>
+            <div><label class="form-label">Observações</label>
+                <textarea class="field" id="en-obs" rows="3" placeholder="Ex: Levar instrumentos; foco no repertório da missa">${escHtml(data?.obs||'')}</textarea></div>
+        </div>
+        <div class="modal-ft">
+            <button class="btn btn-ghost" onclick="closeModal()">Cancelar</button>
+            <button class="btn btn-primary" onclick="salvarEnsaio(${isEdit?`'${data.id}'`:'null'})">${ic('check',16)} ${isEdit?'Salvar':'Agendar para todos'}</button>
+        </div>
+    </div></div>`;
+}
+function salvarEnsaio(editId) {
+    const dataV = document.getElementById('en-data')?.value;
+    if (!dataV) { toast('⚠️ Informe a data do ensaio.'); return; }
+    const obj = {
+        data: dataV,
+        hora: document.getElementById('en-hora')?.value || '',
+        local: document.getElementById('en-local')?.value?.trim() || '',
+        obs: document.getElementById('en-obs')?.value?.trim() || '',
+    };
+    if (!S.ensaios) S.ensaios = [];
+    if (editId) {
+        const e = S.ensaios.find(x=>x.id===editId);
+        if (e) Object.assign(e, obj);
+    } else {
+        obj.id = 'en'+uid();
+        obj.criadoPor = (isAdm() && S.currentMember) ? S.currentMember.name : 'ADM';
+        obj.criadoEm = Date.now();
+        obj.confirmacoes = {};
+        S.ensaios.push(obj);
+    }
+    persist(true);
+    S.modal = null; render();
+    toast(editId?'✅ Ensaio atualizado!':'🎼 Ensaio agendado para todos!');
 }
 
 // ════════════════════════════════════════════════════
