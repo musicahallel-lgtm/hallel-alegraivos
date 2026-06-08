@@ -1386,20 +1386,27 @@ async function _gravaFirestore() {
                 .sort((a,b) => (a.at||0) - (b.at||0))
                 .slice(-300);
 
+            // Proteção: se local está vazio mas remoto tem dados, mantém o remoto
+            // (cobre o caso de carga da nuvem ter falhado — nunca apaga com vazio)
+            const keep = (local, rem) =>
+                (Array.isArray(local) && local.length === 0 && Array.isArray(rem) && rem.length > 0) ? rem : local;
+            const keepObj = (local, rem) =>
+                (local && Object.keys(local).length === 0 && rem && Object.keys(rem).length > 0) ? rem : local;
+
             const ts = Date.now();
             _lastWriteTs = ts;
             tx.set(docRef, {
                 songs:         S.songs,
-                setlists:      S.setlists,
-                escalas:       S.escalas,
+                setlists:      keep(S.setlists,      remote.setlists),
+                escalas:       keepObj(S.escalas,    remote.escalas),
                 members:       S.members,
                 activityLog:   S.activityLog,
-                availability:  S.availability,
-                substitutions: S.substitutions,
-                financeiro:    S.financeiro,
-                inventario:    S.inventario,
-                avisos:        S.avisos,
-                eventosCustom: S.eventosCustom,
+                availability:  keepObj(S.availability, remote.availability),
+                substitutions: keep(S.substitutions, remote.substitutions),
+                financeiro:    keep(S.financeiro,    remote.financeiro),
+                inventario:    keep(S.inventario,    remote.inventario),
+                avisos:        keep(S.avisos,        remote.avisos),
+                eventosCustom: keep(S.eventosCustom, remote.eventosCustom),
                 _updatedAt:    ts,
             });
         });
@@ -6969,11 +6976,8 @@ function maybeInitMixer(song) {
             }
         });
         if (seedChanged && _fbDB) {
-            // Usa UPDATE (não set!) para só atualizar o campo songs — nunca sobrescreve membros
-            _fbDB.collection('ministerio').doc('dados').update({
-                songs: S.songs,
-                _updatedAt: Date.now()
-            }).catch(e => console.warn('Seed sync:', e));
+            // Passa pela transação protegida (merge de membros + músicas) — máxima segurança
+            persist(true);
         }
     }
 })();
