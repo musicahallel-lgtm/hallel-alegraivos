@@ -2424,6 +2424,35 @@ function svgIconDuo(key, size=32) {
     return `<svg viewBox="0 0 24 24" width="${size}" height="${size}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS_DUO[key]||ICONS[key]||''}</svg>`;
 }
 
+function lembreteEscalaHtml() {
+    if (!S.currentMember) return '';
+    const escalas = getMemberEscalas(S.currentMember.name)
+        .filter(e => e.daysUntil >= 0 && e.daysUntil <= 10)
+        .sort((a,b) => a.daysUntil - b.daysUntil);
+    if (!escalas.length) return '';
+    const cards = escalas.map(({ev, roles, daysUntil}) => {
+        const quando = daysUntil===0 ? '🔴 HOJE' : daysUntil===1 ? '🟡 AMANHÃ' : `em ${daysUntil} dias`;
+        const cor = daysUntil===0 ? '#ef4444' : daysUntil<=2 ? '#f59e0b' : '#00963F';
+        const esc = S.escalas[ev.id]||{};
+        const local = (esc.local || ev.local || '').trim();
+        return `<div style="background:rgba(0,150,63,.08);border:1px solid rgba(0,150,63,.25);border-left:4px solid ${cor};border-radius:12px;padding:12px 14px;margin-bottom:8px">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">
+                <div style="font-size:14px;font-weight:800">${ev.alegrai?'⭐ ':''}${escHtml(ev.title)}</div>
+                <div style="font-size:12px;font-weight:800;color:${cor}">${quando}</div>
+            </div>
+            <div style="font-size:12px;color:var(--muted);margin-top:3px">📅 ${evDateLabel(ev)}${ev.horario?' · ⏰ '+ev.horario:''}</div>
+            <div style="font-size:12px;color:var(--purple-light);margin-top:2px">🎵 Sua função: ${roles.map(r=>r.label).join(', ')}</div>
+            ${local?`<div style="font-size:11px;color:var(--muted);margin-top:2px">${ic('pin',11)} ${escHtml(local)}</div>`:''}
+        </div>`;
+    }).join('');
+    return `<div style="margin-bottom:18px">
+        <div style="font-size:13px;font-weight:800;color:var(--gold);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;text-align:center">
+            🎯 Você está escalado!
+        </div>
+        ${cards}
+    </div>`;
+}
+
 function inicioPage() {
     const pending = S.accessRequests.filter(r=>r.status==='pending').length;
     const T = {
@@ -2468,6 +2497,7 @@ function inicioPage() {
         <p>Ministério de Música Hallel — escolha uma área</p>
     </div>
     ${avisosInicio}
+    ${lembreteEscalaHtml()}
     ${isAdm() ? `<div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-bottom:16px">
         <button class="btn btn-sm" onclick="openNovoAviso()"
             style="background:rgba(239,68,68,.15);border:1px solid rgba(239,68,68,.4);color:#f87171;font-weight:700">
