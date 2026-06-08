@@ -6653,6 +6653,7 @@ function eventoModal(ev) {
                 </button>
             </div>
             ${tab==='escala' ? escalaHtml : checkHtml}
+            ${tab==='escala' ? repertorioEventoHtml(ev.id) : ''}
         </div>
     </div></div>`;
 }
@@ -6824,6 +6825,47 @@ function saveEvEscalado(evId, key, val) {
     }
     if (S.modal?.data?.id===evId) S.modal.data = EVENTOS_2026.find(e=>e.id===evId);
     persist();
+}
+
+function repertorioEventoHtml(evId) {
+    const esc = S.escalas[evId];
+    const sl = esc?.setListId && S.setlists.find(x=>x.id===esc.setListId);
+    if (!sl) return '';
+    const blocks = sl.blocks || [];
+    const totalSongs = blocks.reduce((n,b)=>n+(b.songIds||[]).length,0);
+    if (!totalSongs) {
+        if (!isAdm()) return '';
+        return `<div style="background:var(--bg3);border:1px dashed var(--border);border-radius:var(--radius-sm);padding:12px 14px;margin-top:14px">
+            <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:6px">${ic('setlists',13)} Repertório</div>
+            <div style="font-size:13px;color:var(--muted);font-style:italic">Set list criado, mas ainda sem músicas. <a onclick="verSetListDoEvento('${evId}')" style="color:var(--purple-light);cursor:pointer;text-decoration:underline">Montar repertório →</a></div>
+        </div>`;
+    }
+    let n = 0;
+    const linhas = blocks.map(b => {
+        const songs = (b.songIds||[]).map(id => S.songs.find(s=>s.id===id)).filter(Boolean);
+        if (!songs.length) return '';
+        const blockHdr = blocks.length>1 ? `<div style="font-size:11px;font-weight:700;color:var(--gold);margin:8px 0 4px">${escHtml(b.name||'Bloco')}</div>` : '';
+        return blockHdr + songs.map(s => {
+            n++;
+            return `<div onclick="closeModal();openDetail('${s.id}')" style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--bg2);border:1px solid var(--border);border-radius:8px;margin-bottom:5px;cursor:pointer">
+                <span style="font-size:12px;font-weight:800;color:var(--purple-light);min-width:18px">${n}</span>
+                <div style="flex:1;min-width:0">
+                    <div style="font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escHtml(s.title)}</div>
+                    ${s.artist?`<div style="font-size:11px;color:var(--muted)">${escHtml(s.artist)}</div>`:''}
+                </div>
+                ${s.key?`<span class="key-badge" style="flex-shrink:0">${s.key}</span>`:''}
+                ${s.momento?`<span style="font-size:10px;color:#4ade80;white-space:nowrap;flex-shrink:0">⛪ ${s.momento}</span>`:''}
+                <span style="color:var(--muted);flex-shrink:0">›</span>
+            </div>`;
+        }).join('');
+    }).join('');
+    return `<div style="margin-top:16px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+            <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);display:flex;align-items:center;gap:5px">${ic('setlists',13)} Repertório (${totalSongs})</div>
+            <button class="btn btn-ghost btn-sm" style="font-size:11px;padding:3px 9px" onclick="verSetListDoEvento('${evId}')">Abrir Set List →</button>
+        </div>
+        ${linhas}
+    </div>`;
 }
 
 function confirmarPresenca(evId, status) {
