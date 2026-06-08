@@ -1202,6 +1202,7 @@ const S = {
     substitutions: [],   // [{ id, fromId, fromName, toId, toName, evId, evTitle, evDate, role, roleLabel, status:'pending'|'accepted'|'rejected', at, notifiedFrom, notifiedTo }]
     avisos: [],          // [{ id, titulo, texto, tipo:'urgente'|'info'|'ensaio', criadoPor, criadoEm }]
     eventosCustom: [],   // [{ id, title, start, end, horario, local, obs, cor, criadoPor }]
+    lixeira: [],         // [{ tipo:'membro'|'musica', item, excluidoEm, excluidoPor }]
     financeiro: [],      // [{ id, tipo:'entrada'|'saida', categoria, descricao, valor, data, obs, criadoPor, criadoEm }]
     _finFiltro: 'todos', // 'todos'|'entrada'|'saida'
     _finMes: '',         // '' = todos os meses, ou 'YYYY-MM'
@@ -1322,6 +1323,7 @@ function _aplicaDados(d) {
     if (d.inventario)    S.inventario     = d.inventario;
     if (d.avisos)        S.avisos         = d.avisos;
     if (d.eventosCustom) S.eventosCustom  = d.eventosCustom;
+    if (d.lixeira)       S.lixeira         = d.lixeira;
     _normalize();
     // Atualiza membro logado se seus dados mudaram
     if (S.currentMember) {
@@ -1407,6 +1409,7 @@ async function _gravaFirestore() {
                 inventario:    keep(S.inventario,    remote.inventario),
                 avisos:        keep(S.avisos,        remote.avisos),
                 eventosCustom: keep(S.eventosCustom, remote.eventosCustom),
+                lixeira:       keep(S.lixeira,       remote.lixeira),
                 _updatedAt:    ts,
             });
         });
@@ -3247,16 +3250,43 @@ function saveSlEscalado(slId, key, val) {
 }
 
 async function delSong(id) {
-    if (!confirm('Excluir esta música?')) return;
+    const song = S.songs.find(s=>s.id===id);
+    if (!confirm('Excluir esta música?\n\n(Fica na Lixeira por 30 dias — dá para recuperar)')) return;
     S.songs = S.songs.filter(s=>s.id!==id);
     S.setlists.forEach(sl=>{
         (sl.blocks||[]).forEach(b=>{ b.songIds=b.songIds.filter(x=>x!==id); });
     });
     if (S.hasPdf.has(id)) { await dbDeletePDF(id); S.hasPdf.delete(id); }
+    // Guarda na lixeira (recuperável por 30 dias)
+    if (song) S.lixeira.push({ tipo:'musica', item:song, excluidoEm:Date.now(),
+        excluidoPor: S.currentMember?.name || 'ADM' });
+    _limpaLixeiraAntiga();
     // Registra como excluída intencionalmente (evita que o merge restaure)
     const del = JSON.parse(localStorage.getItem('hl_deleted_songs')||'[]');
     if (!del.includes(id)) { del.push(id); localStorage.setItem('hl_deleted_songs', JSON.stringify(del.slice(-200))); }
-    persist(); S.modal=null; toast('🗑 Música excluída.'); render();
+    persist(); S.modal=null; toast('🗑 Música movida para a Lixeira.'); render();
+}
+
+// ── Restaurar / esvaziar lixeira ──
+function restaurarLixeira(idx) {
+    const item = S.lixeira[idx]; if (!item) return;
+    if (item.tipo === 'membro') {
+        if (!S.members.find(m=>m.id===item.item.id)) S.members.push(item.item);
+    } else if (item.tipo === 'musica') {
+        if (!S.songs.find(s=>s.id===item.item.id)) S.songs.push(item.item);
+        // remove do tombstone para não ser apagada de novo
+        const del = JSON.parse(localStorage.getItem('hl_deleted_songs')||'[]').filter(x=>x!==item.item.id);
+        localStorage.setItem('hl_deleted_songs', JSON.stringify(del));
+    }
+    S.lixeira.splice(idx, 1);
+    persist(); render();
+    toast('♻️ Restaurado com sucesso!');
+}
+function excluirDaLixeira(idx) {
+    if (!confirm('Excluir permanentemente? Esta ação não pode ser desfeita.')) return;
+    S.lixeira.splice(idx, 1);
+    persist(); render();
+    toast('Excluído permanentemente.');
 }
 
 // PDF picks
@@ -3642,7 +3672,30 @@ function membrosPage() {
             </div>`;
         })()}
         ${recusadasHtml({violao:'Violão',teclado:'Teclado',bateria:'Bateria',baixo:'Baixo',guitarra:'Guitarra',sopro:'Sopro',vocal1:'Vocal 1',vocal2:'Vocal 2',vocal3:'Vocal 3',animador:'Animador'})}
+        ${lixeiraHtml()}
     </div>`;
+}
+
+function lixeiraHtml() {
+    _limpaLixeiraAntiga();
+    const lix = S.lixeira || [];
+    if (!lix.length) return '';
+    const linhas = lix.map((x,i) => {
+        const nome = x.tipo==='membro' ? x.item.name : x.item.title;
+        const sub  = x.tipo==='membro' ? 'Membro' : 'Música';
+        const dias = Math.max(0, 30 - Math.floor((Date.now()-x.excluidoEm)/(24*60*60*1000)));
+        return '<div style="display:flex;align-items:center;gap:10px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:11px 14px;margin-bottom:8px">'
+            + '<div style="flex:1;min-width:0">'
+            + '<div style="font-size:14px;font-weight:700">'+escHtml(nome)+'</div>'
+            + '<div style="font-size:11px;color:var(--muted)">'+sub+' · excluído por '+escHtml(x.excluidoPor||'ADM')+' · '+dias+' dia'+(dias!==1?'s':'')+' restantes</div>'
+            + '</div>'
+            + '<button class="btn btn-sm" onclick="restaurarLixeira('+i+')" style="background:rgba(0,150,63,.15);border:1px solid rgba(0,150,63,.4);color:#4ade80;font-weight:700;font-size:12px">♻️ Restaurar</button>'
+            + '<button class="btn btn-ghost btn-sm" onclick="excluirDaLixeira('+i+')" style="font-size:12px;color:var(--muted)">'+ic('trash',13)+'</button>'
+            + '</div>';
+    }).join('');
+    return '<div style="margin-top:24px">'
+        + '<div style="font-size:13px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">'+ic('trash',14)+' Lixeira <span style="font-weight:400;text-transform:none">(recuperável por 30 dias)</span></div>'
+        + linhas + '</div>';
 }
 
 function approveRequest(rqId) {
@@ -3896,10 +3949,19 @@ function saveMember(id) {
 
 function deleteMember(id) {
     const m = S.members.find(x=>x.id===id); if(!m) return;
-    if (!confirm(`Remover ${m.name} do ministério?`)) return;
+    if (!confirm(`Remover ${m.name} do ministério?\n\n(Fica na Lixeira por 30 dias — dá para recuperar)`)) return;
     S.members = S.members.filter(x=>x.id!==id);
+    S.lixeira.push({ tipo:'membro', item:m, excluidoEm:Date.now(),
+        excluidoPor: S.currentMember?.name || 'ADM' });
+    _limpaLixeiraAntiga();
     persist(); render();
-    toast(`🗑 ${m.name} removido.`);
+    toast(`🗑 ${m.name} movido para a Lixeira.`);
+}
+
+// Remove da lixeira itens com mais de 30 dias
+function _limpaLixeiraAntiga() {
+    const limite = Date.now() - 30*24*60*60*1000;
+    S.lixeira = (S.lixeira||[]).filter(x => x.excluidoEm > limite);
 }
 
 // ── Minha Escala (view do membro logado) ──
