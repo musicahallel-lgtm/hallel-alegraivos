@@ -2394,9 +2394,9 @@ function doLogin() {
             } else {
                 // Check substitution notifications first, then mission alert
                 const showPersonal = () => { if (!checkSubNotifications(member)) showMissionAlert(member); };
-                const afterTour = () => { if (!maybeShowBirthday({ then: showPersonal })) showPersonal(); };
-                // Mostra o tour 1x por dispositivo; depois aniversário e alertas pessoais
-                maybeShowTour(afterTour);
+                // Aniversário do dia aparece primeiro; ao fechar, mostra os alertas pessoais
+                // (o tour NÃO aparece aqui — só no primeiro acesso, em fecharBemVindo)
+                if (!maybeShowBirthday({ then: showPersonal })) showPersonal();
             }
         }, 300);
         return;
@@ -4537,8 +4537,9 @@ function fecharBemVindo(memberId) {
     const member = S.members.find(m=>m.id===memberId);
     S.modal = null;
     render();
-    // Primeiro acesso: mostra o tour guiado e, ao terminar, o alerta de missão
-    setTimeout(() => maybeShowTour(() => { if (member) showMissionAlert(member); }), 350);
+    // Primeiro acesso: SEMPRE mostra o tour guiado; ao terminar, o alerta de missão
+    _tourThen = () => { if (member) showMissionAlert(member); };
+    setTimeout(() => { S.modal = { type:'tour', data:{ step:0 } }; render(); }, 350);
 }
 
 // ══════════════════════════════════════════════════════════
