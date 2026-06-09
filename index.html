@@ -2301,6 +2301,7 @@ let _presencaTimer = null;
 let _presencaId    = null;
 let _onlineCount   = 0;
 let _onlineNomes   = [];   // nomes (lowercase) atualmente online — usado no registro 24h
+let _onlineInfo    = [];   // [{nome, role, at}] de quem está online agora (para exibir)
 
 function _presencaId_get() {
     // ID único por sessão (não por membro — mesmo sem login conta)
@@ -2337,7 +2338,13 @@ function _iniciaPresenca() {
         const agora = Date.now();
         const ativos = snap.docs.filter(d => (agora - (d.data().at||0)) < 120000);
         _onlineNomes = ativos.map(d => (d.data().nome||'').toLowerCase().trim()).filter(Boolean);
+        _onlineInfo  = ativos.map(d => ({ nome: d.data().nome||'—', role: d.data().role||'', at: d.data().at||0 }));
         const novo = ativos.length;
+        // Se o ADM está vendo a Atividade, atualiza a lista de "quem está online"
+        if (S.page === 'atividade' && !S.modal && novo !== _onlineCount) {
+            const box = document.getElementById('online-now-box');
+            if (box) box.innerHTML = _onlineNowInner();
+        }
         if (novo !== _onlineCount) {
             _onlineCount = novo;
             // Atualiza só os elementos do badge sem re-renderizar a página
@@ -5031,6 +5038,28 @@ function subResultModal({ member, results }) {
 // ════════════════════════════════════════════════════
 //  ATIVIDADE — Dashboard de comportamento
 // ════════════════════════════════════════════════════
+// ── Quem está online agora (nomes da presença em tempo real) ──────────
+function _onlineNowInner() {
+    const agora = Date.now();
+    // remove duplicados pelo nome (mesma pessoa em 2 abas conta 1)
+    const vistos = new Set();
+    const lista = (_onlineInfo||[])
+        .slice()
+        .sort((a,b)=>b.at-a.at)
+        .filter(o => { const k=(o.nome||'').toLowerCase().trim(); if(vistos.has(k))return false; vistos.add(k); return true; });
+    if (!lista.length) return `<span style="font-size:13px;color:var(--muted)">Ninguém online no momento.</span>`;
+    return lista.map(o => {
+        const adm = o.role === 'adm';
+        const seg = Math.round((agora - o.at)/1000);
+        const quando = seg < 75 ? 'agora' : `há ${Math.round(seg/60)} min`;
+        return `<span style="display:inline-flex;align-items:center;gap:6px;background:rgba(34,197,94,.12);border:1px solid rgba(34,197,94,.3);border-radius:20px;padding:5px 12px;font-size:13px;font-weight:600">
+            <span style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;box-shadow:0 0 6px #22c55e"></span>
+            ${escHtml(o.nome)}${adm?' <span style="font-size:10px;color:#fb7a3c;font-weight:800">ADM</span>':''}
+            <span style="font-size:11px;color:var(--muted);font-weight:400">· ${quando}</span>
+        </span>`;
+    }).join('');
+}
+
 // ── Registro de entrada e saída dos membros (últimas 24h) ──────────────
 function registro24hHtml() {
     const agora = Date.now();
@@ -5084,6 +5113,10 @@ function registro24hHtml() {
             <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px">
                 <span style="font-size:12px;background:rgba(0,150,63,.12);border:1px solid rgba(0,150,63,.25);border-radius:8px;padding:4px 10px;color:#4ade80;font-weight:700">${totalEntradas} entrada${totalEntradas!==1?'s':''}</span>
                 <span style="font-size:12px;background:rgba(34,197,94,.12);border:1px solid rgba(34,197,94,.3);border-radius:8px;padding:4px 10px;color:#22c55e;font-weight:700">🟢 ${onlineAgora} online agora</span>
+            </div>
+            <div style="background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:14px">
+                <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:#22c55e;margin-bottom:8px">🟢 Quem está online agora</div>
+                <div id="online-now-box" style="display:flex;flex-wrap:wrap;gap:7px">${_onlineNowInner()}</div>
             </div>
             ${linhas.length ? `<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;min-width:380px">
                 <thead><tr>
