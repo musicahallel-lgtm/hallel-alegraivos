@@ -2381,6 +2381,11 @@ function doLogin() {
         S.currentMember = member;
         localStorage.setItem('hl_role', accessRole);
         localStorage.setItem('hl_current_member', member.id);
+        // Quantos dias o membro ficou sem entrar (antes de registrar este login)
+        const ultimoAcesso = (S.activityLog || [])
+            .filter(a => a.memberId === member.id && a.at)
+            .reduce((max, a) => Math.max(max, a.at), 0);
+        const diasAusente = ultimoAcesso ? Math.floor((Date.now() - ultimoAcesso) / 86400000) : 0;
         // Track login
         S.activityLog.push({ id: uid(), memberId: member.id, memberName: member.name,
             type: 'login', at: Date.now(), duration: 0 });
@@ -2394,9 +2399,9 @@ function doLogin() {
             } else {
                 // Check substitution notifications first, then mission alert
                 const showPersonal = () => { if (!checkSubNotifications(member)) showMissionAlert(member); };
-                // Aniversário do dia aparece primeiro; ao fechar, mostra os alertas pessoais
-                // (o tour NÃO aparece aqui — só no primeiro acesso, em fecharBemVindo)
-                if (!maybeShowBirthday({ then: showPersonal })) showPersonal();
+                const depoisAniv = () => { if (!maybeShowBirthday({ then: showPersonal })) showPersonal(); };
+                // Alerta de inatividade (7+ dias) tem prioridade; depois aniversário e alertas pessoais
+                if (!maybeShowInatividade(member, diasAusente, depoisAniv)) depoisAniv();
             }
         }, 300);
         return;
@@ -2915,6 +2920,7 @@ function modalHtml() {
     if (type==='first-access') return firstAccessModal(data);
     if (type==='bem-vindo')    return bemVindoModal(data);
     if (type==='tour')         return tourModal(data);
+    if (type==='inatividade')  return inatividadeModal(data);
     if (type==='wa-escala')        return waEscalaModal(data);
     if (type==='sub-picker')       return subPickerModal(data);
     if (type==='sub-request')      return subRequestModal(data);
@@ -4568,6 +4574,64 @@ function maybeShowTour(then) {
     return true;
 }
 function startTour() { _tourThen = null; localStorage.removeItem('hl_tour_done'); S.modal = { type:'tour', data:{ step:0 } }; render(); }
+
+// ══════════════════════════════════════════════════════════
+//  ALERTA DE INATIVIDADE
+//  7 a 15 dias  → aviso para voltar a acompanhar
+//  mais de 15   → aviso + oferece rever o tour do app
+// ══════════════════════════════════════════════════════════
+function maybeShowInatividade(member, dias, then) {
+    if (dias < 7) return false;
+    const nivel = dias > 15 ? 'retorno' : 'alerta';
+    _inatThen = then || null;
+    S.modal = { type:'inatividade', data:{ memberId: member.id, dias, nivel } };
+    render();
+    return true;
+}
+let _inatThen = null;
+function fecharInatividade(verTour) {
+    S.modal = null;
+    if (verTour) {
+        // ao terminar/pular o tour, segue para os alertas pessoais
+        _tourThen = () => { const t=_inatThen; _inatThen=null; if (t) setTimeout(t, 200); };
+        S.modal = { type:'tour', data:{ step:0 } };
+        render();
+        return;
+    }
+    render();
+    const t = _inatThen; _inatThen = null;
+    if (t) setTimeout(t, 250);
+}
+function inatividadeModal({ dias, nivel }) {
+    const retorno = nivel === 'retorno';
+    const corBorda = retorno ? 'rgba(239,68,68,.5)' : 'rgba(245,158,11,.5)';
+    const corTit   = retorno ? '#f87171' : '#fbbf24';
+    const emoji    = retorno ? '🙏' : '⚠️';
+    const titulo   = retorno ? `Sentimos a sua falta!` : `Faz uns dias que você não aparece`;
+    const corpo = retorno
+        ? `Você está há <b>${dias} dias</b> sem estudar as músicas nem acompanhar as atividades do ministério. `
+          + `Que tal voltar com tudo? Reveja rapidinho como o app funciona e fique por dentro de novo das escalas, ensaios e avisos.`
+        : `Você está há <b>${dias} dias</b> sem entrar. Fique atento(a) para não perder as <b>movimentações da comunidade</b> `
+          + `pelo ministério — escalas, ensaios, avisos e o repertório. Dê uma olhadinha no que rolou! 💚`;
+    const versic = retorno
+        ? `"Vinde a mim todos os que estais cansados… e eu vos aliviarei." — Mt 11,28`
+        : `"Sede solícitos, sem moleza no zelo, servindo ao Senhor." — Rm 12,11`;
+    return `<div class="mission-backdrop" onclick="">
+    <div class="mission-card" style="max-width:440px;text-align:center;background:linear-gradient(160deg,#1a0f0a 0%,#0d1f2d 100%);border:2px solid ${corBorda}">
+        <div style="font-size:46px;margin-bottom:10px">${emoji}</div>
+        <div style="font-size:23px;font-weight:900;color:${corTit};margin-bottom:14px;line-height:1.2">${titulo}</div>
+        <div style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:15px 17px;margin-bottom:14px;text-align:left">
+            <div style="font-size:14px;color:rgba(255,255,255,.88);line-height:1.7">${corpo}</div>
+        </div>
+        <div style="font-size:13px;color:#ffe066;font-style:italic;line-height:1.6;margin-bottom:20px">${versic}</div>
+        ${retorno
+            ? `<div style="display:flex;flex-direction:column;gap:10px">
+                <button class="mission-btn" onclick="fecharInatividade(true)" style="background:linear-gradient(90deg,#00963F,#2db85a)">📖 Rever o app (tour rápido)</button>
+                <button class="mission-btn" onclick="fecharInatividade(false)" style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.2)">Agora não, já vou entrar</button>
+               </div>`
+            : `<button class="mission-btn" onclick="fecharInatividade(false)" style="background:linear-gradient(90deg,#00963F,#2db85a)">Entendi, vou acompanhar! 💚</button>`}
+    </div></div>`;
+}
 function tourNav(dir) {
     if (!S.modal || S.modal.type!=='tour') return;
     const steps = _tourSteps();
