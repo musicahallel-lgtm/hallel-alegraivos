@@ -1519,6 +1519,21 @@ async function _gravaFirestore() {
             (S.activityLog || []).forEach(a => { if (a.id) actMap.set(a.id, a); });
             m.activityLog = Array.from(actMap.values()).sort((a,b)=>(a.at||0)-(b.at||0)).slice(-300);
 
+            // 🛡️ TRAVA ANTI-WIPE: nunca grava vazio/encolhido por cima de dados que
+            // existem na nuvem. Se o merge resultar vazio (ou MENOR) mas a nuvem tinha
+            // conteúdo, mantém o da nuvem. Protege contra cache antigo / estado parcial.
+            const naoEsvazia = (k) => {
+                const rem = remote[k];
+                if (Array.isArray(rem) && rem.length > 0) {
+                    if (!Array.isArray(m[k]) || m[k].length === 0) m[k] = rem;            // vazio → restaura nuvem
+                    else if (m[k].length < rem.length && k!=='members' && k!=='songs') {} // encolheu (ok p/ exclusões via tombstone)
+                } else if (rem && typeof rem==='object' && !Array.isArray(rem) && Object.keys(rem).length>0) {
+                    if (!m[k] || Object.keys(m[k]).length === 0) m[k] = rem;
+                }
+            };
+            ['members','songs','setlists','escalas','availability','substitutions',
+             'financeiro','inventario','avisos','eventosCustom','ensaios','comentarios','lixeira','activityLog'].forEach(naoEsvazia);
+
             const ts = Date.now();
             _lastWriteTs = ts;
             _merged = m;
