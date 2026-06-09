@@ -114,7 +114,7 @@ story.append(Paragraph("Comunidade Católica Hallel",
 story.append(Spacer(1, 14*mm))
 story.append(HRFlowable(width="40%", thickness=2, color=LARANJA, hAlign='CENTER'))
 story.append(Spacer(1, 6*mm))
-story.append(Paragraph("“Cantai ao Senhor um cântico novo!” — Sl 96",
+story.append(Paragraph("“Cantai ao Senhor um canto novo!” — Sl 96,1",
              S('vers', fontName='Helvetica-Oblique', fontSize=11, textColor=VERDE_ESC, alignment=TA_CENTER)))
 story.append(PageBreak())
 
