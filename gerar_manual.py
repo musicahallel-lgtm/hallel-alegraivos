@@ -122,179 +122,213 @@ story.append(PageBreak())
 story.append(Paragraph("Seja bem-vindo(a)! \U0001F64F", st_h1))
 story.append(Paragraph(
     "Este é o aplicativo do nosso Ministério de Música. Por ele você acompanha as suas "
-    "<b>escalas (missões)</b>, estuda as <b>músicas</b>, vê os <b>set lists</b>, a <b>agenda</b> "
-    "de eventos e muito mais — tudo na palma da mão. Este manual mostra, passo a passo, como usar.",
+    "<b>escalas</b>, confirma <b>presença</b> em missões e ensaios, estuda as <b>músicas</b>, "
+    "vê os <b>set lists</b>, a <b>agenda</b> e conversa com a equipe — tudo na palma da mão. "
+    "Este manual mostra, passo a passo, como usar.",
     st_body))
 story.append(Spacer(1, 3))
 story.append(caixa(None,
-    "Os seus dados ficam guardados <b>no seu próprio celular</b>. O app é leve, rápido e "
-    "funciona até sem internet (para tocar vídeos e áudios você precisa estar conectado)."))
+    "O app é leve, rápido e funciona como um aplicativo de verdade no seu celular. Tudo o que "
+    "você vê fica <b>sincronizado</b> com o ministério. Para tocar vídeos e áudios é preciso "
+    "estar conectado à internet."))
 
 # ───────────────────────── 1. INSTALAR ─────────────────────────
 story.append(Paragraph("1. Como instalar no celular", st_h1))
 story.append(Paragraph(
-    "O Hallel funciona como um aplicativo, mas você instala direto pelo navegador — "
-    "rápido e sem ocupar espaço. Acesse o link enviado pelo coordenador e siga abaixo:", st_body))
-
+    "O coordenador vai te enviar um <b>link</b>. Abra esse link no navegador e instale o app "
+    "na tela inicial — assim ele vira um ícone, igual a qualquer aplicativo.", st_body))
 story.append(Paragraph("\U0001F4F1 iPhone (Safari)", st_h2))
-story.extend(steps([
-    "Abra o link no <b>Safari</b>.",
-    "Toque no botão <b>Compartilhar</b> (o quadradinho com uma seta para cima).",
-    "Escolha <b>“Adicionar à Tela de Início”</b>.",
-    "Pronto! O ícone do Hallel aparece na tela, igual a qualquer app.",
-]))
+for p in steps([
+    "Abra o link no <b>Safari</b> (precisa ser o Safari).",
+    "Toque no botão <b>Compartilhar</b> (o quadradinho com a seta para cima).",
+    "Escolha <b>Adicionar à Tela de Início</b>.",
+    "Toque em <b>Adicionar</b>. Pronto — o ícone Hallel aparece na tela.",
+]): story.append(p)
 story.append(Paragraph("\U0001F916 Android (Chrome)", st_h2))
-story.extend(steps([
+for p in steps([
     "Abra o link no <b>Chrome</b>.",
-    "Toque no menu <b>(três pontinhos)</b> ou no aviso <b>“Instalar aplicativo”</b>.",
-    "Escolha <b>“Instalar”</b>.",
-    "O ícone do Hallel aparece na tela do celular.",
-]))
+    "Toque nos <b>três pontinhos</b> (canto superior direito).",
+    "Escolha <b>Instalar aplicativo</b> (ou <b>Adicionar à tela inicial</b>).",
+    "Confirme. O ícone Hallel aparece na tela.",
+]): story.append(p)
 story.append(dica("Sempre abra o app pelo <b>ícone na tela</b> (não pelo navegador). "
                   "Assim ele abre em tela cheia e fica mais rápido."))
 
 # ───────────────────────── 2. ENTRAR ─────────────────────────
 story.append(Paragraph("2. Como entrar (login)", st_h1))
-story.extend(steps([
-    "O coordenador vai te entregar um <b>usuário</b> e uma <b>senha</b>.",
-    "Na tela inicial, digite o usuário e a senha.",
-    "Toque no \U0001F441 (olhinho) se quiser ver a senha que está digitando.",
-    "Toque em <b>Entrar</b>.",
-]))
+story.append(Paragraph(
+    "Na primeira tela, digite o <b>usuário</b> e a <b>senha</b> que o coordenador criou para você "
+    "e toque em <b>Entrar</b>.", st_body))
 story.append(Paragraph("Primeiro acesso", st_h2))
 story.append(Paragraph(
-    "Na primeira vez, o app vai pedir para você confirmar seu <b>WhatsApp</b> e <b>e-mail</b>. "
-    "Isso ajuda o coordenador a falar com você e a recuperar seu acesso caso esqueça a senha.", st_body))
+    "No primeiro acesso, o app vai pedir para você <b>criar a sua própria senha</b> — escolha "
+    "uma que seja fácil de lembrar. Depois disso, o app te recebe com uma mensagem de boas-vindas.",
+    st_body))
 story.append(caixa("Esqueceu a senha?",
-    "Na tela de login, toque em <b>“Recuperar acesso”</b> e siga as instruções, "
-    "ou peça ao coordenador para redefinir a sua senha."))
+    "Na tela de entrada, toque em <b>Esqueci minha senha</b>. Você pode informar o <b>e-mail "
+    "cadastrado</b> ou o seu <b>primeiro nome</b> para recuperar o acesso. Se precisar, o app "
+    "abre uma mensagem para o coordenador no WhatsApp."))
 story.append(caixa("Ainda não tem acesso?",
-    "Toque em <b>“Solicitar entrada”</b> na tela de login, preencha seus dados "
-    "(nome, instrumento, WhatsApp, data de nascimento e tamanho da camisa) e aguarde o "
-    "coordenador liberar."))
-
+    "Na tela inicial existe a opção <b>Solicitar acesso</b>. Preencha seu nome, instrumento(s), "
+    "tamanho da camisa, aniversário e WhatsApp. O coordenador recebe o pedido e aprova.",
+    bg=BG_DICA, borda=LARANJA))
 story.append(PageBreak())
 
 # ───────────────────────── 3. TELA INICIAL ─────────────────────────
 story.append(Paragraph("3. A tela inicial", st_h1))
 story.append(Paragraph(
-    "Ao entrar, você vê a <b>tela inicial</b> com os ícones de cada área — parecido com a tela "
-    "de apps do celular. É só tocar no ícone para abrir. Para voltar, use o botão "
-    "<b>‹ Voltar</b> no topo ou toque na <b>logo</b>.", st_body))
-story.append(Spacer(1, 2))
+    "Ao entrar, você vê a tela inicial com os <b>atalhos</b> para cada área e alguns avisos "
+    "importantes no topo:", st_body))
+for p in bullets([
+    "<b>Avisos urgentes</b> publicados pelo coordenador aparecem em destaque.",
+    "<b>Lembrete de escala:</b> se você tem missão chegando, ela aparece já na abertura.",
+    "<b>Mural de Ensaios:</b> os próximos ensaios, com botão para confirmar presença.",
+    "<b>Ativar notificações:</b> toque uma vez para receber avisos e ensaios no celular.",
+]): story.append(p)
 story.append(Paragraph("As áreas que você verá:", st_h2))
-area_data = [
-    ["\U0001F3AF  Minha Escala", "Suas missões: onde e quando você está escalado."],
-    ["\U0001F3B8  Músicas",      "A biblioteca com cifras, letras, áudios e partituras."],
-    ["\U0001F4CB  Set Lists",    "A ordem das músicas de cada celebração."],
-    ["▶️  Playlist",    "Ouça as músicas em sequência (YouTube/Spotify)."],
-    ["\U0001F4C5  Agenda",       "Calendário com todos os eventos e cultos."],
-    ["\U0001F4B0  Financeiro",   "Prestação de contas (somente para acompanhar)."],
-    ["\U0001F4E6  Inventário",   "Patrimônio do ministério (somente para acompanhar)."],
+areas = [
+    ("\U0001F3AF Minha Escala", "Suas missões — onde e quando você vai tocar/cantar."),
+    ("\U0001F3B8 Biblioteca", "Todas as músicas, com links, cifra, tom e mixer."),
+    ("\U0001F4CB Set Lists", "A ordem das músicas de cada celebração."),
+    ("▶️ Playlist", "Ouvir as músicas em sequência para estudar."),
+    ("\U0001F4C5 Agenda", "O calendário com todos os eventos do ministério."),
+    ("\U0001F4B0 Financeiro / \U0001F4E6 Inventário", "Prestação de contas e os materiais do grupo."),
 ]
-t = Table([[Paragraph(f"<b>{a}</b>", st_box), Paragraph(b, st_box)] for a,b in area_data],
-          colWidths=[42*mm, 118*mm])
+data = [[Paragraph(f"<b>{n}</b>", st_box), Paragraph(d, st_box)] for n, d in areas]
+t = Table(data, colWidths=[55*mm, 105*mm])
 t.setStyle(TableStyle([
+    ('BACKGROUND',(0,0),(-1,-1), colors.HexColor('#f7f7f7')),
+    ('BOX',(0,0),(-1,-1),0.6, colors.HexColor('#e0e0e0')),
+    ('INNERGRID',(0,0),(-1,-1),0.5, colors.HexColor('#e8e8e8')),
     ('VALIGN',(0,0),(-1,-1),'MIDDLE'),
-    ('LINEBELOW',(0,0),(-1,-2),0.4,colors.HexColor("#e0e0e0")),
-    ('TOPPADDING',(0,0),(-1,-1),6),('BOTTOMPADDING',(0,0),(-1,-1),6),
-    ('LEFTPADDING',(0,0),(-1,-1),4),
+    ('LEFTPADDING',(0,0),(-1,-1),10),('RIGHTPADDING',(0,0),(-1,-1),10),
+    ('TOPPADDING',(0,0),(-1,-1),7),('BOTTOMPADDING',(0,0),(-1,-1),7),
 ]))
 story.append(t)
+story.append(dica("Para voltar à tela inicial a qualquer momento, toque na <b>logo</b> no topo "
+                  "ou no botão <b>Voltar</b>."))
 
 # ───────────────────────── 4. MINHA ESCALA ─────────────────────────
 story.append(Paragraph("4. Minha Escala (suas missões) \U0001F3AF", st_h1))
 story.append(Paragraph(
-    "É a área mais importante para você. Aqui aparecem os eventos em que você foi "
-    "<b>escalado</b> para tocar ou cantar, com a data, o horário, a sua função e o "
-    "<b>local</b>.", st_body))
+    "Aqui ficam todas as celebrações em que você foi escalado, da mais próxima para a mais "
+    "distante. Em cada uma você vê a <b>data</b>, o <b>horário</b>, o <b>local</b> e a sua "
+    "<b>função</b> (violão, vocal, teclado…).", st_body))
 story.append(Paragraph("Confirmar presença", st_h2))
-story.append(Paragraph("Em cada missão você responde se pode ir:", st_body))
-story.extend(bullets([
-    "<b>✅ Posso</b> — confirma que você estará presente.",
-    "<b>❌ Não posso</b> — avisa que não poderá ir naquela data.",
-]))
 story.append(Paragraph(
-    "Se marcar <b>Não posso</b>, você pode <b>indicar um substituto</b>: o app envia um "
-    "convite para o outro membro, que aceita ou recusa. Assim o coordenador fica sabendo "
-    "na hora.", st_body))
-story.append(dica("Confirme sua presença o quanto antes. Isso ajuda demais o coordenador "
-                  "a organizar a equipe de cada celebração. \U0001F64F"))
-
+    "Ao abrir uma missão, você responde se vai poder ir:", st_body))
+for p in bullets([
+    "Toque em <b>✅ Confirmar</b> se você vai.",
+    "Toque em <b>❌ Não poderei</b> se não conseguir ir.",
+]): story.append(p)
+story.append(Paragraph(
+    "O coordenador vê na hora quem confirmou e quem ainda não respondeu. Você pode trocar "
+    "a sua resposta a qualquer momento.", st_body))
+story.append(dica("Confirme o quanto antes! Isso ajuda demais o coordenador a organizar a equipe."))
 story.append(PageBreak())
 
-# ───────────────────────── 5. MÚSICAS ─────────────────────────
-story.append(Paragraph("5. Biblioteca de Músicas \U0001F3B8", st_h1))
+# ───────────────────────── 5. MURAL DE ENSAIOS ─────────────────────────
+story.append(Paragraph("5. Mural de Ensaios \U0001F3BC", st_h1))
 story.append(Paragraph(
-    "Toque em <b>Músicas</b> para ver todo o repertório. Use a <b>busca</b> no topo para "
-    "achar pelo nome ou pelo artista, ou filtre pelo <b>tom</b>.", st_body))
-story.append(Paragraph("Ao abrir uma música você encontra:", st_h2))
-story.extend(bullets([
-    "<b>Player</b> — ouça no YouTube, Spotify ou Deezer (precisa de internet).",
-    "<b>Cifra e letra</b> — para acompanhar e estudar.",
-    "<b>Transpor o tom</b> — suba ou desça o tom da cifra conforme a sua voz/instrumento.",
-    "<b>Partitura em PDF</b> — quando disponível, dá para abrir e baixar.",
-    "<b>Mixer</b> — em algumas músicas, separe os instrumentos (voz, violão, bateria…) "
-    "para estudar cada parte.",
-]))
-story.append(dica("No <b>Mixer</b>, toque em <b>M</b> para silenciar um instrumento e "
-                  "<b>S</b> para ouvir só ele (solo). Ótimo para treinar a sua parte!"))
+    "Na tela inicial fica o <b>Mural de Ensaios</b> com os próximos ensaios marcados pelo "
+    "coordenador. Em cada ensaio você vê data, horário e local (com botões de "
+    "<b>Google Maps</b> e <b>Waze</b> para chegar).", st_body))
+for p in bullets([
+    "Toque em <b>✅ Vou</b> para confirmar que estará no ensaio.",
+    "Toque em <b>❌ Não vou</b> caso não consiga.",
+]): story.append(p)
+story.append(caixa("Lembrete automático",
+    "Se você confirmar presença, o app te <b>lembra na véspera e no dia</b> do ensaio — "
+    "para você não esquecer. \U0001F514"))
 
-# ───────────────────────── 6. SET LISTS ─────────────────────────
-story.append(Paragraph("6. Set Lists \U0001F4CB", st_h1))
+# ───────────────────────── 6. BIBLIOTECA ─────────────────────────
+story.append(Paragraph("6. Biblioteca de Músicas \U0001F3B8", st_h1))
 story.append(Paragraph(
-    "O <b>Set List</b> é a sequência de músicas de cada celebração, na ordem em que serão "
-    "tocadas — muitas vezes separadas por momentos (entrada, ofertório, comunhão…). "
-    "Toque em uma música do set list para abrir a cifra e o player na hora.", st_body))
-
-# ───────────────────────── 7. PLAYLIST ─────────────────────────
-story.append(Paragraph("7. Playlist ▶️", st_h1))
-story.append(Paragraph(
-    "Na <b>Playlist</b> você ouve as músicas em sequência, direto pelo YouTube ou Spotify. "
-    "Dá para tocar todo o repertório ou só as músicas de um set list — perfeito para se "
-    "preparar no caminho para o ensaio.", st_body))
-
-# ───────────────────────── 8. AGENDA ─────────────────────────
-story.append(Paragraph("8. Agenda \U0001F4C5", st_h1))
-story.append(Paragraph(
-    "A <b>Agenda</b> mostra o calendário do ano com todos os eventos e os cultos semanais. "
-    "Os dias com evento ficam destacados — e os dias em que <b>você</b> está escalado também.", st_body))
-story.extend(bullets([
-    "Toque em um <b>dia</b> para ver o(s) evento(s) daquela data.",
-    "Se houver mais de um evento no mesmo dia, o app mostra a lista para você escolher.",
-    "Dentro do evento você vê a <b>escala</b>, o <b>horário</b> e o <b>endereço</b>.",
-]))
-story.append(caixa("\U0001F4CD  Como chegar",
-    "Quando o evento tem endereço, aparecem os botões <b>Google Maps</b> e <b>Waze</b>. "
-    "Toque e o app de navegação abre a rota direto para o local. \U0001F697"))
-
+    "Toque em qualquer música para abrir e ver tudo sobre ela. Para encontrar rápido, use:", st_body))
+for p in bullets([
+    "A <b>busca</b> por nome da música ou do artista.",
+    "O filtro por <b>tom</b> e por <b>momento</b> (Entrada, Comunhão, Adoração…).",
+    "A <b>estrela ★</b> para marcar suas <b>favoritas</b> e filtrar só elas.",
+]): story.append(p)
+story.append(Paragraph("Dentro de cada música você encontra", st_h2))
+for p in bullets([
+    "<b>Player</b> do YouTube, Spotify e Deezer para ouvir.",
+    "<b>Cifra</b> com botões de <b>tom</b> (+ / −) para subir ou descer e cantar no seu tom.",
+    "<b>Tom por vocalista:</b> o tom em que cada cantor canta melhor aquela música.",
+    "<b>Mixer</b> (quando disponível): separe os instrumentos e estude a sua parte.",
+    "<b>PDF</b> da cifra, quando anexado.",
+    "<b>\U0001F4AC Conversa:</b> deixe um recado ou tire dúvidas sobre a música com a equipe.",
+]): story.append(p)
+story.append(dica("Marque suas músicas favoritas ★ — assim você monta sua lista de estudo "
+                  "e encontra tudo num toque."))
 story.append(PageBreak())
 
-# ───────────────────────── 9. OUTROS ─────────────────────────
-story.append(Paragraph("9. Financeiro e Inventário", st_h1))
+# ───────────────────────── 7. SET LISTS ─────────────────────────
+story.append(Paragraph("7. Set Lists (repertório) \U0001F4CB", st_h1))
 story.append(Paragraph(
-    "Você pode <b>acompanhar</b> (apenas visualizar) a prestação de contas no "
-    "<b>Financeiro</b> — entradas, saídas e saldo — e o <b>Inventário</b> com os "
-    "equipamentos e instrumentos do ministério. Só o coordenador faz lançamentos.", st_body))
+    "O <b>set list</b> é a ordem das músicas de uma celebração. Toque para abrir e ver a "
+    "sequência completa, com o tom de cada uma. Ao tocar numa música da lista, ela abre "
+    "direto na Biblioteca para você estudar.", st_body))
+story.append(caixa("Repertório no evento",
+    "Ao abrir um evento na Agenda, além da escala você vê o <b>repertório na ordem</b> "
+    "(com tom e momento de cada música) — basta tocar para abrir a música."))
 
-story.append(Paragraph("10. Aniversários \U0001F389", st_h1))
+# ───────────────────────── 8. PLAYLIST ─────────────────────────
+story.append(Paragraph("8. Playlist ▶️", st_h1))
 story.append(Paragraph(
-    "No dia do aniversário de um membro, o app mostra um aviso para todos celebrarem juntos. "
-    "Não esqueça de parabenizar seu irmão(ã)! \U0001F382", st_body))
+    "A Playlist toca as músicas em sequência, ótima para estudar no carro ou em casa. "
+    "Você escolhe a plataforma (YouTube, Spotify…) e vai passando de uma para a outra.", st_body))
 
-# ───────────────────────── DÚVIDAS ─────────────────────────
+# ───────────────────────── 9. AGENDA ─────────────────────────
+story.append(Paragraph("9. Agenda \U0001F4C5", st_h1))
+story.append(Paragraph(
+    "O calendário mostra todos os eventos do ministério. Toque num dia para ver o evento "
+    "(se houver mais de um no mesmo dia, o app mostra as opções).", st_body))
+for p in bullets([
+    "Veja <b>data, horário e local</b> de cada evento.",
+    "Use os botões <b>Google Maps</b> e <b>Waze</b> para chegar no local.",
+    "Veja a <b>escala</b>, o <b>repertório</b> e <b>confirme sua presença</b>.",
+    "Deixe um recado na <b>\U0001F4AC Conversa</b> do evento.",
+]): story.append(p)
+
+# ───────────────────────── 10. NOTIFICACOES E CONVERSA ─────────────────────────
+story.append(Paragraph("10. Notificações e Conversa", st_h1))
+story.append(Paragraph("\U0001F514 Notificações", st_h2))
+story.append(Paragraph(
+    "Na tela inicial, toque em <b>Ativar notificações</b> e permita quando o celular perguntar. "
+    "Assim você é avisado quando o coordenador <b>publica um aviso</b> ou <b>marca um ensaio</b> "
+    "(com o app aberto ou em segundo plano).", st_body))
+story.append(Paragraph("\U0001F4AC Conversa", st_h2))
+story.append(Paragraph(
+    "Cada música e cada evento têm um espaço de <b>conversa</b>. Escreva sua mensagem e toque "
+    "em <b>Enviar</b>. Todos da equipe veem. Você pode <b>excluir</b> as suas próprias mensagens.",
+    st_body))
+story.append(dica("Use a Conversa para combinar detalhes do ensaio, tirar dúvidas de uma música "
+                  "ou só incentivar a equipe. \U0001F64C"))
+
+# ───────────────────────── 11. ANIVERSARIOS ─────────────────────────
+story.append(Paragraph("11. Aniversários \U0001F389", st_h1))
+story.append(Paragraph(
+    "O app guarda o seu aniversário (informado no cadastro) e mostra os aniversariantes do mês. "
+    "Assim ninguém esquece de celebrar os irmãos do ministério!", st_body))
+story.append(PageBreak())
+
+# ───────────────────────── FAQ ─────────────────────────
 story.append(Paragraph("Dúvidas frequentes", st_h1))
 faq = [
     ("O app está sem novidades / desatualizado?",
-     "Abra o app com internet — ele se atualiza sozinho. No iPhone, se algo não mudar, "
-     "remova o ícone e instale de novo pelo Safari."),
+     "Abra o app com internet e toque no ☁ no topo para atualizar. No iPhone, se algo não "
+     "mudar, remova o ícone e instale de novo pelo Safari."),
     ("Preciso de internet para tudo?",
-     "Não. Ver escalas, cifras e a agenda funciona offline. Só <b>tocar</b> vídeos e "
-     "áudios (YouTube, Spotify, mixer) precisa de conexão."),
+     "Para ver as informações, o básico funciona offline. Para <b>tocar</b> vídeos e áudios "
+     "(YouTube, Spotify, mixer) e para <b>sincronizar</b> dados novos, você precisa de conexão."),
+    ("As coisas que envio aparecem nos outros celulares?",
+     "Sim. Confirmações, conversas e tudo o mais ficam guardados na nuvem. Em outro aparelho, "
+     "toque no ☁ no topo para puxar as novidades."),
     ("Troquei de celular. E meus dados?",
      "É só instalar o app no novo aparelho e entrar com seu usuário e senha."),
-    ("Vou faltar em uma escala. O que faço?",
-     "Em Minha Escala, marque <b>Não posso</b> e, se possível, <b>indique um substituto</b>."),
+    ("Vou faltar em uma escala ou ensaio. O que faço?",
+     "Abra a missão (ou o ensaio) e marque <b>Não poderei / Não vou</b>. O coordenador é avisado."),
 ]
 for q, a in faq:
     story.append(Paragraph(f"<b>{q}</b>", st_h2))
@@ -307,6 +341,7 @@ story.append(Paragraph(
     "Qualquer dúvida, fale com o coordenador do ministério. Que Deus abençoe o seu serviço "
     "e a sua entrega! \U0001F3B6\U0001F64F",
     S('end', fontName='Helvetica-Oblique', fontSize=10.5, textColor=VERDE_ESC, leading=15)))
+
 
 # ── build ──
 doc = SimpleDocTemplate("Manual-do-Membro-Hallel.pdf", pagesize=A4,
