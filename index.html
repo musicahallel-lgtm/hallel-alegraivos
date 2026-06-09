@@ -2394,8 +2394,9 @@ function doLogin() {
             } else {
                 // Check substitution notifications first, then mission alert
                 const showPersonal = () => { if (!checkSubNotifications(member)) showMissionAlert(member); };
-                // Aniversário do dia aparece primeiro; ao fechar, mostra os alertas pessoais
-                if (!maybeShowBirthday({ then: showPersonal })) showPersonal();
+                const afterTour = () => { if (!maybeShowBirthday({ then: showPersonal })) showPersonal(); };
+                // Mostra o tour 1x por dispositivo; depois aniversário e alertas pessoais
+                maybeShowTour(afterTour);
             }
         }, 300);
         return;
@@ -2913,6 +2914,7 @@ function modalHtml() {
     if (type==='member-form')  return memberFormModal(data);
     if (type==='first-access') return firstAccessModal(data);
     if (type==='bem-vindo')    return bemVindoModal(data);
+    if (type==='tour')         return tourModal(data);
     if (type==='wa-escala')        return waEscalaModal(data);
     if (type==='sub-picker')       return subPickerModal(data);
     if (type==='sub-request')      return subRequestModal(data);
@@ -4535,7 +4537,83 @@ function fecharBemVindo(memberId) {
     const member = S.members.find(m=>m.id===memberId);
     S.modal = null;
     render();
-    if (member) setTimeout(() => showMissionAlert(member), 400);
+    // Primeiro acesso: mostra o tour guiado e, ao terminar, o alerta de missão
+    setTimeout(() => maybeShowTour(() => { if (member) showMissionAlert(member); }), 350);
+}
+
+// ══════════════════════════════════════════════════════════
+//  TOUR GUIADO — explica cada área no primeiro acesso
+// ══════════════════════════════════════════════════════════
+let _tourThen = null;
+function _tourSteps() {
+    const base = [
+        { key:'inicio', emoji:'🏠', title:'Tela Inicial', oque:'É a sua central. Aqui aparecem os avisos importantes, os lembretes das suas escalas, os próximos ensaios e os atalhos para todas as áreas.', porque:'É por onde você começa — dá pra ver tudo de relevante num olhar só.' },
+        { key:'minha-escala', title:'Minha Escala', oque:'Mostra todas as celebrações em que você foi escalado: data, horário, local e a sua função (vocal, violão, teclado…).', porque:'É onde você confirma sua presença (✅ Vou / ❌ Não posso). Confirmar cedo ajuda muito o coordenador a montar a equipe.' },
+        { key:'library', title:'Biblioteca de Músicas', oque:'Todas as músicas do ministério: vídeo, cifra com transposição de tom, mixer para estudar cada instrumento, PDF e o tom de cada vocalista.', porque:'É onde você estuda a música ANTES do ensaio e da missão. Use a ★ para marcar suas favoritas.' },
+        { key:'setlists', title:'Set Lists', oque:'A ordem das músicas de cada celebração — qual entra na entrada, no ofertório, na comunhão…', porque:'Pra você saber a sequência exata e não se perder durante a missa.' },
+        { key:'playlist', title:'Playlist', oque:'Toca as músicas em sequência, uma após a outra (YouTube, Spotify…).', porque:'Ótimo pra ensaiar em casa ou no carro, ouvindo o repertório de ponta a ponta.' },
+        { key:'agenda', title:'Agenda', oque:'O calendário com todos os eventos. Toque num dia para ver o evento, o local (com Google Maps e Waze), a escala e o repertório.', porque:'Pra você se organizar e nunca perder uma data ou chegar atrasado.' },
+        { key:'financeiro', title:'Financeiro', oque:'A prestação de contas do ministério: entradas, saídas e saldo.', porque:'Transparência — todos podem acompanhar como os recursos são usados.' },
+        { key:'inventario', title:'Inventário', oque:'A lista dos materiais e equipamentos do ministério (instrumentos, cabos, microfones…) e o estado de cada um.', porque:'Pra cuidarmos bem do que é de todos e saber o que precisa de manutenção.' },
+        { key:'comunicacao', emoji:'💬', title:'Avisos, Conversa e Notificações', oque:'Avisos urgentes aparecem na tela inicial. Cada música e evento tem uma Conversa. E dá pra ativar notificações no celular.', porque:'Pra equipe ficar sempre alinhada e ninguém ficar de fora dos recados.' },
+    ];
+    return base;
+}
+function maybeShowTour(then) {
+    if (localStorage.getItem('hl_tour_done')) { if (then) then(); return false; }
+    _tourThen = then || null;
+    S.modal = { type:'tour', data:{ step:0 } };
+    render();
+    return true;
+}
+function startTour() { _tourThen = null; localStorage.removeItem('hl_tour_done'); S.modal = { type:'tour', data:{ step:0 } }; render(); }
+function tourNav(dir) {
+    if (!S.modal || S.modal.type!=='tour') return;
+    const steps = _tourSteps();
+    let s = S.modal.data.step + dir;
+    if (s < 0) s = 0;
+    if (s >= steps.length) { fecharTour(); return; }
+    S.modal.data.step = s;
+    render();
+}
+function fecharTour() {
+    localStorage.setItem('hl_tour_done', '1');
+    S.modal = null;
+    render();
+    const t = _tourThen; _tourThen = null;
+    if (t) setTimeout(t, 300);
+}
+function tourModal({ step }) {
+    const steps = _tourSteps();
+    const i = Math.max(0, Math.min(step||0, steps.length-1));
+    const s = steps[i];
+    const icon = s.emoji ? `<div style="font-size:46px;line-height:1">${s.emoji}</div>`
+                         : `<span class="app-icon" style="width:72px;height:72px;border-radius:18px;background:linear-gradient(145deg,#00963F,#006b2d);display:inline-flex;align-items:center;justify-content:center">${svgIconDuo(s.key)}</span>`;
+    const dots = steps.map((_,k)=>`<span style="width:${k===i?'22px':'8px'};height:8px;border-radius:5px;background:${k===i?'#FFD400':'rgba(255,255,255,.25)'};transition:width .2s;display:inline-block"></span>`).join('');
+    return `<div class="mission-backdrop" onclick="">
+    <div class="mission-card" style="max-width:440px;text-align:center;background:linear-gradient(160deg,#0a1a0f 0%,#0d1f2d 100%);border:2px solid rgba(0,150,63,.4)">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px">
+            <span style="font-size:11px;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.8px">Passo ${i+1} de ${steps.length}</span>
+            <span onclick="fecharTour()" style="cursor:pointer;font-size:12px;color:rgba(255,255,255,.45)">Pular tour ✕</span>
+        </div>
+        <div style="margin-bottom:16px">${icon}</div>
+        <div style="font-size:23px;font-weight:900;color:#FFD400;margin-bottom:14px">${s.title}</div>
+        <div style="background:rgba(0,150,63,.12);border:1px solid rgba(0,150,63,.3);border-left:4px solid #00963F;border-radius:12px;padding:13px 15px;margin-bottom:12px;text-align:left">
+            <div style="font-size:11px;color:var(--purple-light);font-weight:800;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">O que é</div>
+            <div style="font-size:13px;color:rgba(255,255,255,.85);line-height:1.6">${s.oque}</div>
+        </div>
+        <div style="background:rgba(255,212,0,.08);border:1px solid rgba(255,212,0,.25);border-radius:12px;padding:13px 15px;margin-bottom:20px;text-align:left">
+            <div style="font-size:11px;color:#ffe066;font-weight:800;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Por que importa</div>
+            <div style="font-size:13px;color:rgba(255,255,255,.85);line-height:1.6">${s.porque}</div>
+        </div>
+        <div style="display:flex;gap:6px;justify-content:center;align-items:center;margin-bottom:18px">${dots}</div>
+        <div style="display:flex;gap:10px">
+            ${i>0?`<button class="mission-btn" onclick="tourNav(-1)" style="flex:1;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.2)">← Voltar</button>`:''}
+            <button class="mission-btn" onclick="tourNav(1)" style="flex:2;background:linear-gradient(90deg,#00963F,#2db85a)">
+                ${i===steps.length-1?'✨ Começar a usar!':'Próximo →'}
+            </button>
+        </div>
+    </div></div>`;
 }
 
 // ── Trocar senha (para membros já logados) ────────────────────────
