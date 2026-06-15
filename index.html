@@ -6551,7 +6551,7 @@ function printRelatorio(mesNome) {
     recDates.forEach(ev => { if (!recGroups[ev.recId]) recGroups[ev.recId]=[];  recGroups[ev.recId].push(ev); });
 
     function fmtD(ds) { const [y,m,d]=ds.split('-'); return `${parseInt(d)}/${parseInt(m)}/${y}`; }
-    function escHtml(esc) {
+    function escalaToHtml(esc) {
         if (!esc) return '<em style="color:#999">Sem escala</em>';
         const filled = EV_INSTR.filter(({k})=>esc[k]);
         if (!filled.length) return '<em style="color:#999">Sem escala definida</em>';
@@ -6575,7 +6575,7 @@ function printRelatorio(mesNome) {
         return `<div class="ev-block">
             <div class="ev-title">${ev.alegrai?'⭐ ':''}${ev.title}</div>
             <div class="ev-meta">📅 ${dt}${ev.horario?' · ⏰ '+ev.horario:''}</div>
-            <div class="ev-escala">${escHtml(esc)}</div>
+            <div class="ev-escala">${escalaToHtml(esc)}</div>
             ${slHtml(esc)}
         </div>`;
     }).join('');
@@ -6587,7 +6587,7 @@ function printRelatorio(mesNome) {
             const esc = S.escalas[ev.id]||{};
             return `<tr>
                 <td style="padding:5px 10px;font-weight:600;white-space:nowrap;border-bottom:1px solid #eee">${fmtD(ev.start)}</td>
-                <td style="padding:5px 10px;border-bottom:1px solid #eee">${escHtml(esc)}</td>
+                <td style="padding:5px 10px;border-bottom:1px solid #eee">${escalaToHtml(esc)}</td>
                 <td style="padding:5px 10px;border-bottom:1px solid #eee">${slHtml(esc)}</td>
             </tr>`;
         }).join('');
