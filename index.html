@@ -2400,8 +2400,10 @@ function doLogin() {
         }, 800);
         return;
     }
-    // Check member credentials
-    const member = S.members.find(m => m.user.toLowerCase() === user && m.pass === pass);
+    // Check member credentials — exige usuário E senha preenchidos (impede login vazio)
+    const member = (user && pass)
+        ? S.members.find(m => m.user && m.pass && m.user.toLowerCase() === user && m.pass === pass)
+        : null;
     if (member) {
         const accessRole = member.accessRole || 'membro';
         S.role = accessRole;
