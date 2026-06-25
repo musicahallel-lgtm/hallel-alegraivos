@@ -2569,7 +2569,7 @@ function ic(key, size=18) {
     return `<svg viewBox="0 0 24 24" width="${size}" height="${size}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-.18em;flex-shrink:0" aria-hidden="true">${ICONS[key]||''}</svg>`;
 }
 // Ícone de instrumento (reusa os glifos do mixer) — para uso DENTRO do app
-const INSTR_GLYPH = { violao:'acoustic', teclado:'piano', bateria:'drum', baixo:'guitar', guitarra:'guitar', sopro:'wind', vocal1:'mic', vocal2:'mic', vocal3:'mic', animador:'mic', salmo:'mic' };
+const INSTR_GLYPH = { violao:'acoustic', teclado:'piano', bateria:'drum', baixo:'guitar', guitarra:'guitar', sopro:'wind', vocal1:'mic', vocal2:'mic', vocal3:'mic', animador:'mic', salmo:'mic', sobreaviso:'speaker' };
 function instrIcon(k, size=15) {
     const g = STEM_ICONS[INSTR_GLYPH[k]] || STEM_ICONS.speaker;
     return `<svg viewBox="0 0 24 24" width="${size}" height="${size}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-.18em;flex-shrink:0" aria-hidden="true">${g}</svg>`;
@@ -7055,7 +7055,7 @@ const EV_INSTR = [
     {k:'guitarra',emoji:'🎸',label:'Guitarra'},{k:'sopro',emoji:'🎷',label:'Sopro'},
     {k:'vocal1',emoji:'🎤',label:'Vocal 1'},{k:'vocal2',emoji:'🎤',label:'Vocal 2'},
     {k:'vocal3',emoji:'🎤',label:'Vocal 3'},{k:'salmo',emoji:'📖',label:'Salmo'},
-    {k:'animador',emoji:'🎙',label:'Animador'},
+    {k:'animador',emoji:'🎙',label:'Animador'},{k:'sobreaviso',emoji:'🔔',label:'Sobreaviso'},
 ];
 
 function eventoModal(ev) {
