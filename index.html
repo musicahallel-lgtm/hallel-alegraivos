@@ -1060,6 +1060,9 @@ const EVENTOS_2026 = [
   {id:'e37',title:'Novena — Igreja Nossa Senhora do Perpétuo Socorro', start:'2026-06-20',end:'2026-06-20', local:'Igreja Nossa Senhora do Perpétuo Socorro'},
   {id:'e38',title:'Missa e Adoração — Paróquia de São Sebastião',      start:'2026-06-20',end:'2026-06-20', local:'Largo de São Sebastião'},
   {id:'e18',title:'Missa de Aniversário da Fundadora',              start:'2026-06-27',end:'2026-06-27'},
+  {id:'ej01',title:'Missa / Vigília',                               start:'2026-07-03',end:'2026-07-03', horario:'19:00'},
+  {id:'ej02',title:'Missa / Adoração (Segunda-feira)',              start:'2026-07-20',end:'2026-07-20'},
+  {id:'ej03',title:'Missa / Vigília',                               start:'2026-08-07',end:'2026-08-07', horario:'19:00'},
   {id:'e19',title:'Festa Julina',                                   start:'2026-07-11',end:'2026-07-11'},
   {id:'e20',title:'Congresso das Novas Comunidades',                start:'2026-07-18',end:'2026-07-19'},
   {id:'e21',title:'Acampamento RD Teens',                           start:'2026-07-24',end:'2026-07-26'},
@@ -2566,7 +2569,7 @@ function ic(key, size=18) {
     return `<svg viewBox="0 0 24 24" width="${size}" height="${size}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-.18em;flex-shrink:0" aria-hidden="true">${ICONS[key]||''}</svg>`;
 }
 // Ícone de instrumento (reusa os glifos do mixer) — para uso DENTRO do app
-const INSTR_GLYPH = { violao:'acoustic', teclado:'piano', bateria:'drum', baixo:'guitar', guitarra:'guitar', sopro:'wind', vocal1:'mic', vocal2:'mic', vocal3:'mic', animador:'mic' };
+const INSTR_GLYPH = { violao:'acoustic', teclado:'piano', bateria:'drum', baixo:'guitar', guitarra:'guitar', sopro:'wind', vocal1:'mic', vocal2:'mic', vocal3:'mic', animador:'mic', salmo:'mic' };
 function instrIcon(k, size=15) {
     const g = STEM_ICONS[INSTR_GLYPH[k]] || STEM_ICONS.speaker;
     return `<svg viewBox="0 0 24 24" width="${size}" height="${size}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-.18em;flex-shrink:0" aria-hidden="true">${g}</svg>`;
@@ -7051,7 +7054,8 @@ const EV_INSTR = [
     {k:'bateria',emoji:'🥁',label:'Bateria'},{k:'baixo',emoji:'🎸',label:'Baixo'},
     {k:'guitarra',emoji:'🎸',label:'Guitarra'},{k:'sopro',emoji:'🎷',label:'Sopro'},
     {k:'vocal1',emoji:'🎤',label:'Vocal 1'},{k:'vocal2',emoji:'🎤',label:'Vocal 2'},
-    {k:'vocal3',emoji:'🎤',label:'Vocal 3'},{k:'animador',emoji:'🎙',label:'Animador'},
+    {k:'vocal3',emoji:'🎤',label:'Vocal 3'},{k:'salmo',emoji:'📖',label:'Salmo'},
+    {k:'animador',emoji:'🎙',label:'Animador'},
 ];
 
 function eventoModal(ev) {
