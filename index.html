@@ -3900,20 +3900,30 @@ function stopActTimer() {
 
 // ── Registro de SAÍDA do membro (entrada = 'login') ──────────────────
 let _saidaRegistrada = false;   // evita registrar saída repetida na mesma sessão
+let _lastLogoutAt    = 0;       // throttle: no máx. 1 saída a cada 3 min por sessão
 function trackLogout(motivo) {
     if (!S.currentMember || _saidaRegistrada) return;
+    // Trava anti-spam: trocar de aba/tela várias vezes não gera várias saídas
+    if (Date.now() - _lastLogoutAt < 180000) { _saidaRegistrada = true; return; }
     _saidaRegistrada = true;
+    _lastLogoutAt = Date.now();
     stopActTimer();
     S.activityLog.push({ id: uid(), memberId: S.currentMember.id,
         memberName: S.currentMember.name, type: 'logout', at: Date.now(), duration: 0, motivo: motivo||'' });
     if (S.activityLog.length > 500) S.activityLog = S.activityLog.slice(-500);
     persist(true); // imediato — tenta salvar antes de fechar
 }
-// Sai do app / troca de aba / bloqueia tela → registra saída (visibilitychange é
-// o evento mais confiável no celular; pagehide cobre o fechamento real)
+// Sai do app / fecha o app → registra saída. Só conta como saída quando fica
+// escondido por mais de alguns segundos (evita contar troca rápida de aba).
+let _hiddenTimer = null;
 document.addEventListener('visibilitychange', () => {
-    if (document.hidden) trackLogout('background');
-    else _saidaRegistrada = false; // voltou ao app: libera para registrar a próxima saída
+    if (document.hidden) {
+        clearTimeout(_hiddenTimer);
+        _hiddenTimer = setTimeout(() => trackLogout('background'), 8000); // só após 8s escondido
+    } else {
+        clearTimeout(_hiddenTimer);
+        _saidaRegistrada = false; // voltou ao app: libera a próxima saída
+    }
 });
 window.addEventListener('pagehide', () => trackLogout('fechou'));
 
