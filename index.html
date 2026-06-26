@@ -750,8 +750,8 @@
         /* ── Mission Alert ── */
         @keyframes missionPulse { 0%,100%{opacity:1} 50%{opacity:.82} }
         @keyframes missionEntry { from{opacity:0;transform:scale(.93) translateZ(0)} to{opacity:1;transform:scale(1) translateZ(0)} }
-        .mission-backdrop { position:fixed;inset:0;background:rgba(0,0,0,.93);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px; }
-        .mission-card { background:linear-gradient(160deg,#0f1923 0%,#1a1040 100%);border:2px solid var(--gold);border-radius:20px;padding:32px 28px;max-width:500px;width:100%;text-align:center;animation:missionEntry .35s ease forwards, missionPulse 3s ease 1s infinite;will-change:opacity; }
+        .mission-backdrop { position:fixed;inset:0;background:rgba(0,0,0,.93);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;overflow-y:auto; }
+        .mission-card { background:linear-gradient(160deg,#0f1923 0%,#1a1040 100%);border:2px solid var(--gold);border-radius:20px;padding:32px 28px;max-width:500px;width:100%;max-height:calc(100dvh - 32px);overflow-y:auto;margin:auto;text-align:center;animation:missionEntry .35s ease forwards;will-change:opacity;-webkit-overflow-scrolling:touch; }
         .mission-icon { font-size:56px; margin-bottom:8px; }
         .mission-title { font-size:26px; font-weight:900; color:var(--gold); letter-spacing:1px; margin-bottom:4px; }
         .mission-sub { font-size:13px; color:var(--muted); margin-bottom:24px; }
