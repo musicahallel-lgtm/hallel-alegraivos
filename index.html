@@ -1128,6 +1128,8 @@ async function initFirebase() {
         await _loadScript('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js');
         firebase.initializeApp(FIREBASE_CFG);
         _fbDB = firebase.firestore();
+        // Silencia avisos verbosos de reconexão do Firestore (mantém erros reais)
+        try { firebase.firestore.setLogLevel('error'); } catch(e) {}
 
         // ── Carrega dados do Firestore (única fonte da verdade) ──
         await carregaFirestore();
